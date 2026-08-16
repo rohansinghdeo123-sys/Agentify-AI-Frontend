@@ -7,7 +7,7 @@ import {
   getMissionPlan,
   getMissionQuestion,
   getMissionRoadmap,
-  getPlanningTimeFit,
+  getEstimatedPlanMinutes,
 } from "./contracts";
 import { usePlanningExperience } from "./PlanningExperience";
 import { PlanningLoading, PlanningScreen, planningStyles as styles } from "./PlanningScreen";
@@ -57,7 +57,7 @@ export default function PlanningActive() {
   const route = getMissionPlan(mission);
   const question = getMissionQuestion(mission);
   const roadmap = getMissionRoadmap(mission);
-  const timeFit = getPlanningTimeFit(activePlan);
+  const estimatedMinutes = getEstimatedPlanMinutes(activePlan);
   const handoffs = getPlanningHandoffs(scope, mission.mission_id);
   const strategyGroups = [
     { title: "High-priority concepts", items: mission.high_priority_concepts || [] },
@@ -99,12 +99,7 @@ export default function PlanningActive() {
         <div className={styles.summaryMetrics}>
           <div><span>Subject</span><strong>{scope.subject}</strong></div>
           <div><span>Chapter</span><strong>{scope.chapterLabel}</strong></div>
-          <div><span>Requested</span><strong>{activePlan.requestedMinutes} minutes</strong></div>
-          <div><span>Returned plan</span><strong>{timeFit.planned || "Timing unavailable"}{timeFit.planned ? " minutes" : ""}</strong></div>
-        </div>
-        <div className={styles.timeFit} data-state={timeFit.state} role="status">
-          <strong>{timeFit.label}</strong>
-          <span>{timeFit.detail}</span>
+          <div><span>Estimated duration</span><strong>{estimatedMinutes ? `About ${estimatedMinutes} minutes` : "Flexible pace"}</strong></div>
         </div>
       </section>
 
@@ -199,4 +194,3 @@ export default function PlanningActive() {
     </PlanningScreen>
   );
 }
-

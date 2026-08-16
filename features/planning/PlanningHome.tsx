@@ -4,13 +4,13 @@ import { AppIcon } from "@/components/ui/Polished";
 import { BUCKET_LABELS } from "@/lib/revision";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { formatPlanningLabel, getPlanningTimeFit } from "./contracts";
+import { formatPlanningLabel, getEstimatedPlanMinutes, getMissionPlan } from "./contracts";
 import { usePlanningExperience } from "./PlanningExperience";
 import { PlanningLoading, PlanningScreen, planningStyles as styles } from "./PlanningScreen";
 import { PLANNING_ROUTES } from "./routes";
 
 const JOURNEY = [
-  { number: "01", title: "Plan", detail: "Set one target and a real time window." },
+  { number: "01", title: "Plan", detail: "Select one target and generate a focused route." },
   { number: "02", title: "Study", detail: "Open the exact learning block in Study Lab." },
   { number: "03", title: "Revise", detail: "Protect recall with the guided revision route." },
   { number: "04", title: "Test", detail: "Check application in Exam Lab." },
@@ -32,7 +32,8 @@ export default function PlanningHome() {
 
   if (authBusy || !hydrated) return <PlanningLoading />;
 
-  const timeFit = getPlanningTimeFit(activePlan);
+  const estimatedMinutes = getEstimatedPlanMinutes(activePlan);
+  const blockCount = getMissionPlan(activePlan?.mission).length;
   const continueHref = activePlan?.checkpoint ? PLANNING_ROUTES.review : PLANNING_ROUTES.active;
 
   return (
@@ -53,19 +54,21 @@ export default function PlanningHome() {
           <h2>
             {activePlan
               ? `${activePlan.scope.topicLabel} is ready for focused work.`
-              : "Build a route that fits the time you actually have."}
+              : "Turn one topic into a route you can start now."}
           </h2>
           <p>
             {activePlan
               ? activePlan.mission.objective
-              : "Choose the chapter, topic, goal, and learning fit once. Planning will separate the route, checkpoint, and next action into calm workspaces."}
+              : "Choose the chapter, topic, and learning approach once. Planning will organise the route, checkpoint, and next action into calm workspaces."}
           </p>
           <div className={styles.focusMeta}>
             {activePlan ? (
               <>
                 <span className={styles.statusChip}>{activePlan.scope.subject}</span>
                 <span className={styles.statusChip}>{activePlan.scope.chapterLabel}</span>
-                <span className={styles.timeChip}>{timeFit.planned || activePlan.requestedMinutes} min plan</span>
+                <span className={styles.durationChip}>
+                  {estimatedMinutes ? `About ${estimatedMinutes} min` : `${blockCount} ${blockCount === 1 ? "block" : "blocks"}`}
+                </span>
                 <span className={styles.sourceChip} data-source={activePlan.catalogSource}>
                   {activePlan.catalogSource === "published" ? "Published syllabus" : "Starter catalog"}
                 </span>
@@ -73,7 +76,7 @@ export default function PlanningHome() {
             ) : (
               <>
                 <span className={styles.statusChip}>One topic</span>
-                <span className={styles.statusChip}>One time window</span>
+                <span className={styles.statusChip}>One focused route</span>
                 <span className={styles.statusChip}>One next action</span>
               </>
             )}
@@ -107,7 +110,7 @@ export default function PlanningHome() {
           <div className={styles.trustList}>
             <span>Plan snapshots stay on this device.</span>
             <span>Learning activity counts only after server confirmation.</span>
-            <span>Time fit is shown from the returned block total.</span>
+            <span>Plan duration is estimated from the generated learning blocks.</span>
           </div>
         </aside>
       </section>
@@ -175,4 +178,3 @@ export default function PlanningHome() {
     </PlanningScreen>
   );
 }
-

@@ -1,4 +1,9 @@
-import type { PlanningDraft, PlanningPlan } from "./contracts";
+import {
+  normalizePlanningDraft,
+  normalizePlanningPlan,
+  type PlanningDraft,
+  type PlanningPlan,
+} from "./contracts";
 
 const VERSION = "v3";
 
@@ -26,7 +31,7 @@ function writeJSON(storageKey: string, value: unknown) {
 }
 
 export function readPlanningDraft(userId: string) {
-  return readJSON<PlanningDraft>(key(userId, "draft"));
+  return normalizePlanningDraft(readJSON<unknown>(key(userId, "draft")));
 }
 
 export function writePlanningDraft(userId: string, draft: PlanningDraft) {
@@ -34,7 +39,7 @@ export function writePlanningDraft(userId: string, draft: PlanningDraft) {
 }
 
 export function readActivePlanningPlan(userId: string) {
-  return readJSON<PlanningPlan>(key(userId, "active"));
+  return normalizePlanningPlan(readJSON<unknown>(key(userId, "active")));
 }
 
 export function writeActivePlanningPlan(userId: string, plan: PlanningPlan) {
@@ -51,8 +56,10 @@ export function clearActivePlanningPlan(userId: string) {
 }
 
 export function readPlanningHistory(userId: string) {
-  const history = readJSON<PlanningPlan[]>(key(userId, "history"));
-  return Array.isArray(history) ? history.slice(0, 12) : [];
+  const history = readJSON<unknown>(key(userId, "history"));
+  return Array.isArray(history)
+    ? history.map(normalizePlanningPlan).filter((plan): plan is PlanningPlan => Boolean(plan)).slice(0, 12)
+    : [];
 }
 
 export function writePlanningHistory(userId: string, plans: PlanningPlan[]) {
@@ -65,4 +72,3 @@ export function mergePlanningHistory(history: PlanningPlan[], plan: PlanningPlan
     ...history.filter((entry) => entry.mission.mission_id !== plan.mission.mission_id),
   ].slice(0, 12);
 }
-

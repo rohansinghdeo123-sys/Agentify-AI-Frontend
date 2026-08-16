@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
-import { reconcileSelection, useCatalog } from "@/lib/catalog";
+import { findCatalogTopic, reconcileSelection, useCatalog } from "@/lib/catalog";
 import type { RevisionEntry } from "@/lib/revision";
 import {
   createContext,
@@ -75,7 +75,7 @@ type PlanningExperienceValue = {
   setScope: (chapter: string, topic: string) => void;
   setChapter: (chapter: string) => void;
   setTopic: (topic: string) => void;
-  updateProfile: (key: keyof PlanningProfile, value: string) => void;
+  updateProfile: (key: keyof PlanningProfile, value: PlanningProfile[keyof PlanningProfile]) => void;
   applyRadarTopic: (entry: RevisionEntry) => boolean;
   createPlan: (signal?: AbortSignal) => Promise<PlanningPlan | null>;
   submitCheckpoint: (input: CheckpointInput, signal?: AbortSignal) => Promise<PlanningCheckpointResult | null>;
@@ -205,7 +205,10 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     setScope(draft.chapter, topic);
   }, [draft.chapter, setScope]);
 
-  const updateProfile = useCallback((key: keyof PlanningProfile, value: string) => {
+  const updateProfile = useCallback((
+    key: keyof PlanningProfile,
+    value: PlanningProfile[keyof PlanningProfile],
+  ) => {
     if (draft.profile[key] === value) return;
     retireActivePlan();
     setDraft((current) => ({
@@ -216,11 +219,8 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
   }, [draft.profile, retireActivePlan]);
 
   const applyRadarTopic = useCallback((entry: RevisionEntry) => {
-    const normalized = entry.topic.trim().toLowerCase();
     for (const chapter of chapters) {
-      const match = chapter.topics.find(
-        (topic) => topic.value.toLowerCase() === normalized || topic.label.toLowerCase() === normalized,
-      );
+      const match = findCatalogTopic(chapter, entry.topic);
       if (match) {
         setScope(chapter.value, match.value);
         return true;
@@ -231,11 +231,6 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
 
   const createPlan = useCallback(async (signal?: AbortSignal) => {
     if (!userId || authBusy || generating) return null;
-    const requestedMinutes = Number(draft.profile.availableMinutes);
-    if (!Number.isFinite(requestedMinutes) || requestedMinutes < 10 || requestedMinutes > 240) {
-      setError("Enter an available time between 10 and 240 minutes before building the plan.");
-      return null;
-    }
     setGenerating(true);
     setError("");
     const startedAt = Date.now();
@@ -251,7 +246,6 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
         scope,
         profile: { ...draft.profile },
         catalogSource: source === "published" ? "published" : "starter",
-        requestedMinutes,
         createdAt: new Date().toISOString(),
         responseLatencyMs: Date.now() - startedAt,
       };

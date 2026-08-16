@@ -1,9 +1,16 @@
 .screen {
   --plan-ink: var(--ds-text-primary);
+  --plan-secondary: var(--ds-text-secondary);
   --plan-muted: var(--ds-text-muted);
+  --plan-disabled: var(--ds-text-disabled);
   --plan-line: var(--ds-border);
   --plan-teal: var(--ds-accent-teal);
   --plan-gold: var(--ds-accent-gold);
+  --plan-field-bg: var(--ds-surface);
+  --plan-field-text: #263449;
+  --plan-field-placeholder: #7a8799;
+  --plan-field-border: var(--ds-border);
+  --plan-field-hover: var(--ds-border-strong);
   --plan-success-ink: #0b6b62;
   --plan-danger-ink: #b42335;
   position: relative;
@@ -20,6 +27,15 @@
 }
 
 :global([data-theme="dark"]) .screen {
+  --plan-ink: #e8eef6;
+  --plan-secondary: #bdc9d8;
+  --plan-muted: #91a2b7;
+  --plan-disabled: #64748b;
+  --plan-field-bg: #111d2e;
+  --plan-field-text: #dce7f5;
+  --plan-field-placeholder: #78899f;
+  --plan-field-border: rgba(148, 163, 184, 0.24);
+  --plan-field-hover: rgba(94, 234, 212, 0.46);
   --plan-success-ink: var(--ds-success);
   --plan-danger-ink: var(--ds-danger);
 }
@@ -109,7 +125,7 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--ds-surface-elevated) 92%, transparent);
   box-shadow: var(--ds-shadow-sm);
-  color: var(--ds-text-secondary);
+  color: var(--plan-secondary);
   font-size: 0.75rem;
   font-weight: 780;
 }
@@ -190,7 +206,7 @@
 .historyAction {
   border: 1px solid var(--plan-line);
   background: color-mix(in srgb, var(--ds-surface-elevated) 94%, transparent);
-  color: var(--ds-text-secondary);
+  color: var(--plan-secondary);
 }
 
 .quietButton {
@@ -212,12 +228,16 @@
 .primaryButton:disabled,
 .secondaryButton:disabled {
   cursor: not-allowed;
-  opacity: 0.52;
+  border-color: var(--ds-border-subtle);
+  background: var(--ds-bg-subtle);
+  box-shadow: none;
+  color: var(--plan-disabled);
+  opacity: 1;
 }
 
 .statusChip,
 .sourceChip,
-.timeChip,
+.durationChip,
 .modeChip {
   display: inline-flex;
   min-height: 1.8rem;
@@ -364,7 +384,7 @@
   display: flex;
   align-items: flex-start;
   gap: 0.45rem;
-  color: var(--ds-text-secondary);
+  color: var(--plan-secondary);
   font-size: 0.75rem;
   line-height: 1.45;
 }
@@ -448,7 +468,7 @@
   justify-content: space-between;
   border: 1px solid var(--ds-border-subtle);
   background: var(--ds-surface-elevated);
-  color: var(--ds-text-secondary);
+  color: var(--plan-secondary);
   text-align: left;
 }
 
@@ -478,6 +498,12 @@
 .radarButton:disabled {
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+.radarButton:hover:not(:disabled) {
+  border-color: var(--plan-field-hover);
+  background: var(--ds-bg-subtle);
+  color: var(--plan-ink);
 }
 
 .journeyRow {
@@ -519,13 +545,12 @@
 .stateMessage,
 .alert,
 .notice,
-.sourceNotice,
-.timeFit {
+.sourceNotice {
   padding: 0.85rem 0.95rem;
   border: 1px solid var(--ds-border-subtle);
   border-radius: 0.85rem;
   background: var(--ds-bg-subtle);
-  color: var(--ds-text-secondary);
+  color: var(--plan-secondary);
   font-size: 0.8125rem;
   line-height: 1.55;
 }
@@ -617,13 +642,30 @@
   width: 100%;
   min-height: 2.8rem;
   padding: 0.65rem 2.1rem 0.65rem 0.75rem;
-  border: 1px solid var(--plan-line);
+  border: 1px solid var(--plan-field-border);
   border-radius: 0.78rem;
   outline: none;
-  background: var(--ds-surface);
-  color: var(--plan-ink);
+  background: var(--plan-field-bg);
+  color: var(--plan-field-text);
+  caret-color: var(--plan-teal);
   font-size: 0.8125rem;
   font-weight: 650;
+}
+
+.field::placeholder {
+  color: var(--plan-field-placeholder);
+  opacity: 1;
+}
+
+.field:hover:not(:disabled) {
+  border-color: var(--plan-field-hover);
+}
+
+.field:disabled {
+  cursor: not-allowed;
+  border-color: var(--ds-border-subtle);
+  background: var(--ds-bg-subtle);
+  color: var(--plan-disabled);
 }
 
 :global([data-theme="light"]) .field {
@@ -640,8 +682,13 @@
 }
 
 :global([data-theme="dark"]) .field option {
-  background: #101b2c;
-  color: #f8fafc;
+  background: #111d2e;
+  color: #dce7f5;
+}
+
+:global([data-theme="dark"]) .field option:checked {
+  background: #18364a;
+  color: #e8eef6;
 }
 
 .field:focus-visible {
@@ -664,27 +711,40 @@
   font-size: 0.75rem;
 }
 
-.timeFit {
+.planPreview {
+  display: grid;
+  gap: 0.5rem;
   margin-top: 1rem;
-  border-color: color-mix(in srgb, var(--plan-teal) 26%, transparent);
+}
+
+.planPreview li {
+  display: grid;
+  grid-template-columns: 1.65rem minmax(0, 1fr);
+  gap: 0.55rem;
+  min-height: 2.55rem;
+  padding: 0.55rem 0.65rem;
+  align-items: center;
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: 0.75rem;
+  background: var(--ds-bg-subtle);
+  color: var(--plan-secondary);
+}
+
+.planPreview span {
+  display: inline-flex;
+  width: 1.65rem;
+  height: 1.65rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.55rem;
   background: var(--ds-accent-teal-soft);
+  color: var(--plan-teal);
+  font-size: 0.68rem;
+  font-weight: 850;
 }
 
-.timeFit[data-state="over"] {
-  border-color: color-mix(in srgb, var(--plan-gold) 42%, transparent);
-  background: var(--ds-accent-gold-soft);
-}
-
-.timeFit strong {
-  display: block;
-  font-size: 0.8125rem;
-}
-
-.timeFit span {
-  display: block;
-  margin-top: 0.25rem;
-  color: var(--plan-muted);
-  font-size: 0.75rem;
+.planPreview strong {
+  font-size: 0.76rem;
 }
 
 .builderAction {
@@ -720,7 +780,7 @@
   border: 1px solid var(--ds-border-subtle);
   border-radius: 0.75rem;
   background: var(--ds-surface-elevated);
-  color: var(--ds-text-secondary);
+  color: var(--plan-secondary);
   font-size: 0.75rem;
   font-weight: 700;
 }
@@ -752,7 +812,7 @@
   line-height: 1.15;
 }
 
-.summaryCard > p:not(.eyebrow) {
+.summaryTop p:not(.eyebrow) {
   max-width: 58rem;
   margin-top: 0.65rem;
   color: var(--plan-muted);
@@ -762,7 +822,7 @@
 
 .summaryMetrics {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.55rem;
   margin-top: 1.25rem;
 }
@@ -815,6 +875,14 @@
   border: 1px solid var(--ds-border-subtle);
   border-radius: 0.95rem;
   background: var(--ds-surface-elevated);
+  transition:
+    border-color var(--ds-duration-fast) var(--ds-ease-standard),
+    background var(--ds-duration-fast) var(--ds-ease-standard);
+}
+
+.routeStep:hover {
+  border-color: var(--plan-field-hover);
+  background: var(--ds-bg-subtle);
 }
 
 .stepIndex {
@@ -859,7 +927,7 @@
 .stepCopy small {
   display: block;
   margin-top: 0.32rem;
-  color: var(--ds-text-secondary);
+  color: var(--plan-secondary);
   font-size: 0.72rem;
   font-weight: 720;
 }
@@ -903,7 +971,7 @@
   display: grid;
   grid-template-columns: 0.4rem minmax(0, 1fr);
   gap: 0.5rem;
-  color: var(--ds-text-secondary);
+  color: var(--plan-secondary);
   font-size: 0.75rem;
   line-height: 1.45;
 }
@@ -1033,7 +1101,7 @@
   border: 1px solid var(--plan-line);
   border-radius: 0.85rem;
   background: var(--ds-surface-elevated);
-  color: var(--ds-text-secondary);
+  color: var(--plan-secondary);
   transition:
     border-color var(--ds-duration-fast) var(--ds-ease-standard),
     background var(--ds-duration-fast) var(--ds-ease-standard);
@@ -1058,6 +1126,12 @@
   border-color: var(--plan-teal);
   background: var(--ds-accent-teal-soft);
   color: var(--plan-teal);
+}
+
+.optionLabel:hover,
+.confidenceLabel:hover {
+  border-color: var(--plan-field-hover);
+  color: var(--plan-ink);
 }
 
 .optionLabel[data-result="correct"] {
@@ -1111,7 +1185,7 @@
   padding: 0.65rem 0.75rem;
   border-radius: 0.75rem;
   background: var(--ds-accent-teal-soft);
-  color: var(--ds-text-secondary);
+  color: var(--plan-secondary);
   font-size: 0.75rem;
   line-height: 1.5;
 }
@@ -1139,7 +1213,7 @@
 
 .checkpointResult p {
   margin-top: 0.35rem;
-  color: var(--ds-text-secondary);
+  color: var(--plan-secondary);
   font-size: 0.8125rem;
   line-height: 1.55;
 }
@@ -1150,7 +1224,7 @@
   border: 1px solid var(--ds-border-subtle);
   border-radius: 0.8rem;
   background: var(--ds-bg-subtle);
-  color: var(--ds-text-secondary);
+  color: var(--plan-secondary);
   font-size: 0.8125rem;
   line-height: 1.6;
 }
@@ -1194,7 +1268,7 @@
   border: 1px solid var(--ds-border-subtle);
   border-radius: 0.75rem;
   background: var(--ds-surface-elevated);
-  color: var(--ds-text-secondary);
+  color: var(--plan-secondary);
   font-size: 0.8125rem;
   line-height: 1.45;
 }
@@ -1349,9 +1423,6 @@
     min-height: auto;
   }
 
-  .summaryMetrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 48rem) {
@@ -1408,7 +1479,7 @@
   }
 
   .summaryMetrics {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
   }
 
   .hintRow {
@@ -1430,12 +1501,6 @@
 
   .historyAction {
     width: 100%;
-  }
-}
-
-@media (max-width: 25rem) {
-  .summaryMetrics {
-    grid-template-columns: 1fr;
   }
 }
 

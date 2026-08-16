@@ -2,7 +2,12 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  getPlanningTimeFit,
+  getEstimatedPlanMinutes,
+  GOAL_OPTIONS,
+  KNOWLEDGE_OPTIONS,
+  normalizePlanningDraft,
+  normalizePlanningPlan,
+  STYLE_OPTIONS,
   type AutonomousMission,
   type PlanningPlan,
   type PlanningScope,
@@ -43,20 +48,17 @@ const scope: PlanningScope = {
   classLevel: "Class 11",
 };
 
-function plan(requestedMinutes: number): PlanningPlan {
+function plan(): PlanningPlan {
   return {
     mission,
     scope,
     profile: {
       currentKnowledge: "some_idea",
       learningGoal: "exam",
-      availableMinutes: String(requestedMinutes),
-      examTarget: "school_exam",
       preferredStyle: "examples_first",
       prerequisiteConfidence: "medium",
     },
     catalogSource: "published",
-    requestedMinutes,
     createdAt: "2026-07-29T10:00:00.000Z",
   };
 }
@@ -78,21 +80,51 @@ describe("market-ready Planning routes", () => {
     });
   });
 
-  it("states time fit from returned block totals without pseudo readiness", () => {
-    expect(getPlanningTimeFit(plan(45))).toMatchObject({
-      requested: 45,
-      planned: 35,
-      difference: 10,
-      state: "fits",
-      label: "Fits your study window",
+  it("shows only the generated duration and keeps retired setup controls out of the API", () => {
+    expect(getEstimatedPlanMinutes(plan())).toBe(35);
+
+    const api = readSource("features/planning/api.ts");
+    const builder = readSource("features/planning/PlanningBuilder.tsx");
+    expect(api).toContain("current_topic: scope.topicLabel");
+    expect(api).not.toContain("available_minutes");
+    expect(api).not.toContain("exam_target");
+    expect(builder).not.toContain("Available time");
+    expect(builder).not.toContain("Exam target");
+  });
+
+  it("keeps only supported setup options", () => {
+    expect(KNOWLEDGE_OPTIONS.map((option) => option.value)).toEqual(["new", "some_idea", "know_basics"]);
+    expect(GOAL_OPTIONS.map((option) => option.value)).toEqual(["deep_understanding", "exam", "fast_track"]);
+    expect(STYLE_OPTIONS.map((option) => option.value)).toEqual([
+      "examples_first",
+      "short_explanations",
+      "conceptual_detail",
+    ]);
+  });
+
+  it("normalizes old device snapshots into the compact profile", () => {
+    const legacyDraft = normalizePlanningDraft({
+      chapter: scope.chapter,
+      topic: scope.topic,
+      profile: {
+        currentKnowledge: "some_idea",
+        learningGoal: "quick_revision",
+        availableMinutes: "45",
+        examTarget: "school_exam",
+        preferredStyle: "examples_first",
+        prerequisiteConfidence: "medium",
+      },
     });
-    expect(getPlanningTimeFit(plan(20))).toMatchObject({
-      requested: 20,
-      planned: 35,
-      difference: 15,
-      state: "over",
-      label: "Needs more time",
+    expect(legacyDraft?.profile).toEqual({
+      currentKnowledge: "some_idea",
+      learningGoal: "fast_track",
+      preferredStyle: "examples_first",
+      prerequisiteConfidence: "medium",
     });
+
+    const legacyPlan = normalizePlanningPlan({ ...plan(), requestedMinutes: 45 });
+    expect(legacyPlan).not.toBeNull();
+    expect(legacyPlan).not.toHaveProperty("requestedMinutes");
   });
 
   it("makes route blocks executable and carries plan context", () => {
@@ -152,6 +184,17 @@ describe("market-ready Planning routes", () => {
     expect(provider).toContain("retireActivePlan()");
     expect(provider).toContain("previous plan no longer matches this setup");
     expect(provider).toContain("clearActivePlanningPlan(userId)");
+  });
+
+  it("defines Planning-specific dark control and typography hierarchy", () => {
+    const css = readSource("features/planning/planning.module.css");
+    expect(css).toMatch(/\[data-theme="dark"\]\) \.screen\s*\{[^}]*--plan-ink:[^;]+;[^}]*--plan-secondary:[^;]+;[^}]*--plan-muted:/);
+    expect(css).toContain("--plan-field-text: #dce7f5");
+    expect(css).toContain("--plan-field-placeholder: #78899f");
+    expect(css).toMatch(/\.field\s*\{[^}]*background:\s*var\(--plan-field-bg\)[^}]*color:\s*var\(--plan-field-text\)/);
+    expect(css).toContain('.field option:checked');
+    expect(css).toContain(".field:hover:not(:disabled)");
+    expect(css).toContain(".field:disabled");
   });
 
   it("keeps Planning parent-sized with one route scroll owner and no viewport units", () => {

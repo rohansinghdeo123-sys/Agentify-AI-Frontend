@@ -14,7 +14,7 @@ import { useAuth } from "@/context/AuthContext";
 import { apiJson } from "@/lib/apiClient";
 import { useEffect, useState } from "react";
 
-export type CatalogTopic = { label: string; value: string };
+export type CatalogTopic = { label: string; value: string; memberIds?: string[] };
 export type CatalogChapter = {
   label: string;
   value: string;
@@ -56,14 +56,28 @@ export const BUILTIN_CHAPTERS: CatalogChapter[] = [
   },
 ];
 
-export function findChapterForTopic(chapters: CatalogChapter[], topicValue: string): string {
-  const normalized = topicValue
+function normalizeCatalogKey(value: string) {
+  return value
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
+}
+
+/** Resolve current unit IDs plus legacy member IDs/titles from saved links. */
+export function findCatalogTopic(chapter: CatalogChapter | undefined, rawTopic: string) {
+  const requested = normalizeCatalogKey(rawTopic);
+  if (!chapter || !requested) return undefined;
+  return chapter.topics.find((topic) => (
+    normalizeCatalogKey(topic.value) === requested
+    || normalizeCatalogKey(topic.label) === requested
+    || topic.memberIds?.some((memberId) => normalizeCatalogKey(memberId) === requested)
+  ));
+}
+
+export function findChapterForTopic(chapters: CatalogChapter[], topicValue: string): string {
   return (
-    chapters.find((chapter) => chapter.topics.some((topic) => topic.value === normalized))?.value || ""
+    chapters.find((chapter) => findCatalogTopic(chapter, topicValue))?.value || ""
   );
 }
 
@@ -76,7 +90,7 @@ export function reconcileSelection(
   const fallback = chapters[0];
   const chapter = chapters.find((item) => item.value === chapterValue) || fallback;
   if (!chapter) return { chapter: chapterValue, topic: topicValue, changed: false };
-  const topic = chapter.topics.find((item) => item.value === topicValue) || chapter.topics[0];
+  const topic = findCatalogTopic(chapter, topicValue) || chapter.topics[0];
   const next = { chapter: chapter.value, topic: topic?.value || "" };
   return { ...next, changed: next.chapter !== chapterValue || next.topic !== topicValue };
 }
@@ -89,7 +103,7 @@ type BackendCatalog = {
     chapters?: Array<{
       slug?: string;
       name?: string;
-      topics?: Array<{ id?: string; label?: string }>;
+      topics?: Array<{ id?: string; label?: string; concept_ids?: string[] }>;
     }>;
   }>;
 };
@@ -104,7 +118,7 @@ function normalizeClassLevel(value: string) {
 }
 
 export function catalogCacheKey(userId: string, classLevel: string) {
-  return `catalog:${encodeURIComponent(userId)}:${normalizeClassLevel(classLevel) || "unspecified"}`;
+  return `catalog:v2:${encodeURIComponent(userId)}:${normalizeClassLevel(classLevel) || "unspecified"}`;
 }
 
 function mapBackendCatalog(payload: BackendCatalog, preferredClassLevel: string): CatalogChapter[] {
@@ -125,7 +139,13 @@ function mapBackendCatalog(payload: BackendCatalog, preferredClassLevel: string)
       subject,
       classLevel,
       topics: (chapter.topics || [])
-        .map((topic) => ({ label: String(topic.label || topic.id || ""), value: String(topic.id || "") }))
+        .map((topic) => ({
+          label: String(topic.label || topic.id || ""),
+          value: String(topic.id || ""),
+          memberIds: Array.isArray(topic.concept_ids)
+            ? topic.concept_ids.map((value) => String(value)).filter(Boolean)
+            : undefined,
+        }))
         .filter((topic) => topic.value),
     }))
     .filter((chapter) => chapter.value && chapter.topics.length);

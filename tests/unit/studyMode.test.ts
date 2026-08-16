@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseStudyStreamFrame } from "@/features/study/api";
-import { catalogCacheKey } from "@/lib/catalog";
+import { catalogCacheKey, findCatalogTopic, reconcileSelection } from "@/lib/catalog";
 import {
   legacyStudyHandoff,
   openStudyScope,
@@ -116,13 +116,35 @@ describe("focused Study Lab architecture", () => {
   });
 
   it("isolates authenticated catalog caches by account and normalized class", () => {
-    expect(catalogCacheKey("student-a", "Class 11")).toBe("catalog:student-a:11");
-    expect(catalogCacheKey("student-b", "11")).toBe("catalog:student-b:11");
+    expect(catalogCacheKey("student-a", "Class 11")).toBe("catalog:v2:student-a:11");
+    expect(catalogCacheKey("student-b", "11")).toBe("catalog:v2:student-b:11");
     expect(catalogCacheKey("student-a", "Class 11")).not.toBe(catalogCacheKey("student-b", "Class 11"));
 
     const catalog = source("lib/catalog.ts");
     expect(catalog).toContain("setChapters(BUILTIN_CHAPTERS)");
     expect(catalog).toContain('setSource("builtin")');
+  });
+
+  it("maps legacy microtopic selections to their current learning unit", () => {
+    const chapter = {
+      value: "matter",
+      label: "Matter",
+      subject: "Chemistry",
+      topics: [
+        {
+          value: "unit_matter_abc",
+          label: "States and properties of matter",
+          memberIds: ["solid_state", "liquid_state", "gaseous_state"],
+        },
+      ],
+    };
+
+    expect(findCatalogTopic(chapter, "Liquid State")?.value).toBe("unit_matter_abc");
+    expect(reconcileSelection([chapter], "matter", "gaseous_state")).toEqual({
+      chapter: "matter",
+      topic: "unit_matter_abc",
+      changed: true,
+    });
   });
 
   it("keeps Study route styles free of viewport-height scroll traps", () => {

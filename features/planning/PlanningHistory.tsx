@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { formatPlanningLabel, getPlanningTimeFit } from "./contracts";
+import { formatPlanningLabel, getEstimatedPlanMinutes, getMissionPlan } from "./contracts";
 import { usePlanningExperience } from "./PlanningExperience";
 import { PlanningLoading, PlanningScreen, planningStyles as styles } from "./PlanningScreen";
 import { PLANNING_ROUTES } from "./routes";
@@ -41,7 +41,8 @@ export default function PlanningHistory() {
         ) : (
           <div className={styles.historyList}>
             {history.map((plan) => {
-              const fit = getPlanningTimeFit(plan);
+              const estimatedMinutes = getEstimatedPlanMinutes(plan);
+              const blockCount = getMissionPlan(plan.mission).length;
               return (
                 <article key={plan.mission.mission_id} className={styles.historyCard}>
                   <div className={styles.historyTop}>
@@ -63,7 +64,9 @@ export default function PlanningHistory() {
                   </div>
                   <div className={styles.historyMeta}>
                     <span className={styles.statusChip}>{formatDate(plan.createdAt)}</span>
-                    <span className={styles.statusChip}>{fit.planned || plan.requestedMinutes} min</span>
+                    <span className={styles.statusChip}>
+                      {estimatedMinutes ? `About ${estimatedMinutes} min` : `${blockCount} ${blockCount === 1 ? "block" : "blocks"}`}
+                    </span>
                     <span className={styles.statusChip}>{plan.checkpoint ? "Checkpoint recorded" : "Checkpoint pending"}</span>
                     <span className={styles.sourceChip} data-source={plan.catalogSource}>
                       {plan.catalogSource === "published" ? "Published syllabus" : "Starter catalog"}
@@ -78,4 +81,3 @@ export default function PlanningHistory() {
     </PlanningScreen>
   );
 }
-

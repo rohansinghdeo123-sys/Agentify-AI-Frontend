@@ -60,13 +60,16 @@ export interface AutonomousMission {
   };
 }
 
+export type PlanningKnowledge = "new" | "some_idea" | "know_basics";
+export type PlanningGoal = "deep_understanding" | "exam" | "fast_track";
+export type PlanningStyle = "examples_first" | "short_explanations" | "conceptual_detail";
+export type PlanningPrerequisiteConfidence = "low" | "medium" | "high";
+
 export interface PlanningProfile {
-  currentKnowledge: string;
-  learningGoal: string;
-  availableMinutes: string;
-  examTarget: string;
-  preferredStyle: string;
-  prerequisiteConfidence: string;
+  currentKnowledge: PlanningKnowledge;
+  learningGoal: PlanningGoal;
+  preferredStyle: PlanningStyle;
+  prerequisiteConfidence: PlanningPrerequisiteConfidence;
 }
 
 export interface PlanningDraft {
@@ -104,57 +107,34 @@ export interface PlanningPlan {
   scope: PlanningScope;
   profile: PlanningProfile;
   catalogSource: "published" | "starter";
-  requestedMinutes: number;
   createdAt: string;
   responseLatencyMs?: number;
   checkpoint?: PlanningCheckpointResult;
 }
 
-export interface PlanningTimeFit {
-  requested: number;
-  planned: number;
-  difference: number;
-  state: "fits" | "over" | "unknown";
-  label: string;
-  detail: string;
-}
-
 export const DEFAULT_PLANNING_PROFILE: PlanningProfile = {
   currentKnowledge: "some_idea",
   learningGoal: "exam",
-  availableMinutes: "45",
-  examTarget: "school_exam",
   preferredStyle: "examples_first",
   prerequisiteConfidence: "medium",
 };
 
-export const KNOWLEDGE_OPTIONS = [
+export const KNOWLEDGE_OPTIONS: ReadonlyArray<{ label: string; value: PlanningKnowledge }> = [
   { label: "New to this", value: "new" },
-  { label: "Weak basics", value: "weak_basics" },
   { label: "Some idea", value: "some_idea" },
   { label: "Know basics", value: "know_basics" },
 ];
 
-export const GOAL_OPTIONS = [
+export const GOAL_OPTIONS: ReadonlyArray<{ label: string; value: PlanningGoal }> = [
   { label: "Deep understanding", value: "deep_understanding" },
   { label: "Exam scoring", value: "exam" },
-  { label: "Quick revision", value: "quick_revision" },
   { label: "Fast track", value: "fast_track" },
 ];
 
-export const EXAM_OPTIONS = [
-  { label: "School exam", value: "school_exam" },
-  { label: "Boards", value: "boards" },
-  { label: "JEE", value: "jee" },
-  { label: "NEET", value: "neet" },
-  { label: "Quick revision", value: "quick_revision" },
-];
-
-export const STYLE_OPTIONS = [
+export const STYLE_OPTIONS: ReadonlyArray<{ label: string; value: PlanningStyle }> = [
   { label: "Examples first", value: "examples_first" },
   { label: "Short explanations", value: "short_explanations" },
   { label: "Conceptual detail", value: "conceptual_detail" },
-  { label: "Visual intuition", value: "visual_intuition" },
 ];
 
 export const CONFIDENCE_OPTIONS = [
@@ -163,11 +143,97 @@ export const CONFIDENCE_OPTIONS = [
   { label: "Strong", value: "high", score: 82 },
 ];
 
-export const PREREQUISITE_OPTIONS = [
+export const PREREQUISITE_OPTIONS: ReadonlyArray<{ label: string; value: PlanningPrerequisiteConfidence }> = [
   { label: "Low", value: "low" },
   { label: "Medium", value: "medium" },
   { label: "High", value: "high" },
 ];
+
+const KNOWLEDGE_VALUES = new Set<PlanningKnowledge>(KNOWLEDGE_OPTIONS.map((option) => option.value));
+const GOAL_VALUES = new Set<PlanningGoal>(GOAL_OPTIONS.map((option) => option.value));
+const STYLE_VALUES = new Set<PlanningStyle>(STYLE_OPTIONS.map((option) => option.value));
+const PREREQUISITE_VALUES = new Set<PlanningPrerequisiteConfidence>(PREREQUISITE_OPTIONS.map((option) => option.value));
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function profileValue<T extends string>(
+  value: unknown,
+  supported: ReadonlySet<T>,
+  fallback: T,
+): T {
+  return typeof value === "string" && supported.has(value as T) ? value as T : fallback;
+}
+
+/**
+ * Converts device snapshots from earlier Planning versions into the current
+ * compact profile. Reconstructing the object also drops retired setup fields.
+ */
+export function normalizePlanningProfile(value: unknown): PlanningProfile {
+  const profile = isRecord(value) ? value : {};
+  const rawGoal = profile.learningGoal;
+  return {
+    currentKnowledge: profileValue(
+      profile.currentKnowledge,
+      KNOWLEDGE_VALUES,
+      DEFAULT_PLANNING_PROFILE.currentKnowledge,
+    ),
+    learningGoal: rawGoal === "quick_revision"
+      ? "fast_track"
+      : profileValue(rawGoal, GOAL_VALUES, DEFAULT_PLANNING_PROFILE.learningGoal),
+    preferredStyle: profileValue(
+      profile.preferredStyle,
+      STYLE_VALUES,
+      DEFAULT_PLANNING_PROFILE.preferredStyle,
+    ),
+    prerequisiteConfidence: profileValue(
+      profile.prerequisiteConfidence,
+      PREREQUISITE_VALUES,
+      DEFAULT_PLANNING_PROFILE.prerequisiteConfidence,
+    ),
+  };
+}
+
+export function normalizePlanningDraft(value: unknown): PlanningDraft | null {
+  if (!isRecord(value) || typeof value.chapter !== "string" || typeof value.topic !== "string") return null;
+  return {
+    chapter: value.chapter,
+    topic: value.topic,
+    profile: normalizePlanningProfile(value.profile),
+  };
+}
+
+export function normalizePlanningPlan(value: unknown): PlanningPlan | null {
+  if (!isRecord(value) || !isAutonomousMission(value.mission) || !isRecord(value.scope)) return null;
+  const scope = value.scope;
+  if (
+    typeof scope.chapter !== "string"
+    || typeof scope.chapterLabel !== "string"
+    || typeof scope.topic !== "string"
+    || typeof scope.topicLabel !== "string"
+    || typeof scope.subject !== "string"
+    || typeof scope.classLevel !== "string"
+  ) return null;
+
+  const plan: PlanningPlan = {
+    mission: value.mission,
+    scope: {
+      chapter: scope.chapter,
+      chapterLabel: scope.chapterLabel,
+      topic: scope.topic,
+      topicLabel: scope.topicLabel,
+      subject: scope.subject,
+      classLevel: scope.classLevel,
+    },
+    profile: normalizePlanningProfile(value.profile),
+    catalogSource: value.catalogSource === "published" ? "published" : "starter",
+    createdAt: typeof value.createdAt === "string" ? value.createdAt : new Date(0).toISOString(),
+  };
+  if (typeof value.responseLatencyMs === "number") plan.responseLatencyMs = value.responseLatencyMs;
+  if (isRecord(value.checkpoint)) plan.checkpoint = value.checkpoint as unknown as PlanningCheckpointResult;
+  return plan;
+}
 
 export function formatPlanningLabel(value?: string | number) {
   if (value === undefined || value === null || value === "") return "Not set";
@@ -226,46 +292,10 @@ export function parsePlanningMinutes(value?: string | number) {
   return match ? Math.max(0, Number(match[0])) : 0;
 }
 
-export function getPlanningTimeFit(plan?: PlanningPlan | null): PlanningTimeFit {
-  const requested = Math.max(0, Number(plan?.requestedMinutes || 0));
+export function getEstimatedPlanMinutes(plan?: PlanningPlan | null) {
   const steps = getMissionPlan(plan?.mission);
   const plannedFromSteps = steps.reduce((sum, step) => sum + parsePlanningMinutes(step.duration), 0);
-  const planned = plannedFromSteps || Math.max(0, Number(plan?.mission.estimated_minutes || 0));
-
-  if (!requested || !planned) {
-    return {
-      requested,
-      planned,
-      difference: 0,
-      state: "unknown",
-      label: "Review the timing",
-      detail: "The coach did not return enough timing detail to verify this window.",
-    };
-  }
-
-  if (planned <= requested) {
-    const buffer = requested - planned;
-    return {
-      requested,
-      planned,
-      difference: buffer,
-      state: "fits",
-      label: "Fits your study window",
-      detail: buffer
-        ? `${planned} planned minutes leave a ${buffer}-minute buffer.`
-        : `${planned} planned minutes use your full ${requested}-minute window.`,
-    };
-  }
-
-  const over = planned - requested;
-  return {
-    requested,
-    planned,
-    difference: over,
-    state: "over",
-    label: "Needs more time",
-    detail: `${planned} planned minutes are ${over} minutes over your ${requested}-minute window. Rebuild with more time or complete the first blocks now.`,
-  };
+  return plannedFromSteps || Math.max(0, Number(plan?.mission.estimated_minutes || 0));
 }
 
 export function buildPlanningReport(mission: AutonomousMission, correct: boolean): PlanningReport {

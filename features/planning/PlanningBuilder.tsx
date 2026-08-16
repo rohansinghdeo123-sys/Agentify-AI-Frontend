@@ -1,11 +1,11 @@
 "use client";
 
 import { AppIcon } from "@/components/ui/Polished";
+import { findCatalogTopic } from "@/lib/catalog";
 import { BUCKET_LABELS } from "@/lib/revision";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
 import {
-  EXAM_OPTIONS,
   formatPlanningLabel,
   GOAL_OPTIONS,
   KNOWLEDGE_OPTIONS,
@@ -25,7 +25,7 @@ function SelectField({
 }: {
   label: string;
   value: string;
-  options: Array<{ label: string; value: string }>;
+  options: ReadonlyArray<{ label: string; value: string }>;
   onChange: (value: string) => void;
 }) {
   return (
@@ -72,8 +72,8 @@ export default function PlanningBuilder() {
     const requestedTopic = searchParams.get("topic") || "";
     const requestedChapter = searchParams.get("chapter") || "";
     const chapter = chapters.find((item) => item.value === requestedChapter)
-      || chapters.find((item) => item.topics.some((topic) => topic.value === requestedTopic));
-    const topic = chapter?.topics.find((item) => item.value === requestedTopic) || chapter?.topics[0];
+      || chapters.find((item) => findCatalogTopic(item, requestedTopic));
+    const topic = findCatalogTopic(chapter, requestedTopic) || chapter?.topics[0];
     if (chapter && topic) setScope(chapter.value, topic.value);
   }, [catalogSettled, chapters, hydrated, searchParams, setScope]);
 
@@ -81,9 +81,9 @@ export default function PlanningBuilder() {
 
   if (authBusy || !hydrated) return <PlanningLoading label="Preparing your plan builder..." />;
 
-  const changeProfile = (key: keyof PlanningProfile) => (value: string) => updateProfile(key, value);
-  const requestedMinutes = Number(draft.profile.availableMinutes);
-  const validTimeWindow = Number.isFinite(requestedMinutes) && requestedMinutes >= 10 && requestedMinutes <= 240;
+  const changeProfile = (key: keyof PlanningProfile) => (value: string) => (
+    updateProfile(key, value as PlanningProfile[keyof PlanningProfile])
+  );
 
   const buildPlan = async () => {
     requestRef.current?.abort();
@@ -96,8 +96,8 @@ export default function PlanningBuilder() {
   return (
     <PlanningScreen
       eyebrow="Planning Lab / Builder"
-      title="Build one realistic route."
-      intro="Keep the target narrow and the available time honest. The generated block total will be checked against your window before it is called a fit."
+      title="Select. Generate. Start learning."
+      intro="Choose one syllabus topic and how you want to approach it. AgentifyAI will group the learning into a focused route and estimate the duration for you."
       backHref={PLANNING_ROUTES.home}
     >
       {staleNotice ? <div className={styles.notice} role="status">{staleNotice}</div> : null}
@@ -142,23 +142,11 @@ export default function PlanningBuilder() {
             <div className={styles.builderSection}>
               <div className={styles.builderSectionTitle}>
                 <span>02</span>
-                <div><strong>Set the learning fit</strong><small>All existing planning controls remain available.</small></div>
+                <div><strong>Choose your learning approach</strong><small>Four quick choices help shape the route.</small></div>
               </div>
               <div className={styles.formGrid}>
                 <SelectField label="Current knowledge" value={draft.profile.currentKnowledge} options={KNOWLEDGE_OPTIONS} onChange={changeProfile("currentKnowledge")} />
                 <SelectField label="Plan goal" value={draft.profile.learningGoal} options={GOAL_OPTIONS} onChange={changeProfile("learningGoal")} />
-                <label>
-                  <span className={styles.fieldLabel}>Available time in minutes</span>
-                  <input
-                    type="number"
-                    min={10}
-                    max={240}
-                    value={draft.profile.availableMinutes}
-                    onChange={(event) => updateProfile("availableMinutes", event.target.value)}
-                    className={styles.field}
-                  />
-                </label>
-                <SelectField label="Exam target" value={draft.profile.examTarget} options={EXAM_OPTIONS} onChange={changeProfile("examTarget")} />
                 <SelectField label="Preferred style" value={draft.profile.preferredStyle} options={STYLE_OPTIONS} onChange={changeProfile("preferredStyle")} />
                 <SelectField label="Prerequisite confidence" value={draft.profile.prerequisiteConfidence} options={PREREQUISITE_OPTIONS} onChange={changeProfile("prerequisiteConfidence")} />
               </div>
@@ -168,13 +156,14 @@ export default function PlanningBuilder() {
 
         <aside className={styles.builderAside} aria-label="Plan confirmation">
           <div className={styles.asideBlock}>
-            <p className={styles.eyebrow}>Your window</p>
-            <h2>{validTimeWindow ? `${requestedMinutes} minutes` : "Choose 10–240 minutes"} for {selectedTopic?.label || formatPlanningLabel(draft.topic)}</h2>
-            <p>The active plan will show its returned block total. If it exceeds this window, Planning will say so clearly.</p>
-            <div className={styles.timeFit} data-state="unknown">
-              <strong>Fit is verified after generation</strong>
-              <span>No artificial readiness percentage is used.</span>
-            </div>
+            <p className={styles.eyebrow}>Ready to generate</p>
+            <h2>{selectedTopic?.label || formatPlanningLabel(draft.topic)}</h2>
+            <p>The planner will combine related ideas into a compact route, preserve syllabus coverage, and estimate the learning duration.</p>
+            <ol className={styles.planPreview} aria-label="Expected learning route">
+              <li><span>01</span><strong>Learn the core ideas</strong></li>
+              <li><span>02</span><strong>Apply with focused practice</strong></li>
+              <li><span>03</span><strong>Check your understanding</strong></li>
+            </ol>
           </div>
 
           <div className={styles.asideBlock}>
@@ -211,11 +200,11 @@ export default function PlanningBuilder() {
           <button
             type="button"
             className={`${styles.primaryButton} ${styles.builderAction}`}
-            disabled={!userId || !catalogSettled || !validTimeWindow || generating}
+            disabled={!userId || !catalogSettled || generating}
             onClick={buildPlan}
           >
             <AppIcon name={generating ? "clock" : "mission"} />
-            {generating ? "Building your plan…" : "Build this plan"}
+            {generating ? "Building your plan…" : "Generate my plan"}
           </button>
         </aside>
       </div>
