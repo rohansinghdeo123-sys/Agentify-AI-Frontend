@@ -1,8 +1,7 @@
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
-import { findCatalogTopic, reconcileSelection, useCatalog } from "@/lib/catalog";
-import type { RevisionEntry } from "@/lib/revision";
+import { useCatalog } from "@/lib/catalog";
 import {
   createContext,
   useCallback,
@@ -14,7 +13,6 @@ import {
   type ReactNode,
 } from "react";
 import {
-  fetchPlanningRadar,
   generatePlanningMission,
   planningErrorMessage,
   submitPlanningCheckpoint,
@@ -34,15 +32,13 @@ import {
 import {
   clearActivePlanningPlan,
   mergePlanningHistory,
-  readActivePlanningPlan,
+  readActivePlanningPlanState,
   readPlanningDraft,
   readPlanningHistory,
   writeActivePlanningPlan,
   writePlanningDraft,
   writePlanningHistory,
 } from "./storage";
-
-type RadarState = "loading" | "ready" | "empty" | "unavailable";
 
 type CheckpointInput = {
   answer: string;
@@ -62,21 +58,16 @@ type PlanningExperienceValue = {
   catalogSource: "published" | "starter";
   catalogSettled: boolean;
   selectedChapter: ReturnType<typeof useCatalog>["chapters"][number] | undefined;
-  selectedTopic: { label: string; value: string } | undefined;
   scope: PlanningScope;
   activePlan: PlanningPlan | null;
   history: PlanningPlan[];
-  radar: RevisionEntry[];
-  radarState: RadarState;
   generating: boolean;
   savingCheckpoint: boolean;
   error: string;
   staleNotice: string;
-  setScope: (chapter: string, topic: string) => void;
   setChapter: (chapter: string) => void;
-  setTopic: (topic: string) => void;
   updateProfile: (key: keyof PlanningProfile, value: PlanningProfile[keyof PlanningProfile]) => void;
-  applyRadarTopic: (entry: RevisionEntry) => boolean;
+  togglePlanStep: (index: number) => void;
   createPlan: (signal?: AbortSignal) => Promise<PlanningPlan | null>;
   submitCheckpoint: (input: CheckpointInput, signal?: AbortSignal) => Promise<PlanningCheckpointResult | null>;
   loadHistoryPlan: (missionId: string) => PlanningPlan | null;
@@ -87,7 +78,6 @@ const PlanningExperienceContext = createContext<PlanningExperienceValue | null>(
 
 const DEFAULT_DRAFT: PlanningDraft = {
   chapter: "hydrocarbon",
-  topic: "alkanes",
   profile: DEFAULT_PLANNING_PROFILE,
 };
 
@@ -98,49 +88,58 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
   const [draft, setDraft] = useState<PlanningDraft>(DEFAULT_DRAFT);
   const [activePlan, setActivePlan] = useState<PlanningPlan | null>(null);
   const [history, setHistory] = useState<PlanningPlan[]>([]);
-  const [radar, setRadar] = useState<RevisionEntry[]>([]);
-  const [radarState, setRadarState] = useState<RadarState>("loading");
   const [hydrated, setHydrated] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [savingCheckpoint, setSavingCheckpoint] = useState(false);
   const [error, setError] = useState("");
   const [staleNotice, setStaleNotice] = useState("");
   const loadedUserRef = useRef("");
+  const generationRef = useRef(0);
+  const generationInFlightRef = useRef(false);
+  const currentInputRef = useRef("");
 
   const selectedChapter = useMemo(
     () => chapters.find((chapter) => chapter.value === draft.chapter) || chapters[0],
     [chapters, draft.chapter],
   );
-  const selectedTopic = useMemo(
-    () => selectedChapter?.topics.find((topic) => topic.value === draft.topic) || selectedChapter?.topics[0],
-    [draft.topic, selectedChapter],
-  );
   const scope = useMemo<PlanningScope>(() => ({
     chapter: selectedChapter?.value || draft.chapter,
     chapterLabel: selectedChapter?.label || draft.chapter.replace(/_/g, " "),
-    topic: selectedTopic?.value || draft.topic,
-    topicLabel: selectedTopic?.label || draft.topic.replace(/_/g, " "),
     subject: selectedChapter?.subject || "Chemistry",
     classLevel: selectedChapter?.classLevel || "",
-  }), [draft.chapter, draft.topic, selectedChapter, selectedTopic]);
+  }), [draft.chapter, selectedChapter]);
+  currentInputRef.current = JSON.stringify({ userId, scope, profile: draft.profile, source });
 
   useEffect(() => {
     if (authBusy) return;
     const accountKey = userId || "guest";
     if (loadedUserRef.current === accountKey) return;
     loadedUserRef.current = accountKey;
+    generationRef.current += 1;
+    generationInFlightRef.current = false;
+    setGenerating(false);
     setHydrated(false);
     if (userId) {
       const savedDraft = readPlanningDraft(userId);
-      const savedPlan = readActivePlanningPlan(userId);
+      const savedPlanState = readActivePlanningPlanState(userId);
       const savedHistory = readPlanningHistory(userId);
-      if (savedDraft?.profile) setDraft(savedDraft);
-      setActivePlan(savedPlan);
+      setDraft(savedDraft ?? DEFAULT_DRAFT);
+      setActivePlan(savedPlanState.plan);
       setHistory(savedHistory);
+      if (savedPlanState.retired) {
+        setStaleNotice("An older topic-based plan was retired because Planning is now chapter-based. Choose a chapter to build a fresh roadmap.");
+        clearActivePlanningPlan(userId);
+      } else if (savedPlanState.invalid) {
+        setStaleNotice("A saved plan could not be restored safely. Choose a chapter to build a fresh roadmap.");
+        clearActivePlanningPlan(userId);
+      } else {
+        setStaleNotice("");
+      }
     } else {
       setDraft(DEFAULT_DRAFT);
       setActivePlan(null);
       setHistory([]);
+      setStaleNotice("");
     }
     setHydrated(true);
   }, [authBusy, userId]);
@@ -148,9 +147,8 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
   useEffect(() => {
     if (!chapters.length) return;
     setDraft((current) => {
-      const next = reconcileSelection(chapters, current.chapter, current.topic);
-      if (!next.changed) return current;
-      return { ...current, chapter: next.chapter, topic: next.topic };
+      if (chapters.some((chapter) => chapter.value === current.chapter)) return current;
+      return { ...current, chapter: chapters[0].value };
     });
   }, [chapters]);
 
@@ -159,29 +157,6 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     writePlanningDraft(userId, draft);
   }, [draft, hydrated, userId]);
 
-  useEffect(() => {
-    if (authBusy || !userId) {
-      setRadar([]);
-      setRadarState("empty");
-      return;
-    }
-    const controller = new AbortController();
-    setRadarState("loading");
-    void fetchPlanningRadar({ userId, getAuthHeaders }, 4, controller.signal)
-      .then((payload) => {
-        const next = payload.queue.filter((entry) => entry.bucket !== "fresh").slice(0, 3);
-        setRadar(next);
-        setRadarState(next.length ? "ready" : "empty");
-      })
-      .catch((requestError) => {
-        if (controller.signal.aborted) return;
-        setRadar([]);
-        setRadarState("unavailable");
-        if (requestError instanceof Error && requestError.name === "AbortError") return;
-      });
-    return () => controller.abort();
-  }, [authBusy, getAuthHeaders, userId]);
-
   const retireActivePlan = useCallback(() => {
     if (!activePlan) return;
     setActivePlan(null);
@@ -189,27 +164,24 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     if (userId) clearActivePlanningPlan(userId);
   }, [activePlan, userId]);
 
-  const setScope = useCallback((chapter: string, topic: string) => {
-    if (chapter === draft.chapter && topic === draft.topic) return;
-    retireActivePlan();
-    setDraft((current) => ({ ...current, chapter, topic }));
-    setError("");
-  }, [draft.chapter, draft.topic, retireActivePlan]);
-
   const setChapter = useCallback((chapter: string) => {
-    const nextTopic = chapters.find((item) => item.value === chapter)?.topics[0]?.value || "";
-    setScope(chapter, nextTopic);
-  }, [chapters, setScope]);
-
-  const setTopic = useCallback((topic: string) => {
-    setScope(draft.chapter, topic);
-  }, [draft.chapter, setScope]);
+    if (chapter === draft.chapter) return;
+    generationRef.current += 1;
+    generationInFlightRef.current = false;
+    setGenerating(false);
+    retireActivePlan();
+    setDraft((current) => ({ ...current, chapter }));
+    setError("");
+  }, [draft.chapter, retireActivePlan]);
 
   const updateProfile = useCallback((
     key: keyof PlanningProfile,
     value: PlanningProfile[keyof PlanningProfile],
   ) => {
     if (draft.profile[key] === value) return;
+    generationRef.current += 1;
+    generationInFlightRef.current = false;
+    setGenerating(false);
     retireActivePlan();
     setDraft((current) => ({
       ...current,
@@ -218,19 +190,12 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     setError("");
   }, [draft.profile, retireActivePlan]);
 
-  const applyRadarTopic = useCallback((entry: RevisionEntry) => {
-    for (const chapter of chapters) {
-      const match = findCatalogTopic(chapter, entry.topic);
-      if (match) {
-        setScope(chapter.value, match.value);
-        return true;
-      }
-    }
-    return false;
-  }, [chapters, setScope]);
-
   const createPlan = useCallback(async (signal?: AbortSignal) => {
-    if (!userId || authBusy || generating) return null;
+    if (!userId || authBusy || generating || generationInFlightRef.current) return null;
+    const generationId = generationRef.current + 1;
+    generationRef.current = generationId;
+    generationInFlightRef.current = true;
+    const requestInput = currentInputRef.current;
     setGenerating(true);
     setError("");
     const startedAt = Date.now();
@@ -241,6 +206,11 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
         draft.profile,
         signal,
       );
+      if (
+        signal?.aborted
+        || generationId !== generationRef.current
+        || requestInput !== currentInputRef.current
+      ) return null;
       const plan: PlanningPlan = {
         mission,
         scope,
@@ -259,13 +229,38 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
       writeActivePlanningPlan(userId, plan);
       return plan;
     } catch (requestError) {
-      if (signal?.aborted) return null;
+      if (
+        signal?.aborted
+        || generationId !== generationRef.current
+        || requestInput !== currentInputRef.current
+      ) return null;
       setError(planningErrorMessage(requestError));
       return null;
     } finally {
-      setGenerating(false);
+      if (generationId === generationRef.current) {
+        generationInFlightRef.current = false;
+        setGenerating(false);
+      }
     }
   }, [authBusy, draft.profile, generating, getAuthHeaders, scope, source, userId]);
+
+  const togglePlanStep = useCallback((index: number) => {
+    if (!activePlan || !userId || !Number.isInteger(index) || index < 0) return;
+    const completed = new Set(activePlan.completedStepIndexes || []);
+    if (completed.has(index)) completed.delete(index);
+    else completed.add(index);
+    const nextPlan: PlanningPlan = {
+      ...activePlan,
+      completedStepIndexes: Array.from(completed).sort((left, right) => left - right),
+    };
+    setActivePlan(nextPlan);
+    writeActivePlanningPlan(userId, nextPlan);
+    setHistory((current) => {
+      const next = mergePlanningHistory(current, nextPlan);
+      writePlanningHistory(userId, next);
+      return next;
+    });
+  }, [activePlan, userId]);
 
   const submitCheckpoint = useCallback(async (input: CheckpointInput, signal?: AbortSignal) => {
     if (!userId || !activePlan || savingCheckpoint || activePlan.checkpoint) return activePlan?.checkpoint || null;
@@ -294,7 +289,7 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
       await submitPlanningCheckpoint(
         { userId, getAuthHeaders },
         {
-          topic: activePlan.scope.topic,
+          chapter: activePlan.scope.chapter,
           subject: activePlan.scope.subject,
           correct,
           durationSeconds,
@@ -325,7 +320,7 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
             questions: [{
               id: question.id,
               text: question.question,
-              topic: question.topic || activePlan.scope.topic,
+              topic: question.topic || activePlan.scope.chapter,
               subtopic: question.subtopic || "",
               options: question.options,
               correct_answer: question.correct,
@@ -344,7 +339,7 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
         correct,
         focusScore,
         savedAt: completedAt.toISOString(),
-        report: buildPlanningReport(activePlan.mission, correct),
+        report: buildPlanningReport(activePlan.mission, correct, activePlan.scope.chapterLabel),
       };
       const nextPlan = { ...activePlan, checkpoint };
       setActivePlan(nextPlan);
@@ -368,7 +363,7 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     const plan = history.find((entry) => entry.mission.mission_id === missionId) || null;
     if (!plan) return null;
     setActivePlan(plan);
-    setDraft({ chapter: plan.scope.chapter, topic: plan.scope.topic, profile: { ...plan.profile } });
+    setDraft({ chapter: plan.scope.chapter, profile: { ...plan.profile } });
     setStaleNotice("");
     if (userId) writeActivePlanningPlan(userId, plan);
     return plan;
@@ -383,28 +378,22 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     catalogSource: source === "published" ? "published" : "starter",
     catalogSettled: settled,
     selectedChapter,
-    selectedTopic,
     scope,
     activePlan,
     history,
-    radar,
-    radarState,
     generating,
     savingCheckpoint,
     error,
     staleNotice,
-    setScope,
     setChapter,
-    setTopic,
     updateProfile,
-    applyRadarTopic,
+    togglePlanStep,
     createPlan,
     submitCheckpoint,
     loadHistoryPlan,
     clearError: () => setError(""),
   }), [
     activePlan,
-    applyRadarTopic,
     authBusy,
     chapters,
     createPlan,
@@ -414,19 +403,15 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     history,
     hydrated,
     loadHistoryPlan,
-    radar,
-    radarState,
     savingCheckpoint,
     scope,
     selectedChapter,
-    selectedTopic,
     setChapter,
-    setScope,
-    setTopic,
     settled,
     source,
     staleNotice,
     submitCheckpoint,
+    togglePlanStep,
     updateProfile,
     userId,
   ]);

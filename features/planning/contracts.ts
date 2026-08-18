@@ -1,8 +1,19 @@
 export interface MissionPlanStep {
+  sequence: number;
+  unit_id: string;
   title: string;
-  duration?: string;
+  duration: string;
   detail: string;
-  focus?: string;
+  focus: string;
+  prerequisite_check: {
+    status: "repair_first" | "ready" | "connect_previous";
+    question: string;
+    guidance: string;
+  };
+  completion_check: {
+    question: string;
+    expected_outcome: string;
+  };
 }
 
 export interface MissionQuestion {
@@ -15,12 +26,6 @@ export interface MissionQuestion {
   explanation?: string;
 }
 
-export interface MissionRoadmapStep {
-  condition: string;
-  next_step: string;
-  mentor_action?: string;
-}
-
 export interface AutonomousMission {
   mission_id: string;
   status: string;
@@ -28,6 +33,8 @@ export interface AutonomousMission {
   chapter?: string;
   target_topic: string;
   target_source: string;
+  plan_scope?: "chapter" | string;
+  learning_unit_count?: number;
   mission_type?: string;
   priority?: string;
   mastery_band?: string;
@@ -50,12 +57,10 @@ export interface AutonomousMission {
   success_criteria?: string[];
   study_plan?: MissionPlanStep[];
   diagnostic_question?: MissionQuestion;
-  adaptive_roadmap?: MissionRoadmapStep[];
   result?: {
     data?: {
       questions?: MissionQuestion[];
       study_plan?: MissionPlanStep[];
-      adaptive_roadmap?: MissionRoadmapStep[];
     };
   };
 }
@@ -74,15 +79,12 @@ export interface PlanningProfile {
 
 export interface PlanningDraft {
   chapter: string;
-  topic: string;
   profile: PlanningProfile;
 }
 
 export interface PlanningScope {
   chapter: string;
   chapterLabel: string;
-  topic: string;
-  topicLabel: string;
   subject: string;
   classLevel: string;
 }
@@ -110,6 +112,7 @@ export interface PlanningPlan {
   createdAt: string;
   responseLatencyMs?: number;
   checkpoint?: PlanningCheckpointResult;
+  completedStepIndexes?: number[];
 }
 
 export const DEFAULT_PLANNING_PROFILE: PlanningProfile = {
@@ -196,35 +199,27 @@ export function normalizePlanningProfile(value: unknown): PlanningProfile {
 }
 
 export function normalizePlanningDraft(value: unknown): PlanningDraft | null {
-  if (!isRecord(value) || typeof value.chapter !== "string" || typeof value.topic !== "string") return null;
+  if (!isRecord(value) || typeof value.chapter !== "string") return null;
   return {
     chapter: value.chapter,
-    topic: value.topic,
     profile: normalizePlanningProfile(value.profile),
   };
 }
 
 export function normalizePlanningPlan(value: unknown): PlanningPlan | null {
-  if (!isRecord(value) || !isAutonomousMission(value.mission) || !isRecord(value.scope)) return null;
+  if (!isRecord(value) || !isChapterPlanningMission(value.mission) || !isRecord(value.scope)) return null;
   const scope = value.scope;
-  if (
-    typeof scope.chapter !== "string"
-    || typeof scope.chapterLabel !== "string"
-    || typeof scope.topic !== "string"
-    || typeof scope.topicLabel !== "string"
-    || typeof scope.subject !== "string"
-    || typeof scope.classLevel !== "string"
-  ) return null;
+  if (typeof scope.chapter !== "string") return null;
 
   const plan: PlanningPlan = {
     mission: value.mission,
     scope: {
       chapter: scope.chapter,
-      chapterLabel: scope.chapterLabel,
-      topic: scope.topic,
-      topicLabel: scope.topicLabel,
-      subject: scope.subject,
-      classLevel: scope.classLevel,
+      chapterLabel: typeof scope.chapterLabel === "string"
+        ? scope.chapterLabel
+        : formatPlanningLabel(value.mission.chapter || scope.chapter),
+      subject: typeof scope.subject === "string" ? scope.subject : value.mission.subject,
+      classLevel: typeof scope.classLevel === "string" ? scope.classLevel : "",
     },
     profile: normalizePlanningProfile(value.profile),
     catalogSource: value.catalogSource === "published" ? "published" : "starter",
@@ -232,6 +227,11 @@ export function normalizePlanningPlan(value: unknown): PlanningPlan | null {
   };
   if (typeof value.responseLatencyMs === "number") plan.responseLatencyMs = value.responseLatencyMs;
   if (isRecord(value.checkpoint)) plan.checkpoint = value.checkpoint as unknown as PlanningCheckpointResult;
+  if (Array.isArray(value.completedStepIndexes)) {
+    plan.completedStepIndexes = Array.from(new Set(
+      value.completedStepIndexes.filter((index): index is number => Number.isInteger(index) && index >= 0),
+    ));
+  }
   return plan;
 }
 
@@ -271,20 +271,12 @@ export function calculatePlanningFocusScore({
 export function getMissionPlan(mission?: AutonomousMission | null): MissionPlanStep[] {
   if (!mission) return [];
   const plan = mission.study_plan || mission.result?.data?.study_plan || [];
-  if (plan.length) return plan;
-  return (mission.steps || []).map((detail, index) => ({
-    title: `Step ${index + 1}`,
-    detail,
-    duration: "Focused work",
-  }));
+  return plan.length && plan.every(isMissionPlanStep) ? plan : [];
 }
 
 export function getMissionQuestion(mission?: AutonomousMission | null) {
-  return mission?.diagnostic_question || mission?.result?.data?.questions?.[0] || null;
-}
-
-export function getMissionRoadmap(mission?: AutonomousMission | null) {
-  return mission?.adaptive_roadmap || mission?.result?.data?.adaptive_roadmap || [];
+  const question = mission?.diagnostic_question || mission?.result?.data?.questions?.[0];
+  return isMissionQuestion(question) ? question : null;
 }
 
 export function parsePlanningMinutes(value?: string | number) {
@@ -298,34 +290,94 @@ export function getEstimatedPlanMinutes(plan?: PlanningPlan | null) {
   return plannedFromSteps || Math.max(0, Number(plan?.mission.estimated_minutes || 0));
 }
 
-export function buildPlanningReport(mission: AutonomousMission, correct: boolean): PlanningReport {
-  const topic = formatPlanningLabel(mission.target_topic);
+export function buildPlanningReport(
+  mission: AutonomousMission,
+  correct: boolean,
+  chapterLabel = formatPlanningLabel(mission.chapter || mission.target_topic),
+): PlanningReport {
   return {
     title: correct ? "Strong first signal" : "Weak point detected",
     summary: correct
-      ? `You understood the first diagnostic for ${topic}. Move into application so the signal becomes exam-ready.`
-      : `The diagnostic found a gap in ${topic}. Rebuild that exact concept before adding more practice.`,
+      ? `You understood the chapter check for ${chapterLabel}. Use the result to finish the remaining steps with confidence.`
+      : `The chapter check found a gap in ${chapterLabel}. Revisit the matching roadmap step before adding more practice.`,
     next: correct
       ? [
-          `Try two exam-style application questions on ${topic}.`,
+          `Try two exam-style application questions from ${chapterLabel}.`,
           "Explain the concept once in your own words.",
           "Use revision after the next learning block to protect recall.",
         ]
       : [
-          `Ask the Study tutor for a simpler explanation of ${topic}.`,
+          `Revisit the clearest explanation in your ${chapterLabel} roadmap.`,
           "Learn one worked example and one common mistake.",
           "Retry a similar question before increasing difficulty.",
         ],
   };
 }
 
-export function isAutonomousMission(value: unknown): value is AutonomousMission {
-  if (!value || typeof value !== "object") return false;
-  const mission = value as Partial<AutonomousMission>;
-  return Boolean(
-    mission.mission_id &&
-      mission.target_topic &&
-      mission.objective &&
-      Array.isArray(mission.steps),
+function nonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && Boolean(value.trim());
+}
+
+function isMissionPlanStep(value: unknown, index: number): value is MissionPlanStep {
+  if (!isRecord(value)) return false;
+  const prerequisite = value.prerequisite_check;
+  const completion = value.completion_check;
+  return (
+    value.sequence === index + 1
+    && nonEmptyString(value.unit_id)
+    && nonEmptyString(value.title)
+    && nonEmptyString(value.duration)
+    && nonEmptyString(value.detail)
+    && nonEmptyString(value.focus)
+    && isRecord(prerequisite)
+    && ["repair_first", "ready", "connect_previous"].includes(String(prerequisite.status))
+    && nonEmptyString(prerequisite.question)
+    && nonEmptyString(prerequisite.guidance)
+    && isRecord(completion)
+    && nonEmptyString(completion.question)
+    && nonEmptyString(completion.expected_outcome)
   );
+}
+
+function isMissionQuestion(value: unknown): value is MissionQuestion {
+  if (!isRecord(value) || !nonEmptyString(value.question) || !nonEmptyString(value.correct)) return false;
+  if (!Array.isArray(value.options) || value.options.length < 2 || !value.options.every(nonEmptyString)) return false;
+  return value.options.includes(value.correct);
+}
+
+export function isChapterPlanningMission(value: unknown): value is AutonomousMission {
+  if (!isRecord(value) || value.plan_scope !== "chapter") return false;
+  const plan = Array.isArray(value.study_plan)
+    ? value.study_plan
+    : isRecord(value.result) && isRecord(value.result.data) && Array.isArray(value.result.data.study_plan)
+      ? value.result.data.study_plan
+      : [];
+  if (!plan.length || !plan.every(isMissionPlanStep)) return false;
+  if (value.learning_unit_count !== plan.length) return false;
+  const unitIds = new Set(plan.map((step) => step.unit_id));
+  const prerequisiteQuestions = new Set(plan.map((step) => (
+    String(step.prerequisite_check?.question)
+      .trim()
+      .toLocaleLowerCase()
+  )));
+  if (unitIds.size !== plan.length || prerequisiteQuestions.size !== plan.length) return false;
+
+  const diagnostic = isRecord(value.diagnostic_question)
+    ? value.diagnostic_question
+    : isRecord(value.result) && isRecord(value.result.data) && Array.isArray(value.result.data.questions)
+      ? value.result.data.questions[0]
+      : null;
+  return Boolean(
+    nonEmptyString(value.mission_id)
+    && nonEmptyString(value.subject)
+    && nonEmptyString(value.target_topic)
+    && nonEmptyString(value.objective)
+    && nonEmptyString(value.why)
+    && isMissionQuestion(diagnostic),
+  );
+}
+
+export function isRetiredTopicPlanningSnapshot(value: unknown) {
+  if (!isRecord(value) || !isRecord(value.mission)) return false;
+  return value.mission.plan_scope !== "chapter";
 }

@@ -1,6 +1,7 @@
 import {
   normalizePlanningDraft,
   normalizePlanningPlan,
+  isRetiredTopicPlanningSnapshot,
   type PlanningDraft,
   type PlanningPlan,
 } from "./contracts";
@@ -38,8 +39,15 @@ export function writePlanningDraft(userId: string, draft: PlanningDraft) {
   writeJSON(key(userId, "draft"), draft);
 }
 
-export function readActivePlanningPlan(userId: string) {
-  return normalizePlanningPlan(readJSON<unknown>(key(userId, "active")));
+export function readActivePlanningPlanState(userId: string) {
+  const raw = readJSON<unknown>(key(userId, "active"));
+  const plan = normalizePlanningPlan(raw);
+  const retired = !plan && isRetiredTopicPlanningSnapshot(raw);
+  return {
+    plan,
+    retired,
+    invalid: Boolean(raw && !plan && !retired),
+  };
 }
 
 export function writeActivePlanningPlan(userId: string, plan: PlanningPlan) {

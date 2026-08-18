@@ -2,49 +2,37 @@
 
 import { AppIcon } from "@/components/ui/Polished";
 import Link from "next/link";
+import { useState } from "react";
 import {
-  formatPlanningLabel,
+  getEstimatedPlanMinutes,
   getMissionPlan,
   getMissionQuestion,
-  getMissionRoadmap,
-  getEstimatedPlanMinutes,
 } from "./contracts";
 import { usePlanningExperience } from "./PlanningExperience";
 import { PlanningLoading, PlanningScreen, planningStyles as styles } from "./PlanningScreen";
-import {
-  getPlanBlockDestination,
-  getPlanningHandoffs,
-  PLANNING_ROUTES,
-} from "./routes";
-
-function StrategyGroup({ title, items }: { title: string; items: string[] }) {
-  if (!items.length) return null;
-  return (
-    <section className={styles.strategyGroup}>
-      <h3>{title}</h3>
-      <ul>{items.map((item) => <li key={item}>{item}</li>)}</ul>
-    </section>
-  );
-}
+import { PLANNING_ROUTES } from "./routes";
 
 export default function PlanningActive() {
-  const { authBusy, hydrated, activePlan } = usePlanningExperience();
-  if (authBusy || !hydrated) return <PlanningLoading label="Opening your active plan..." />;
+  const { authBusy, hydrated, activePlan, staleNotice, togglePlanStep } = usePlanningExperience();
+  const [openStep, setOpenStep] = useState<number | null>(null);
+
+  if (authBusy || !hydrated) return <PlanningLoading label="Opening your chapter plan..." />;
 
   if (!activePlan) {
     return (
       <PlanningScreen
         eyebrow="Planning Lab / Active plan"
-        title="No active plan on this device."
-        intro="Build a new plan or reopen a previous device snapshot. Planning will never substitute a different topic silently."
+        title="No active chapter plan on this device."
+        intro="Choose a chapter to create a calm, step-by-step route from the foundations to the final check."
         backHref={PLANNING_ROUTES.home}
       >
+        {staleNotice ? <div className={styles.notice} role="status">{staleNotice}</div> : null}
         <div className={styles.checkpointWrap}>
           <section className={styles.emptyCard}>
-            <h2>Choose the route you want to restore.</h2>
-            <p>A generated plan becomes active only after the planning service returns a complete mission.</p>
+            <h2>Choose the chapter you want to finish.</h2>
+            <p>A plan becomes active only after the planning service returns a complete chapter roadmap.</p>
             <div className={styles.emptyActions}>
-              <Link href={PLANNING_ROUTES.new} className={styles.primaryButton}>Build a plan</Link>
+              <Link href={PLANNING_ROUTES.new} className={styles.primaryButton}>Build a chapter plan</Link>
               <Link href={PLANNING_ROUTES.history} className={styles.secondaryButton}>Open device history</Link>
             </div>
           </section>
@@ -56,29 +44,28 @@ export default function PlanningActive() {
   const { mission, scope } = activePlan;
   const route = getMissionPlan(mission);
   const question = getMissionQuestion(mission);
-  const roadmap = getMissionRoadmap(mission);
   const estimatedMinutes = getEstimatedPlanMinutes(activePlan);
-  const handoffs = getPlanningHandoffs(scope, mission.mission_id);
-  const strategyGroups = [
-    { title: "High-priority concepts", items: mission.high_priority_concepts || [] },
-    { title: "Fast-track strategy", items: mission.fast_track_strategy || [] },
-    { title: "Revision emphasis", items: mission.fast_revision_strategy || [] },
-    { title: "Weakness detection", items: mission.weakness_detection_points || [] },
-    { title: "Final confidence check", items: mission.final_confidence_check || [] },
-  ];
+  const completed = new Set(
+    (activePlan.completedStepIndexes || []).filter((index) => index >= 0 && index < route.length),
+  );
+  const completedCount = completed.size;
+  const progress = route.length ? Math.round((completedCount / route.length) * 100) : 0;
+  const currentIndex = route.findIndex((_, index) => !completed.has(index));
+  const nextIndex = currentIndex < 0 ? Math.max(0, route.length - 1) : currentIndex;
+  const displayedOpenStep = openStep === null ? nextIndex : openStep;
 
   return (
     <PlanningScreen
-      eyebrow="Planning Lab / Active plan"
-      title={scope.topicLabel}
-      intro="Follow the route in order or launch the exact block you need. The topic context moves with you into Study, Revision, and Exam."
+      eyebrow="Planning Lab / Chapter plan"
+      title={scope.chapterLabel}
+      intro="Follow one comfortable step at a time. Your roadmap, prerequisite guidance, and chapter check all stay inside Planning."
       backHref={PLANNING_ROUTES.home}
       actions={(
         <>
-          <Link href={PLANNING_ROUTES.new} className={styles.secondaryButton}>Change setup</Link>
+          <Link href={PLANNING_ROUTES.new} className={styles.secondaryButton}>Choose another chapter</Link>
           {question ? (
             <Link href={activePlan.checkpoint ? PLANNING_ROUTES.review : PLANNING_ROUTES.checkpoint} className={styles.primaryButton}>
-              {activePlan.checkpoint ? "Review checkpoint" : "Open checkpoint"}
+              {activePlan.checkpoint ? "Review chapter check" : "Open chapter check"}
               <AppIcon name="arrowRight" />
             </Link>
           ) : null}
@@ -88,7 +75,7 @@ export default function PlanningActive() {
       <section className={styles.summaryCard} aria-labelledby="active-plan-objective">
         <div className={styles.summaryTop}>
           <div>
-            <p className={styles.eyebrow}>Adaptive learning plan</p>
+            <p className={styles.eyebrow}>Your complete chapter route</p>
             <h2 id="active-plan-objective">{mission.objective}</h2>
             <p>{mission.why}</p>
           </div>
@@ -98,8 +85,18 @@ export default function PlanningActive() {
         </div>
         <div className={styles.summaryMetrics}>
           <div><span>Subject</span><strong>{scope.subject}</strong></div>
-          <div><span>Chapter</span><strong>{scope.chapterLabel}</strong></div>
+          <div><span>Progress</span><strong>{completedCount} of {route.length} steps</strong></div>
           <div><span>Estimated duration</span><strong>{estimatedMinutes ? `About ${estimatedMinutes} minutes` : "Flexible pace"}</strong></div>
+        </div>
+        <div
+          className={styles.progressTrack}
+          role="progressbar"
+          aria-label="Chapter plan progress"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={progress}
+        >
+          <span style={{ width: `${progress}%` }} />
         </div>
       </section>
 
@@ -107,90 +104,94 @@ export default function PlanningActive() {
         <section className={styles.routePanel} aria-labelledby="route-heading">
           <div className={styles.sectionHeader}>
             <div>
-              <p className={styles.eyebrow}>Executable route</p>
-              <h2 id="route-heading">Your study blocks</h2>
-              <p>Each block opens in the workspace best suited to the task.</p>
+              <p className={styles.eyebrow}>Step-by-step roadmap</p>
+              <h2 id="route-heading">Complete the chapter in this order</h2>
+              <p>Open only the step you are working on. Mark it complete when its check feels comfortable.</p>
             </div>
-            <span className={styles.statusChip}>{route.length} {route.length === 1 ? "block" : "blocks"}</span>
+            <span className={styles.statusChip}>{progress}% complete</span>
           </div>
+
           {route.length ? (
             <ol className={styles.routeList}>
               {route.map((step, index) => {
-                const destination = getPlanBlockDestination(step, index, scope, mission.mission_id);
+                const isComplete = completed.has(index);
+                const isOpen = displayedOpenStep === index;
+                const prerequisite = step.prerequisite_check;
+                const completion = step.completion_check;
                 return (
-                  <li key={`${step.title}-${index}`} className={styles.routeStep}>
-                    <span className={styles.stepIndex}>{String(index + 1).padStart(2, "0")}</span>
+                  <li
+                    key={step.unit_id || `${step.title}-${index}`}
+                    className={styles.routeStep}
+                    data-completed={isComplete ? "true" : "false"}
+                    data-current={index === nextIndex && !isComplete ? "true" : "false"}
+                  >
+                    <span className={styles.stepIndex}>{isComplete ? <AppIcon name="check" /> : String(index + 1).padStart(2, "0")}</span>
                     <div className={styles.stepCopy}>
-                      <div className={styles.stepHeading}>
-                        <strong>{step.title}</strong>
-                        <span>{step.duration || "Focused work"}</span>
-                      </div>
-                      <p>{step.detail}</p>
-                      {step.focus ? <small>Focus: {step.focus}</small> : null}
+                      <button type="button" className={styles.stepToggle} onClick={() => setOpenStep(isOpen ? -1 : index)} aria-expanded={isOpen}>
+                        <span>
+                          <strong>{step.title}</strong>
+                          <small>{step.duration}</small>
+                          <small className={styles.stepCompletionState} data-completed={isComplete ? "true" : "false"}>
+                            {isComplete ? "Completed" : index === nextIndex ? "Next step" : "Not completed"}
+                          </small>
+                        </span>
+                        <span aria-hidden="true">{isOpen ? "−" : "+"}</span>
+                      </button>
+                      {isOpen ? (
+                        <div className={styles.stepDetails}>
+                          <p>{step.detail}</p>
+                          <p><strong>Focus:</strong> {step.focus}</p>
+                          <div className={styles.inlineCheck} data-status={prerequisite.status}>
+                            <span>{prerequisite.status === "repair_first" ? "Before this step" : "Quick readiness check"}</span>
+                            <strong>{prerequisite.question}</strong>
+                            <p>{prerequisite.guidance}</p>
+                          </div>
+                          <div className={styles.inlineCheck}>
+                            <span>Before marking complete</span>
+                            <strong>{completion.question}</strong>
+                            <p>{completion.expected_outcome}</p>
+                          </div>
+                          <button type="button" className={isComplete ? styles.secondaryButton : styles.primaryButton} onClick={() => togglePlanStep(index)}>
+                            <AppIcon name={isComplete ? "x" : "check"} />
+                            {isComplete ? "Mark as not finished" : "Mark step complete"}
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
-                    <Link href={destination.href} className={styles.stepAction}>
-                      {destination.label}
-                      <AppIcon name="arrowRight" />
-                    </Link>
                   </li>
                 );
               })}
             </ol>
-          ) : <p className={styles.stateMessage}>The service returned no executable blocks. Rebuild this plan before starting.</p>}
+          ) : <p className={styles.stateMessage}>No chapter steps were returned. Rebuild the plan before starting.</p>}
         </section>
 
-        <aside className={styles.strategyPanel} aria-labelledby="strategy-heading">
-          <p className={styles.eyebrow}>Plan intelligence</p>
-          <h2 id="strategy-heading">Focus and strategy</h2>
-          {mission.prerequisite_check ? (
-            <section className={styles.strategyGroup}>
-              <h3>Prerequisite check</h3>
-              <ul>
-                <li>{formatPlanningLabel(mission.prerequisite_check.status || "Ready check")}</li>
-                {mission.prerequisite_check.question ? <li>{mission.prerequisite_check.question}</li> : null}
-                {mission.prerequisite_check.action ? <li>{mission.prerequisite_check.action}</li> : null}
-              </ul>
-            </section>
+        <aside className={styles.strategyPanel} aria-labelledby="chapter-next-heading">
+          <p className={styles.eyebrow}>Your next move</p>
+          <h2 id="chapter-next-heading">{progress === 100 ? "Roadmap complete" : `Step ${nextIndex + 1} is next`}</h2>
+          <p className={styles.panelCopy}>
+            {progress === 100
+              ? "You have worked through every chapter step. Use the chapter check when you are ready."
+              : "Stay with one step until its completion check feels clear. You can return here anytime without losing progress."}
+          </p>
+          {route[nextIndex] ? (
+            <div className={styles.nextStepCard}>
+              <span>{progress === 100 ? "Last completed step" : "Continue here"}</span>
+              <strong>{route[nextIndex].title}</strong>
+              <p>{route[nextIndex].focus}</p>
+              <button type="button" className={styles.secondaryButton} onClick={() => setOpenStep(nextIndex)}>Open this step</button>
+            </div>
           ) : null}
-          <div className={styles.strategyList}>
-            {strategyGroups.map((group) => <StrategyGroup key={group.title} title={group.title} items={group.items} />)}
-            {roadmap.length ? (
-              <section className={styles.strategyGroup}>
-                <h3>Adaptive roadmap</h3>
-                <div>
-                  {roadmap.map((item) => (
-                    <article key={item.condition} className={styles.roadmapItem}>
-                      <strong>{item.condition}</strong>
-                      <p>{item.next_step}</p>
-                      {item.mentor_action ? <p>Coach: {item.mentor_action}</p> : null}
-                    </article>
-                  ))}
-                </div>
-              </section>
-            ) : null}
-          </div>
+          {question ? (
+            <Link href={activePlan.checkpoint ? PLANNING_ROUTES.review : PLANNING_ROUTES.checkpoint} className={`${styles.primaryButton} ${styles.chapterCheckAction}`}>
+              {activePlan.checkpoint ? "View chapter result" : "Take the chapter check"}
+              <AppIcon name="arrowRight" />
+            </Link>
+          ) : (
+            <p className={styles.stateMessage}>The planner did not return a chapter check. Your roadmap remains usable.</p>
+          )}
+          <p className={styles.safetyNote}>Your chapter roadmap and checks stay together in Planning.</p>
         </aside>
       </div>
-
-      <section className={styles.handoffSection} aria-labelledby="handoff-heading">
-        <div className={styles.sectionHeader}>
-          <div>
-            <p className={styles.eyebrow}>Learning journey</p>
-            <h2 id="handoff-heading">Continue with this exact topic</h2>
-            <p>These handoffs launch the current plan scope. Completion remains tied to confirmed learning sessions.</p>
-          </div>
-        </div>
-        <div className={styles.handoffGrid}>
-          {handoffs.map((handoff) => (
-            <Link key={handoff.mode} href={handoff.href} className={styles.handoffCard}>
-              <span className={styles.modeChip}>{handoff.mode}</span>
-              <strong>{handoff.title}</strong>
-              <p>{handoff.detail}</p>
-              <span>Open workspace →</span>
-            </Link>
-          ))}
-        </div>
-      </section>
     </PlanningScreen>
   );
 }

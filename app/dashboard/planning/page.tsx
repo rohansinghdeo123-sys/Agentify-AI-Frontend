@@ -3,7 +3,7 @@ import PlanningHome from "@/features/planning/PlanningHome";
 
 export const metadata: Metadata = {
   title: "Planning | AgentifyAI",
-  description: "Build a focused, adaptive study plan for your next topic.",
+  description: "Turn a complete chapter into a comfortable, step-by-step learning roadmap.",
   alternates: { canonical: "/dashboard/planning" },
 };
 

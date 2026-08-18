@@ -1,12 +1,9 @@
 "use client";
 
 import { AppIcon } from "@/components/ui/Polished";
-import { findCatalogTopic } from "@/lib/catalog";
-import { BUCKET_LABELS } from "@/lib/revision";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
 import {
-  formatPlanningLabel,
   GOAL_OPTIONS,
   KNOWLEDGE_OPTIONS,
   PREREQUISITE_OPTIONS,
@@ -22,16 +19,18 @@ function SelectField({
   value,
   options,
   onChange,
+  disabled = false,
 }: {
   label: string;
   value: string;
   options: ReadonlyArray<{ label: string; value: string }>;
   onChange: (value: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <label>
       <span className={styles.fieldLabel}>{label}</span>
-      <select value={value} onChange={(event) => onChange(event.target.value)} className={styles.field}>
+      <select value={value} onChange={(event) => onChange(event.target.value)} className={styles.field} disabled={disabled}>
         {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
     </label>
@@ -52,30 +51,21 @@ export default function PlanningBuilder() {
     catalogSource,
     catalogSettled,
     selectedChapter,
-    selectedTopic,
-    radar,
-    radarState,
     generating,
     error,
     staleNotice,
-    setScope,
     setChapter,
-    setTopic,
     updateProfile,
-    applyRadarTopic,
     createPlan,
   } = usePlanningExperience();
 
   useEffect(() => {
     if (appliedQueryRef.current || !hydrated || !catalogSettled || !chapters.length) return;
     appliedQueryRef.current = true;
-    const requestedTopic = searchParams.get("topic") || "";
     const requestedChapter = searchParams.get("chapter") || "";
-    const chapter = chapters.find((item) => item.value === requestedChapter)
-      || chapters.find((item) => findCatalogTopic(item, requestedTopic));
-    const topic = findCatalogTopic(chapter, requestedTopic) || chapter?.topics[0];
-    if (chapter && topic) setScope(chapter.value, topic.value);
-  }, [catalogSettled, chapters, hydrated, searchParams, setScope]);
+    const chapter = chapters.find((item) => item.value === requestedChapter);
+    if (chapter) setChapter(chapter.value);
+  }, [catalogSettled, chapters, hydrated, searchParams, setChapter]);
 
   useEffect(() => () => requestRef.current?.abort(), []);
 
@@ -96,8 +86,8 @@ export default function PlanningBuilder() {
   return (
     <PlanningScreen
       eyebrow="Planning Lab / Builder"
-      title="Select. Generate. Start learning."
-      intro="Choose one syllabus topic and how you want to approach it. AgentifyAI will group the learning into a focused route and estimate the duration for you."
+      title="Choose a chapter. Get a clear plan."
+      intro="Pick the chapter you want to finish. AgentifyAI will arrange it into comfortable learning steps, from the first idea to the final chapter check."
       backHref={PLANNING_ROUTES.home}
     >
       {staleNotice ? <div className={styles.notice} role="status">{staleNotice}</div> : null}
@@ -106,24 +96,18 @@ export default function PlanningBuilder() {
       <div className={styles.builderLayout}>
         <section className={styles.builderPanel} aria-labelledby="builder-heading">
           <p className={styles.eyebrow}>Plan setup</p>
-          <h2 id="builder-heading">The inputs that shape this route</h2>
+          <h2 id="builder-heading">One choice is enough to begin</h2>
           <div className={styles.builderSections}>
             <div className={styles.builderSection}>
               <div className={styles.builderSectionTitle}>
                 <span>01</span>
-                <div><strong>Choose the target</strong><small>One chapter and one topic only.</small></div>
+                <div><strong>Choose your chapter</strong><small>Your plan will cover the complete chapter in a clear order.</small></div>
               </div>
-              <div className={styles.formGrid}>
+              <div className={styles.chapterField}>
                 <label>
                   <span className={styles.fieldLabel}>Chapter</span>
-                  <select value={draft.chapter} onChange={(event) => setChapter(event.target.value)} className={styles.field}>
+                  <select value={draft.chapter} onChange={(event) => setChapter(event.target.value)} className={styles.field} disabled={generating}>
                     {chapters.map((chapter) => <option key={chapter.value} value={chapter.value}>{chapter.label}</option>)}
-                  </select>
-                </label>
-                <label>
-                  <span className={styles.fieldLabel}>Topic</span>
-                  <select value={draft.topic} onChange={(event) => setTopic(event.target.value)} className={styles.field}>
-                    {(selectedChapter?.topics || []).map((topic) => <option key={topic.value} value={topic.value}>{topic.label}</option>)}
                   </select>
                 </label>
               </div>
@@ -139,49 +123,40 @@ export default function PlanningBuilder() {
               </div>
             </div>
 
-            <div className={styles.builderSection}>
-              <div className={styles.builderSectionTitle}>
-                <span>02</span>
-                <div><strong>Choose your learning approach</strong><small>Four quick choices help shape the route.</small></div>
-              </div>
+            <details
+              className={styles.personalisePanel}
+              aria-disabled={generating}
+              onClick={(event) => {
+                if (generating) event.preventDefault();
+              }}
+              onKeyDown={(event) => {
+                if (generating && (event.key === "Enter" || event.key === " ")) event.preventDefault();
+              }}
+            >
+              <summary>
+                <span><strong>Personalise my plan</strong><small>Optional — the defaults already work well for most students.</small></span>
+                <span aria-hidden="true">+</span>
+              </summary>
               <div className={styles.formGrid}>
-                <SelectField label="Current knowledge" value={draft.profile.currentKnowledge} options={KNOWLEDGE_OPTIONS} onChange={changeProfile("currentKnowledge")} />
-                <SelectField label="Plan goal" value={draft.profile.learningGoal} options={GOAL_OPTIONS} onChange={changeProfile("learningGoal")} />
-                <SelectField label="Preferred style" value={draft.profile.preferredStyle} options={STYLE_OPTIONS} onChange={changeProfile("preferredStyle")} />
-                <SelectField label="Prerequisite confidence" value={draft.profile.prerequisiteConfidence} options={PREREQUISITE_OPTIONS} onChange={changeProfile("prerequisiteConfidence")} />
+                <SelectField label="What I know now" value={draft.profile.currentKnowledge} options={KNOWLEDGE_OPTIONS} onChange={changeProfile("currentKnowledge")} disabled={generating} />
+                <SelectField label="My goal" value={draft.profile.learningGoal} options={GOAL_OPTIONS} onChange={changeProfile("learningGoal")} disabled={generating} />
+                <SelectField label="How I learn best" value={draft.profile.preferredStyle} options={STYLE_OPTIONS} onChange={changeProfile("preferredStyle")} disabled={generating} />
+                <SelectField label="Basics confidence" value={draft.profile.prerequisiteConfidence} options={PREREQUISITE_OPTIONS} onChange={changeProfile("prerequisiteConfidence")} disabled={generating} />
               </div>
-            </div>
+            </details>
           </div>
         </section>
 
         <aside className={styles.builderAside} aria-label="Plan confirmation">
           <div className={styles.asideBlock}>
             <p className={styles.eyebrow}>Ready to generate</p>
-            <h2>{selectedTopic?.label || formatPlanningLabel(draft.topic)}</h2>
-            <p>The planner will combine related ideas into a compact route, preserve syllabus coverage, and estimate the learning duration.</p>
-            <ol className={styles.planPreview} aria-label="Expected learning route">
-              <li><span>01</span><strong>Learn the core ideas</strong></li>
-              <li><span>02</span><strong>Apply with focused practice</strong></li>
-              <li><span>03</span><strong>Check your understanding</strong></li>
+            <h2>{selectedChapter?.label || "Your chapter"}</h2>
+            <p>You will receive a complete, ordered roadmap. Every step stays together in Planning so it is always easy to continue.</p>
+            <ol className={styles.planPreview} aria-label="Expected chapter route">
+              <li><span>01</span><strong>Start with the foundations</strong></li>
+              <li><span>02</span><strong>Build the chapter step by step</strong></li>
+              <li><span>03</span><strong>Finish with one chapter check</strong></li>
             </ol>
-          </div>
-
-          <div className={styles.asideBlock}>
-            <p className={styles.eyebrow}>Revision radar</p>
-            <h2>Use a due topic instead</h2>
-            {radarState === "loading" ? <p className={styles.stateMessage}>Checking revision data…</p> : null}
-            {radarState === "unavailable" ? <p className={styles.stateMessage}>Revision data is currently unavailable.</p> : null}
-            {radarState === "empty" ? <p className={styles.stateMessage}>No due targets were returned.</p> : null}
-            {radar.length ? (
-              <div className={styles.radarList}>
-                {radar.map((entry) => (
-                  <button key={entry.topic} type="button" className={styles.radarButton} onClick={() => applyRadarTopic(entry)}>
-                    <span><strong>{formatPlanningLabel(entry.topic)}</strong><small>{entry.reason}</small></span>
-                    <span className={styles.modeChip}>{BUCKET_LABELS[entry.bucket]} · {entry.suggested_minutes}m</span>
-                  </button>
-                ))}
-              </div>
-            ) : null}
           </div>
 
           {generating ? (
@@ -189,9 +164,9 @@ export default function PlanningBuilder() {
               <p className={styles.eyebrow}>Building your route</p>
               <div className={styles.buildState}>
                 {[
-                  "Checking prerequisite signals",
-                  "Allocating the study order",
-                  "Preparing one checkpoint",
+                  "Reading the complete chapter",
+                  "Arranging comfortable learning steps",
+                  "Preparing the final chapter check",
                 ].map((step) => <div key={step} className={styles.buildStep}>{step}</div>)}
               </div>
             </div>

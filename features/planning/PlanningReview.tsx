@@ -5,7 +5,7 @@ import Link from "next/link";
 import { getMissionQuestion } from "./contracts";
 import { usePlanningExperience } from "./PlanningExperience";
 import { PlanningLoading, PlanningScreen, planningStyles as styles } from "./PlanningScreen";
-import { getPlanningHandoffs, PLANNING_ROUTES } from "./routes";
+import { PLANNING_ROUTES } from "./routes";
 
 export default function PlanningReview() {
   const { authBusy, hydrated, activePlan } = usePlanningExperience();
@@ -37,13 +37,11 @@ export default function PlanningReview() {
   }
 
   const question = getMissionQuestion(activePlan.mission);
-  const handoffs = getPlanningHandoffs(activePlan.scope, activePlan.mission.mission_id);
-
   return (
     <PlanningScreen
       eyebrow="Planning Lab / Performance review"
-      title="Use the signal. Choose the next move."
-      intro="Your checkpoint was accepted by the learning service. The plan snapshot itself remains device-local until plan synchronization is available."
+      title="Use the result to finish the chapter."
+      intro="Your chapter check was accepted by the learning service. Return to the roadmap and revisit only the steps that need another pass."
       backHref={PLANNING_ROUTES.active}
       backLabel="Active plan"
       actions={(
@@ -65,7 +63,7 @@ export default function PlanningReview() {
           </div>
 
           <div className={styles.summaryMetrics}>
-            <div><span>Topic</span><strong>{activePlan.scope.topicLabel}</strong></div>
+            <div><span>Chapter</span><strong>{activePlan.scope.chapterLabel}</strong></div>
             <div><span>Answer</span><strong>{checkpoint.correct ? "Correct" : "Needs review"}</strong></div>
             <div><span>Confidence</span><strong>{checkpoint.confidence}</strong></div>
             <div><span>Focus signal</span><strong>{checkpoint.focusScore}/100</strong></div>
@@ -85,27 +83,12 @@ export default function PlanningReview() {
           ) : null}
         </section>
       </div>
-
-      <section className={styles.handoffSection} aria-labelledby="review-next-heading">
-        <div className={styles.sectionHeader}>
-          <div>
-            <p className={styles.eyebrow}>Next workspace</p>
-            <h2 id="review-next-heading">Continue with evidence, not guesswork</h2>
-            <p>Keep the same chapter and topic as you move from this review.</p>
-          </div>
-        </div>
-        <div className={styles.handoffGrid}>
-          {handoffs.map((handoff) => (
-            <Link key={handoff.mode} href={handoff.href} className={styles.handoffCard}>
-              <span className={styles.modeChip}>{handoff.mode}</span>
-              <strong>{handoff.title}</strong>
-              <p>{handoff.detail}</p>
-              <span>Open workspace →</span>
-            </Link>
-          ))}
-        </div>
-      </section>
+      <div className={styles.reviewReturn}>
+        <Link href={PLANNING_ROUTES.active} className={styles.primaryButton}>
+          Return to chapter roadmap
+          <AppIcon name="arrowRight" />
+        </Link>
+      </div>
     </PlanningScreen>
   );
 }
-

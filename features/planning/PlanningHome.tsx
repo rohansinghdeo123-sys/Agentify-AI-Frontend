@@ -1,23 +1,19 @@
 "use client";
 
 import { AppIcon } from "@/components/ui/Polished";
-import { BUCKET_LABELS } from "@/lib/revision";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { formatPlanningLabel, getEstimatedPlanMinutes, getMissionPlan } from "./contracts";
+import { getEstimatedPlanMinutes, getMissionPlan } from "./contracts";
 import { usePlanningExperience } from "./PlanningExperience";
 import { PlanningLoading, PlanningScreen, planningStyles as styles } from "./PlanningScreen";
 import { PLANNING_ROUTES } from "./routes";
 
 const JOURNEY = [
-  { number: "01", title: "Plan", detail: "Select one target and generate a focused route." },
-  { number: "02", title: "Study", detail: "Open the exact learning block in Study Lab." },
-  { number: "03", title: "Revise", detail: "Protect recall with the guided revision route." },
-  { number: "04", title: "Test", detail: "Check application in Exam Lab." },
+  { number: "01", title: "Choose a chapter", detail: "One clear selection and no complicated setup." },
+  { number: "02", title: "Follow the roadmap", detail: "Work through comfortable chapter steps in order." },
+  { number: "03", title: "Take the chapter check", detail: "Use one clear result to decide what needs another pass." },
 ];
 
 export default function PlanningHome() {
-  const router = useRouter();
   const {
     authBusy,
     hydrated,
@@ -25,9 +21,7 @@ export default function PlanningHome() {
     history,
     catalogSource,
     catalogSettled,
-    radar,
-    radarState,
-    applyRadarTopic,
+    staleNotice,
   } = usePlanningExperience();
 
   if (authBusy || !hydrated) return <PlanningLoading />;
@@ -39,8 +33,8 @@ export default function PlanningHome() {
   return (
     <PlanningScreen
       eyebrow="AgentifyAI / Planning Lab"
-      title="Plan the work. Then do the work."
-      intro="Turn one syllabus target into a realistic sequence, launch each block in the right learning lab, and use a checkpoint before moving forward."
+      title="One chapter. One clear way forward."
+      intro="Choose a chapter and receive a comfortable step-by-step roadmap. Planning keeps every step and check together so students always know what to do next."
       actions={(
         <Link href={PLANNING_ROUTES.history} className={styles.secondaryButton}>
           <AppIcon name="history" />
@@ -48,18 +42,19 @@ export default function PlanningHome() {
         </Link>
       )}
     >
+      {staleNotice ? <div className={styles.notice} role="status">{staleNotice}</div> : null}
       <section className={styles.homeHero} aria-label="Current planning focus">
         <article className={styles.focusCard}>
           <p className={styles.eyebrow}>{activePlan ? "Active plan" : "Start with one clear target"}</p>
           <h2>
             {activePlan
-              ? `${activePlan.scope.topicLabel} is ready for focused work.`
-              : "Turn one topic into a route you can start now."}
+              ? `${activePlan.scope.chapterLabel} is ready to continue.`
+              : "Turn a full chapter into steps you can actually finish."}
           </h2>
           <p>
             {activePlan
               ? activePlan.mission.objective
-              : "Choose the chapter, topic, and learning approach once. Planning will organise the route, checkpoint, and next action into calm workspaces."}
+              : "Choose only the chapter. Planning will organise the foundations, learning units, practice, and final check in a calm order."}
           </p>
           <div className={styles.focusMeta}>
             {activePlan ? (
@@ -75,9 +70,9 @@ export default function PlanningHome() {
               </>
             ) : (
               <>
-                <span className={styles.statusChip}>One topic</span>
-                <span className={styles.statusChip}>One focused route</span>
-                <span className={styles.statusChip}>One next action</span>
+                <span className={styles.statusChip}>Chapter-wide</span>
+                <span className={styles.statusChip}>Step by step</span>
+                <span className={styles.statusChip}>Everything in one place</span>
               </>
             )}
           </div>
@@ -102,8 +97,8 @@ export default function PlanningHome() {
             <p>
               {catalogSettled
                 ? catalogSource === "published"
-                  ? "Your target selector is using the published catalog for this account."
-                  : "No published catalog was available, so starter topics remain clearly labelled."
+                  ? "Your chapter selector is using the published catalog for this account."
+                  : "No published catalog was available, so starter chapters remain clearly labelled."
                 : "Checking the published catalog before you build."}
             </p>
           </div>
@@ -115,63 +110,39 @@ export default function PlanningHome() {
         </aside>
       </section>
 
-      <section className={styles.dashboardGrid} aria-label="Planning recommendations and journey">
+      <section className={styles.dashboardGrid} aria-label="Simple chapter planning journey">
         <article className={styles.panel}>
           <div className={styles.panelHeader}>
             <div>
-              <p className={styles.eyebrow}>Memory signal</p>
-              <h2>Revision radar</h2>
-              <p>Use real due-topic data as the next planning target.</p>
+              <p className={styles.eyebrow}>Simple by design</p>
+              <h2>Three calm steps</h2>
+              <p>No second selector, no crowded controls, and no broken learning flow.</p>
             </div>
-            {radarState === "ready" ? <span className={styles.statusChip}>{radar.length} signals</span> : null}
-          </div>
-          {radarState === "loading" ? <p className={styles.stateMessage}>Checking your revision queue…</p> : null}
-          {radarState === "unavailable" ? (
-            <p className={styles.stateMessage}>Revision data is unavailable right now. This is different from having no due topics.</p>
-          ) : null}
-          {radarState === "empty" ? <p className={styles.stateMessage}>No due revision targets were returned.</p> : null}
-          {radar.length ? (
-            <div className={styles.radarList}>
-              {radar.map((entry) => (
-                <button
-                  key={entry.topic}
-                  type="button"
-                  className={styles.radarButton}
-                  onClick={() => {
-                    if (!applyRadarTopic(entry)) return;
-                    router.push(PLANNING_ROUTES.new);
-                  }}
-                >
-                  <span>
-                    <strong>{formatPlanningLabel(entry.topic)}</strong>
-                    <small>{entry.reason}</small>
-                  </span>
-                  <span className={styles.modeChip}>{BUCKET_LABELS[entry.bucket]} · {entry.suggested_minutes}m</span>
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </article>
-
-        <article className={styles.panel}>
-          <div className={styles.panelHeader}>
-            <div>
-              <p className={styles.eyebrow}>Learning journey</p>
-              <h2>Every plan leads somewhere</h2>
-              <p>The active plan carries the same topic into focused learning workspaces.</p>
-            </div>
-            <span className={styles.statusChip}>{history.length} on device</span>
+            <span className={styles.statusChip}>Chapter-wide</span>
           </div>
           <div className={styles.journeyList}>
             {JOURNEY.map((item) => (
               <div key={item.number} className={styles.journeyRow}>
                 <span>{item.number}</span>
-                <div>
-                  <strong>{item.title}</strong>
-                  <p>{item.detail}</p>
-                </div>
+                <div><strong>{item.title}</strong><p>{item.detail}</p></div>
               </div>
             ))}
+          </div>
+        </article>
+
+        <article className={styles.panel}>
+          <div className={styles.panelHeader}>
+            <div>
+              <p className={styles.eyebrow}>Always reliable</p>
+              <h2>Your place is easy to find</h2>
+              <p>Completed steps are saved with the plan on this device, and the next unfinished step is shown clearly.</p>
+            </div>
+            <span className={styles.statusChip}>{history.length} on device</span>
+          </div>
+          <div className={styles.trustList}>
+            <span>Every plan covers the complete selected chapter.</span>
+            <span>Prerequisite guidance belongs to its exact learning step.</span>
+            <span>Only you decide when a step is complete or when to open the chapter check.</span>
           </div>
         </article>
       </section>

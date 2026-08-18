@@ -36,7 +36,7 @@ export default function PlanningCheckpoint() {
       <PlanningScreen
         eyebrow="Planning Lab / Checkpoint"
         title="Build a plan before checking it."
-        intro="The checkpoint belongs to one immutable plan and topic, so Planning will not guess which mission you meant."
+        intro="The chapter check belongs to one saved plan, so Planning will not guess which chapter you meant."
         backHref={PLANNING_ROUTES.home}
       >
         <div className={styles.checkpointWrap}>
@@ -61,8 +61,8 @@ export default function PlanningCheckpoint() {
     return (
       <PlanningScreen
         eyebrow="Planning Lab / Checkpoint"
-        title="This plan has no checkpoint."
-        intro="The planning service did not return a diagnostic question. Continue with the executable route or rebuild the plan."
+        title="This plan has no chapter check."
+        intro="The planning service did not return a chapter question. Continue with the roadmap or rebuild the plan."
         backHref={PLANNING_ROUTES.active}
         backLabel="Active plan"
       >
@@ -113,13 +113,13 @@ export default function PlanningCheckpoint() {
     }, controller.signal);
   };
 
-  const hint = `Focus on the core idea in ${question.subtopic || question.topic || activePlan.scope.topicLabel} before comparing the options.`;
+  const hint = `Think about the central ideas in ${activePlan.scope.chapterLabel} before comparing the options.`;
 
   return (
     <PlanningScreen
       eyebrow="Planning Lab / Diagnostic checkpoint"
-      title={`Check your route for ${activePlan.scope.topicLabel}.`}
-      intro="One question, one confidence signal, and one confirmed save. Planning does not mark this checkpoint recorded until the learning service accepts it."
+      title={`Check your understanding of ${activePlan.scope.chapterLabel}.`}
+      intro="One chapter question, one confidence signal, and one confirmed save. Everything stays inside your Planning workspace."
       backHref={PLANNING_ROUTES.active}
       backLabel="Active plan"
       actions={result ? (
@@ -134,7 +134,7 @@ export default function PlanningCheckpoint() {
         <section className={styles.checkpointCard} aria-labelledby="checkpoint-question">
           <div className={styles.sectionHeader}>
             <div>
-              <p className={styles.eyebrow}>One-question diagnostic</p>
+              <p className={styles.eyebrow}>One chapter check</p>
               <h2>{activePlan.scope.chapterLabel}</h2>
             </div>
             <span className={styles.statusChip}>{result ? "Recorded" : "Not submitted"}</span>

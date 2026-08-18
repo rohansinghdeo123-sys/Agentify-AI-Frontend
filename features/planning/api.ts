@@ -1,7 +1,6 @@
 import { ApiRequestError, apiJson } from "@/lib/apiClient";
-import type { RevisionQueueResponse } from "@/lib/revision";
 import {
-  isAutonomousMission,
+  isChapterPlanningMission,
   type AutonomousMission,
   type PlanningProfile,
   type PlanningScope,
@@ -85,9 +84,9 @@ export async function generatePlanningMission(
         method: "POST",
         headers: await jsonHeaders(context.getAuthHeaders),
         body: JSON.stringify({
-          current_topic: scope.topicLabel,
           current_chapter: scope.chapter,
           subject: scope.subject,
+          class_level: scope.classLevel,
           current_knowledge: profile.currentKnowledge,
           learning_goal: profile.learningGoal,
           preferred_style: profile.preferredStyle,
@@ -100,7 +99,7 @@ export async function generatePlanningMission(
       },
     );
 
-    if (!isAutonomousMission(mission)) {
+    if (!isChapterPlanningMission(mission)) {
       throw new PlanningApiError("The planner returned an incomplete plan. Please try again.", "invalid_response");
     }
     return mission;
@@ -109,30 +108,8 @@ export async function generatePlanningMission(
   }
 }
 
-export async function fetchPlanningRadar(
-  context: PlanningRequestContext,
-  limit = 4,
-  signal?: AbortSignal,
-): Promise<RevisionQueueResponse> {
-  try {
-    return await apiJson<RevisionQueueResponse>(
-      `${getBackendURL(context.backendURL)}/revision/queue/${encodeURIComponent(context.userId)}?limit=${limit}`,
-      {
-        headers: await context.getAuthHeaders(),
-        retries: 1,
-        timeoutMs: 12000,
-        cacheKey: `planning-radar:${context.userId}:${limit}`,
-        cacheTtlMs: 30000,
-        signal,
-      },
-    );
-  } catch (error) {
-    throw normalizePlanningError(error, "Revision recommendations are unavailable.");
-  }
-}
-
 export type PlanningCheckpointSubmission = {
-  topic: string;
+  chapter: string;
   subject: string;
   correct: boolean;
   durationSeconds: number;
@@ -160,7 +137,7 @@ export async function submitPlanningCheckpoint(
         headers: await jsonHeaders(context.getAuthHeaders),
         body: JSON.stringify({
           user_id: context.userId,
-          topic: submission.topic,
+          topic: submission.chapter,
           subject: submission.subject,
           score: submission.correct ? 1 : 0,
           total_questions: 1,

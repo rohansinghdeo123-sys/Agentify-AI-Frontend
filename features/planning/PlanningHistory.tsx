@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { formatPlanningLabel, getEstimatedPlanMinutes, getMissionPlan } from "./contracts";
+import { getEstimatedPlanMinutes, getMissionPlan } from "./contracts";
 import { usePlanningExperience } from "./PlanningExperience";
 import { PlanningLoading, PlanningScreen, planningStyles as styles } from "./PlanningScreen";
 import { PLANNING_ROUTES } from "./routes";
@@ -25,7 +25,7 @@ export default function PlanningHistory() {
     <PlanningScreen
       eyebrow="Planning Lab / Device history"
       title="Plans created on this device."
-      intro="History is deliberately labelled device-only. Opening a snapshot restores its exact topic and setup; it does not claim cross-device synchronization."
+      intro="Opening a snapshot restores its exact chapter, preferences, roadmap, and completed steps on this device."
       backHref={PLANNING_ROUTES.home}
       actions={<Link href={PLANNING_ROUTES.new} className={styles.primaryButton}>Build a new plan</Link>}
     >
@@ -43,12 +43,13 @@ export default function PlanningHistory() {
             {history.map((plan) => {
               const estimatedMinutes = getEstimatedPlanMinutes(plan);
               const blockCount = getMissionPlan(plan.mission).length;
+              const completedCount = (plan.completedStepIndexes || []).filter((index) => index < blockCount).length;
               return (
                 <article key={plan.mission.mission_id} className={styles.historyCard}>
                   <div className={styles.historyTop}>
                     <div>
-                      <p className={styles.eyebrow}>{plan.scope.subject} / {plan.scope.chapterLabel}</p>
-                      <h2>{plan.scope.topicLabel || formatPlanningLabel(plan.mission.target_topic)}</h2>
+                      <p className={styles.eyebrow}>{plan.scope.subject}{plan.scope.classLevel ? ` / ${plan.scope.classLevel}` : ""}</p>
+                      <h2>{plan.scope.chapterLabel}</h2>
                       <p className={styles.panelCopy}>{plan.mission.objective}</p>
                     </div>
                     <button
@@ -65,9 +66,10 @@ export default function PlanningHistory() {
                   <div className={styles.historyMeta}>
                     <span className={styles.statusChip}>{formatDate(plan.createdAt)}</span>
                     <span className={styles.statusChip}>
-                      {estimatedMinutes ? `About ${estimatedMinutes} min` : `${blockCount} ${blockCount === 1 ? "block" : "blocks"}`}
+                      {estimatedMinutes ? `About ${estimatedMinutes} min` : `${blockCount} ${blockCount === 1 ? "step" : "steps"}`}
                     </span>
-                    <span className={styles.statusChip}>{plan.checkpoint ? "Checkpoint recorded" : "Checkpoint pending"}</span>
+                    <span className={styles.statusChip}>{completedCount} of {blockCount} steps complete</span>
+                    <span className={styles.statusChip}>{plan.checkpoint ? "Chapter check recorded" : "Chapter check pending"}</span>
                     <span className={styles.sourceChip} data-source={plan.catalogSource}>
                       {plan.catalogSource === "published" ? "Published syllabus" : "Starter catalog"}
                     </span>

@@ -3,8 +3,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Active Plan | AgentifyAI",
-  description: "Follow and launch every block in your active learning plan.",
+  description: "Follow your chapter roadmap, prerequisite guidance, and final check in Planning.",
 };
 
 export default PlanningActive;
-
