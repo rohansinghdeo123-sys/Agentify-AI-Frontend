@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
-import { parseStudyStreamFrame } from "@/features/study/api";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { parseStudyStreamFrame, streamCoachTurn } from "@/features/study/api";
 import { catalogCacheKey, findCatalogTopic, reconcileSelection } from "@/lib/catalog";
 import {
   legacyStudyHandoff,
@@ -15,7 +15,30 @@ function source(relativePath: string) {
   return readFileSync(join(process.cwd(), relativePath), "utf8");
 }
 
+function coachTurnPayload(): Parameters<typeof streamCoachTurn>[1] {
+  return {
+    userId: "student-1",
+    conversationId: "study-1",
+    prompt: "Explain matter",
+    groundingContextPrompt: "Explain matter",
+    scope: openStudyScope(),
+    attachments: [],
+    directAnswer: false,
+    socraticMode: true,
+    strictAttachmentGrounding: false,
+    intent: "concept",
+    mentorDirective: "Teach clearly.",
+    systemGuardrail: "Be accurate.",
+    studentState: {},
+    adaptiveStrategy: {},
+    learningContext: {},
+    requiredNotFoundResponse: "Material unavailable.",
+  };
+}
+
 describe("focused Study Lab architecture", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   const routes = [
     "app/dashboard/study/page.tsx",
     "app/dashboard/study/history/page.tsx",
@@ -98,11 +121,78 @@ describe("focused Study Lab architecture", () => {
     expect(parseStudyStreamFrame('data: {"type":"turn_event","event":"answer.completed","answer":"Clear answer","blocks":[]}')).toEqual({
       kind: "answer",
       result: { answer: "Clear answer", blocks: [], sources: undefined, socratic: undefined },
+      semantic: true,
     });
     expect(parseStudyStreamFrame("data: VGVzdCBhbnN3ZXI=")).toEqual({
       kind: "answer",
       result: { answer: "Test answer", blocks: [] },
+      semantic: false,
     });
+  });
+
+  it("keeps the Study request connected through the full SSE answer", async () => {
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        [
+          'data: {"type":"agent_stage","stage":"drafting","status":"active"}\n\n',
+          'data: {"type":"answer_delta","delta":"Working answer"}\n\n',
+          'data: {"type":"turn_event","event":"answer.completed","answer":"Complete answer","blocks":[]}\n\n',
+          "data: [DONE]\n\n",
+        ].forEach((frame) => controller.enqueue(encoder.encode(frame)));
+        controller.close();
+      },
+    });
+    const fetchMock = vi.fn().mockResolvedValue(new Response(body, {
+      status: 200,
+      headers: { "Content-Type": "text/event-stream" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const deltas: string[] = [];
+
+    const result = await streamCoachTurn(
+      { backendURL: "https://backend.test", headers: { Authorization: "Bearer test" } },
+      coachTurnPayload(),
+      { onDelta: (delta) => deltas.push(delta) },
+    );
+
+    expect(result.answer).toBe("Complete answer");
+    expect(deltas.join("")).toBe("Working answer");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/coach/chat/stream",
+      expect.objectContaining({ method: "POST", signal: expect.any(AbortSignal) }),
+    );
+  });
+
+  it("finishes on the backend DONE frame while the socket is open and preserves the semantic answer", async () => {
+    const encoder = new TextEncoder();
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode([
+          'data: {"type":"answer_delta","delta":"Draft answer"}\n\n',
+          'data: {"type":"turn_event","event":"answer.completed","answer":"Rich final answer","blocks":[{"kind":"explanation","title":"Why","content":"Grounded detail"}],"sources":{"grounded":true,"citations":[]}}\n\n',
+          "data: TGVnYWN5IGFuc3dlciB0aGF0IG11c3Qgbm90IHdpbg==\n\n",
+          "data: [DONE]\n\n",
+        ].join("")));
+        // The production backend may keep the HTTP socket open briefly after [DONE].
+      },
+      cancel,
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(body, {
+      status: 200,
+      headers: { "Content-Type": "text/event-stream" },
+    })));
+
+    const result = await streamCoachTurn(
+      { backendURL: "https://backend.test", headers: { Authorization: "Bearer test" } },
+      coachTurnPayload(),
+    );
+
+    expect(result.answer).toBe("Rich final answer");
+    expect(result.blocks).toEqual([{ kind: "explanation", title: "Why", content: "Grounded detail" }]);
+    expect(result.sources).toEqual({ grounded: true, citations: [] });
+    expect(cancel).toHaveBeenCalledTimes(1);
   });
 
   it("persists the source ids needed to resume a syllabus chat on another device", () => {

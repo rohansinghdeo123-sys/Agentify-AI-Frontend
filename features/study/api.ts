@@ -70,8 +70,11 @@ type ParsedFrame =
   | { kind: "done" }
   | { kind: "stage"; stage: AgentStagePayload }
   | { kind: "delta"; delta: string }
-  | { kind: "answer"; result: CoachTurnResult }
+  | { kind: "answer"; result: CoachTurnResult; semantic: boolean }
   | { kind: "none" };
+
+const STUDY_STREAM_CONNECT_TIMEOUT_MS = 25000;
+const STUDY_STREAM_IDLE_TIMEOUT_MS = 60000;
 
 function apiBase(override?: string) {
   const configured = override || process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -126,17 +129,18 @@ export function parseStudyStreamFrame(raw: string): ParsedFrame {
           sources: parsed.sources && typeof parsed.sources === "object" ? parsed.sources as unknown as CoachSources : undefined,
           socratic: typeof parsed.socratic === "boolean" ? parsed.socratic : undefined,
         },
+        semantic: true,
       };
     }
     if (typeof parsed.answer === "string") {
-      return { kind: "answer", result: { answer: parsed.answer.trim(), blocks: [] } };
+      return { kind: "answer", result: { answer: parsed.answer.trim(), blocks: [] }, semantic: false };
     }
     return { kind: "none" };
   } catch {
     const decoded = decodeBase64Utf8(payload);
     return decoded
-      ? { kind: "answer", result: { answer: decoded, blocks: [] } }
-      : { kind: "answer", result: { answer: payload, blocks: [] } };
+      ? { kind: "answer", result: { answer: decoded, blocks: [] }, semantic: false }
+      : { kind: "answer", result: { answer: payload, blocks: [] }, semantic: false };
   }
 }
 
@@ -169,6 +173,40 @@ function normalizeError(error: unknown): StudyApiError {
 async function errorFromResponse(response: Response) {
   const body = await response.json().catch(() => null) as { detail?: unknown } | null;
   return normalizeError(new ApiRequestError(String(body?.detail || `Request failed: ${response.status}`), response.status));
+}
+
+async function readStreamChunk(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  controller: AbortController,
+) {
+  let timedOut = false;
+  let timeout: ReturnType<typeof globalThis.setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      reader.read(),
+      new Promise<never>((_, reject) => {
+        timeout = globalThis.setTimeout(() => {
+          timedOut = true;
+          controller.abort();
+          reject(new StudyApiError(
+            "Your tutor took too long to continue this response. Your question is safe—please try again.",
+            "timeout",
+          ));
+        }, STUDY_STREAM_IDLE_TIMEOUT_MS);
+      }),
+    ]);
+  } catch (error) {
+    if (timedOut) {
+      throw new StudyApiError(
+        "Your tutor took too long to continue this response. Your question is safe—please try again.",
+        "timeout",
+      );
+    }
+    throw error;
+  } finally {
+    if (timeout) globalThis.clearTimeout(timeout);
+  }
 }
 
 export async function listStudyConversations(
@@ -288,13 +326,22 @@ export async function streamCoachTurn(
   const strictGrounding = syllabusGrounded || attachmentGrounded;
   let streamed = "";
   let completed: CoachTurnResult | null = null;
+  const streamController = new AbortController();
+  const abortStream = () => streamController.abort();
+  let connectionTimedOut = false;
+  const connectionTimeout = globalThis.setTimeout(() => {
+    connectionTimedOut = true;
+    streamController.abort();
+  }, STUDY_STREAM_CONNECT_TIMEOUT_MS);
+  if (callbacks.signal?.aborted) abortStream();
+  else callbacks.signal?.addEventListener("abort", abortStream, { once: true });
 
   try {
-    const response = await apiFetch(`${apiBase(context.backendURL)}/coach/chat/stream`, {
+    const response = await fetch(`${apiBase(context.backendURL)}/coach/chat/stream`, {
       method: "POST",
       headers: context.headers,
-      signal: callbacks.signal,
-      timeoutMs: 25000,
+      cache: "no-store",
+      signal: streamController.signal,
       body: JSON.stringify({
         user_id: payload.userId,
         message: payload.prompt,
@@ -335,6 +382,7 @@ export async function streamCoachTurn(
         },
       }),
     });
+    globalThis.clearTimeout(connectionTimeout);
     if (!response.ok) throw await errorFromResponse(response);
 
     if (!response.body) {
@@ -346,26 +394,39 @@ export async function streamCoachTurn(
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
+    let streamDone = false;
+    let completedIsSemantic = false;
 
     const processFrame = (frameText: string) => {
       const frame = parseStudyStreamFrame(frameText);
+      if (frame.kind === "done") {
+        streamDone = true;
+        return;
+      }
       if (frame.kind === "stage") callbacks.onStage?.(frame.stage);
       if (frame.kind === "delta") {
         streamed += frame.delta;
         callbacks.onDelta?.(frame.delta);
       }
-      if (frame.kind === "answer") completed = frame.result;
+      if (frame.kind === "answer" && (!completedIsSemantic || frame.semantic)) {
+        completed = frame.result;
+        completedIsSemantic = frame.semantic;
+      }
     };
 
-    while (true) {
-      const { value, done } = await reader.read();
+    while (!streamDone) {
+      const { value, done } = await readStreamChunk(reader, streamController);
       if (done) break;
       buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
       const frames = buffer.split("\n\n");
       buffer = frames.pop() || "";
-      frames.forEach(processFrame);
+      for (const frame of frames) {
+        processFrame(frame);
+        if (streamDone) break;
+      }
     }
-    if (buffer.trim()) processFrame(buffer);
+    if (streamDone) await reader.cancel().catch(() => undefined);
+    else if (buffer.trim()) processFrame(buffer);
 
     const result = completed as CoachTurnResult | null;
     const answer = result?.answer || streamed.trim();
@@ -377,7 +438,16 @@ export async function streamCoachTurn(
       socratic: result?.socratic,
     };
   } catch (error) {
+    if (connectionTimedOut) {
+      throw new StudyApiError(
+        "The tutor could not start this response in time. Your question is safe—please try again.",
+        "timeout",
+      );
+    }
     throw normalizeError(error);
+  } finally {
+    globalThis.clearTimeout(connectionTimeout);
+    callbacks.signal?.removeEventListener("abort", abortStream);
   }
 }
 
