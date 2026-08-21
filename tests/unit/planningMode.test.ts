@@ -349,15 +349,25 @@ describe("compact Planning focus brief", () => {
     expect(normalized).not.toHaveProperty("requestedMinutes");
   });
 
-  it("renders focus levels, grounded subtopics, and concise ordered guidance without a workspace", () => {
+  it("renders a priority-first artifact journey with concise ordered guidance", () => {
     const active = readSource("features/planning/PlanningActive.tsx");
     expect(active).toContain('high: "Deep focus"');
     expect(active).toContain('medium: "Learn well"');
     expect(active).toContain('light: "Quick scan"');
-    expect(active).toContain("area.subtopics.map");
-    expect(active).toContain('<ol className={styles.focusAreaList}>');
+    expect(active.indexOf('level: "high"')).toBeLessThan(active.indexOf('level: "medium"'));
+    expect(active.indexOf('level: "medium"')).toBeLessThan(active.indexOf('level: "light"'));
+    expect(active).toContain("firstDeepFocusId");
+    expect(active).toContain("const primarySubtopic = area.subtopics[0] || area.title");
+    expect(active).toContain("area.subtopics.slice(1)");
+    expect(active).toContain('className={styles.artifactSubtopicPreview}');
+    expect(active).toContain('<ol className={styles.artifactGrid}>');
+    expect(active).toContain('className={styles.artifactSummary}');
+    expect(active).toContain('aria-expanded={isOpen}');
+    expect(active).toContain('aria-controls={panelId}');
+    expect(active).toContain('type="button"');
     expect(active).toContain('<ol className={styles.guidanceList}>');
     expect(active).toContain("mission.completion_signal");
+    expect(active).not.toContain("<details");
     expect(active).not.toContain("duration");
     expect(active).not.toContain("progress");
     expect(active).not.toContain("checkpoint");
@@ -366,14 +376,18 @@ describe("compact Planning focus brief", () => {
 
   it("defines readable focus contrast, mobile collapse, and reduced motion", () => {
     const css = readSource("features/planning/planning.module.css");
-    expect(css).toContain('.focusAreaCard[data-level="high"]');
-    expect(css).toContain('.focusAreaCard[data-level="medium"]');
-    expect(css).toContain('.focusAreaCard[data-level="light"]');
+    expect(css).toContain('.priorityBand[data-level="high"]');
+    expect(css).toContain('.priorityBand[data-level="medium"]');
+    expect(css).toContain('.priorityBand[data-level="light"]');
     expect(css).toContain(".selectionControl:focus-visible");
     expect(css).toMatch(/\.selectionControl\s*\{[^}]*min-height:\s*3rem/);
+    expect(css).toMatch(/\.artifactSummary\s*\{[^}]*min-height:\s*4\.75rem/);
+    expect(css).toMatch(/\.artifactGrid\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+    expect(css).toContain(".artifactSummary:focus-visible");
     expect(css).toContain("@media (max-width: 48rem)");
     expect(css).toContain("@media (max-width: 22rem)");
-    expect(css).toMatch(/\.subtopicList li\s*\{[^}]*font-size:\s*0\.875rem[^}]*overflow-wrap:\s*anywhere/);
+    expect(css).toMatch(/\.artifactSubtopicPreview li\s*\{[^}]*font-size:\s*0\.8125rem[^}]*overflow-wrap:\s*anywhere/);
+    expect(css).not.toContain("line-clamp");
     expect(css).toContain("@media (prefers-reduced-motion: reduce)");
   });
 

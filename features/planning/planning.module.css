@@ -419,7 +419,7 @@
 
 .focusBrief {
   display: grid;
-  gap: 1rem;
+  gap: 1.1rem;
   width: min(100%, 76rem);
   margin: 0.5rem auto 0;
 }
@@ -435,10 +435,7 @@
 }
 
 .focusMapHeader {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
+  max-width: 44rem;
 }
 
 .focusMapHeader h2,
@@ -460,14 +457,6 @@
   line-height: 1.5;
 }
 
-.focusLegend {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.4rem;
-}
-
-.focusLegend span,
 .focusLevel {
   display: inline-flex;
   min-height: 1.8rem;
@@ -483,7 +472,6 @@
   white-space: nowrap;
 }
 
-.focusLegend i,
 .focusLevel i {
   width: 0.48rem;
   height: 0.48rem;
@@ -491,145 +479,299 @@
   background: var(--plan-teal);
 }
 
-.focusLegend span[data-level="high"] i,
 .focusLevel[data-level="high"] i { background: #23d3c5; }
-.focusLegend span[data-level="medium"] i,
 .focusLevel[data-level="medium"] i { background: #0e8593; }
-.focusLegend span[data-level="light"] i,
 .focusLevel[data-level="light"] i { background: #93a8b5; }
 
-.focusAreaList {
+.focusJourney {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.75rem;
-  margin-top: 1rem;
+  gap: 0.9rem;
+  margin-top: 1.15rem;
 }
 
-.focusAreaCard {
-  --focus-card-bg: var(--ds-surface-elevated);
-  --focus-card-ink: var(--plan-ink);
-  --focus-card-muted: var(--plan-muted);
-  --focus-card-line: var(--ds-border-subtle);
-  display: flex;
-  min-width: 0;
-  min-height: 14rem;
-  padding: 1rem;
-  flex-direction: column;
-  border: 1px solid var(--focus-card-line);
-  border-radius: 1rem;
-  background: var(--focus-card-bg);
-  color: var(--focus-card-ink);
+.priorityBand {
+  --artifact-bg: var(--ds-surface-elevated);
+  --artifact-ink: var(--plan-ink);
+  --artifact-muted: var(--plan-muted);
+  --artifact-line: var(--plan-line);
+  --artifact-accent: var(--plan-teal);
+  padding: 0.85rem;
+  border: 1px solid var(--artifact-line);
+  border-radius: 1.05rem;
+  background: var(--artifact-bg);
+  color: var(--artifact-ink);
 }
 
-.focusAreaCard[data-level="high"] {
-  --focus-card-bg: linear-gradient(145deg, #0a2737 0%, #0d4f5b 100%);
-  --focus-card-ink: #f2fbfc;
-  --focus-card-muted: #c0dce1;
-  --focus-card-line: rgba(94, 234, 212, 0.35);
-  box-shadow: 0 18px 35px rgba(5, 40, 53, 0.2);
+.priorityBand[data-level="high"] {
+  --artifact-bg: linear-gradient(145deg, #082738 0%, #0b4654 58%, #0c5961 100%);
+  --artifact-ink: #f4fbfc;
+  --artifact-muted: #c5dfe3;
+  --artifact-line: rgba(94, 234, 212, 0.35);
+  --artifact-accent: #62eadc;
+  box-shadow: 0 20px 42px rgba(4, 40, 52, 0.2);
 }
 
-.focusAreaCard[data-level="medium"] {
-  --focus-card-bg: color-mix(in srgb, var(--ds-accent-teal-soft) 72%, var(--ds-surface));
-  --focus-card-ink: var(--plan-ink);
-  --focus-card-muted: var(--plan-secondary);
-  --focus-card-line: color-mix(in srgb, var(--plan-teal) 38%, var(--plan-line));
+.priorityBand[data-level="medium"] {
+  --artifact-bg: linear-gradient(145deg, color-mix(in srgb, var(--ds-accent-teal-soft) 86%, var(--ds-surface)), color-mix(in srgb, var(--ds-accent-teal-soft) 54%, var(--ds-surface)));
+  --artifact-ink: var(--plan-ink);
+  --artifact-muted: var(--plan-secondary);
+  --artifact-line: color-mix(in srgb, var(--plan-teal) 40%, var(--plan-line));
+  --artifact-accent: #087985;
 }
 
-.focusAreaCard[data-level="light"] {
-  --focus-card-bg: color-mix(in srgb, var(--ds-bg-subtle) 78%, var(--ds-surface));
-  --focus-card-ink: var(--plan-secondary);
-  --focus-card-muted: var(--plan-muted);
+.priorityBand[data-level="light"] {
+  --artifact-bg: linear-gradient(145deg, color-mix(in srgb, var(--ds-bg-subtle) 82%, var(--ds-surface)), color-mix(in srgb, var(--ds-surface) 96%, transparent));
+  --artifact-ink: var(--plan-secondary);
+  --artifact-muted: var(--plan-secondary);
+  --artifact-line: var(--ds-border-subtle);
+  --artifact-accent: #526979;
 }
 
-.focusAreaTop {
-  display: flex;
+:global([data-theme="dark"]) .priorityBand[data-level="medium"] {
+  --artifact-bg: linear-gradient(145deg, #153744, #122b37);
+  --artifact-ink: #e5f4f5;
+  --artifact-muted: #aac5cc;
+  --artifact-line: rgba(94, 234, 212, 0.28);
+  --artifact-accent: #65d8ce;
+}
+
+:global([data-theme="dark"]) .priorityBand[data-level="light"] {
+  --artifact-bg: linear-gradient(145deg, #15202e, #111b29);
+  --artifact-ink: #d3deea;
+  --artifact-muted: #91a2b7;
+  --artifact-line: rgba(148, 163, 184, 0.2);
+  --artifact-accent: #9db1c0;
+}
+
+.priorityBandHeading {
+  display: grid;
+  grid-template-columns: 2.35rem minmax(0, 1fr) auto;
+  gap: 0.7rem;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
+  padding: 0.15rem 0.1rem 0.75rem;
 }
 
-.focusSequence {
-  color: var(--focus-card-muted);
-  font-size: 0.75rem;
-  font-weight: 900;
-  letter-spacing: 0.1em;
+.priorityMark {
+  display: inline-flex;
+  width: 2.35rem;
+  height: 2.35rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--artifact-line);
+  border-radius: 0.8rem;
+  background: color-mix(in srgb, var(--artifact-accent) 14%, transparent);
+  color: var(--artifact-accent);
 }
 
-.focusAreaCard[data-level="high"] .focusLevel {
+.priorityMark svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.priorityBandHeading h3 {
+  color: var(--artifact-ink);
+  font-size: 1rem;
+  font-weight: 840;
+  letter-spacing: -0.02em;
+}
+
+.priorityBandHeading p {
+  margin-top: 0.08rem;
+  color: var(--artifact-muted);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.priorityBand[data-level="high"] .focusLevel {
   border-color: rgba(255, 255, 255, 0.2);
   background: rgba(255, 255, 255, 0.09);
   color: #edfafa;
 }
 
-.focusAreaCard h3 {
-  margin-top: 0.75rem;
-  color: var(--focus-card-ink);
-  font-size: 1.02rem;
+.artifactGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.artifactGrid > li {
+  min-width: 0;
+}
+
+.focusArtifact {
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--artifact-line);
+  border-radius: 0.9rem;
+  background: color-mix(in srgb, var(--ds-surface-elevated) 94%, transparent);
+  color: var(--artifact-ink);
+  transition:
+    transform var(--ds-duration-fast) var(--ds-ease-standard),
+    border-color var(--ds-duration-fast) var(--ds-ease-standard),
+    box-shadow var(--ds-duration-fast) var(--ds-ease-standard);
+}
+
+.priorityBand[data-level="high"] .focusArtifact {
+  background: rgba(255, 255, 255, 0.075);
+}
+
+.focusArtifact:hover {
+  transform: translateY(-1px);
+  border-color: var(--artifact-accent);
+  box-shadow: 0 12px 24px color-mix(in srgb, #061521 12%, transparent);
+}
+
+.artifactSummary {
+  display: grid;
+  width: 100%;
+  min-height: 4.75rem;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  padding: 0.75rem;
+  align-items: center;
+  border: 0;
+  border-radius: 0.88rem;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.artifactSummary:focus-visible {
+  outline: 3px solid var(--artifact-accent);
+  outline-offset: -3px;
+}
+
+.artifactNumber {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--artifact-line);
+  border-radius: 0.65rem;
+  background: color-mix(in srgb, var(--artifact-accent) 13%, transparent);
+  color: var(--artifact-accent);
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.artifactSummaryCopy,
+.artifactTitle,
+.artifactMeta {
+  display: block;
+  min-width: 0;
+}
+
+.artifactTitle {
+  color: var(--artifact-ink);
+  font-size: 0.9375rem;
   font-weight: 820;
   letter-spacing: -0.02em;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.artifactMeta {
+  margin-top: 0.2rem;
+  color: var(--artifact-muted);
+  font-size: 0.75rem;
+  font-weight: 680;
+  line-height: 1.3;
+}
+
+.artifactToggle {
+  display: inline-flex;
+  min-height: 2.75rem;
+  padding-left: 0.45rem;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--artifact-muted);
+  font-size: 0.75rem;
+  font-weight: 820;
+}
+
+.artifactToggle svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  transition: transform var(--ds-duration-fast) var(--ds-ease-standard);
+}
+
+.focusArtifact[data-open] .artifactToggle svg {
+  transform: rotate(90deg);
+}
+
+.artifactDetails {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.55rem;
+  padding: 0 0.75rem 0.75rem;
+}
+
+.artifactDetails[hidden] {
+  display: none;
+}
+
+.artifactNote {
+  min-width: 0;
+  padding: 0.7rem;
+  border: 1px solid var(--artifact-line);
+  border-radius: 0.72rem;
+  background: color-mix(in srgb, var(--ds-surface-elevated) 78%, transparent);
+}
+
+.priorityBand[data-level="high"] .artifactNote {
+  background: rgba(255, 255, 255, 0.065);
+}
+
+.artifactNote > span {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--artifact-muted);
+  font-size: 0.7rem;
+  font-weight: 880;
+  letter-spacing: 0.08em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.artifactNote svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.artifactSubtopicPreview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0 0.75rem 0.75rem 3.4rem;
+}
+
+.artifactSubtopicPreview li {
+  max-width: 100%;
+  padding: 0.3rem 0.48rem;
+  border: 1px solid var(--artifact-line);
+  border-radius: 999px;
+  color: var(--artifact-ink);
+  font-size: 0.8125rem;
+  font-weight: 730;
   line-height: 1.3;
   overflow-wrap: anywhere;
 }
 
-.subtopicList {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin-top: 0.65rem;
-}
-
-.subtopicList li {
-  max-width: 100%;
-  padding: 0.28rem 0.48rem;
-  border: 1px solid var(--focus-card-line);
-  border-radius: 999px;
-  color: var(--focus-card-ink);
-  font-size: 0.875rem;
-  font-weight: 730;
-  line-height: 1.25;
+.artifactNote p {
+  margin-top: 0.42rem;
+  color: var(--artifact-ink);
+  font-size: 0.8125rem;
+  line-height: 1.45;
   overflow-wrap: anywhere;
-  white-space: normal;
-}
-
-.focusAreaCard[data-level="high"] .subtopicList li {
-  background: rgba(255, 255, 255, 0.07);
-}
-
-.focusReason {
-  margin-top: 0.7rem;
-  color: var(--focus-card-muted);
-  font-size: 0.875rem;
-  line-height: 1.5;
-}
-
-.focusAction {
-  margin-top: auto;
-  padding-top: 0.75rem;
-}
-
-.focusAction > span {
-  display: block;
-  color: var(--focus-card-muted);
-  font-size: 0.75rem;
-  font-weight: 880;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
-.focusAction p {
-  margin-top: 0.28rem;
-  color: var(--focus-card-ink);
-  font-size: 0.875rem;
-  font-weight: 680;
-  line-height: 1.5;
 }
 
 .guidancePanel {
   display: grid;
-  grid-template-columns: minmax(13rem, 0.58fr) minmax(0, 1.42fr);
-  gap: 1rem 1.4rem;
-  align-items: start;
+  gap: 0.9rem;
 }
 
 .guidanceHeading {
@@ -638,64 +780,86 @@
   gap: 0.7rem;
 }
 
+.guidanceHeading p:not(.eyebrow) {
+  margin-top: 0.2rem;
+  color: var(--plan-muted);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
 .guidanceList {
   display: grid;
-  gap: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
 }
 
 .guidanceList li {
   display: grid;
-  grid-template-columns: 2rem minmax(0, 1fr);
-  gap: 0.7rem;
-  padding: 0.7rem 0;
-  border-bottom: 1px solid var(--ds-border-subtle);
+  min-width: 0;
+  grid-template-columns: 2.1rem minmax(0, 1fr);
+  gap: 0.65rem;
+  padding: 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--plan-teal) 28%, var(--plan-line));
+  border-radius: 0.95rem;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--ds-accent-teal-soft) 65%, var(--ds-surface)), var(--ds-surface));
+  box-shadow: var(--ds-shadow-sm);
 }
 
-.guidanceList li:first-child { padding-top: 0; }
-.guidanceList li:last-child { border-bottom: 0; }
+.guidanceList li[data-tone="2"] {
+  border-color: color-mix(in srgb, var(--plan-gold) 34%, var(--plan-line));
+  background: linear-gradient(145deg, color-mix(in srgb, var(--ds-accent-gold-soft) 72%, var(--ds-surface)), var(--ds-surface));
+}
 
-.guidanceList li > span {
+.guidanceList li[data-tone="3"] {
+  border-color: color-mix(in srgb, var(--ds-info) 28%, var(--plan-line));
+  background: linear-gradient(145deg, color-mix(in srgb, var(--ds-info-soft) 70%, var(--ds-surface)), var(--ds-surface));
+}
+
+.guidanceNumber {
   display: inline-flex;
-  width: 2rem;
-  height: 2rem;
+  width: 2.1rem;
+  height: 2.1rem;
+  grid-row: 1 / span 2;
   align-items: center;
   justify-content: center;
-  border-radius: 0.65rem;
+  border-radius: 0.68rem;
   background: linear-gradient(135deg, #10243a, #0e7490);
   color: #fff;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 900;
 }
 
 .guidanceList strong {
+  display: block;
   color: var(--plan-ink);
   font-size: 0.9rem;
+  line-height: 1.35;
   overflow-wrap: anywhere;
 }
 
 .guidanceList p {
-  margin-top: 0.2rem;
+  margin-top: 0.18rem;
   color: var(--plan-muted);
-  font-size: 0.875rem;
-  line-height: 1.5;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .completionSignal {
   display: grid;
-  grid-column: 1 / -1;
-  grid-template-columns: 2rem minmax(0, 1fr);
+  grid-template-columns: 2.4rem minmax(0, 1fr);
   gap: 0.7rem;
-  padding: 0.85rem;
+  padding: 0.9rem;
   align-items: center;
-  border: 1px solid color-mix(in srgb, var(--ds-success) 35%, var(--plan-line));
-  border-radius: 0.85rem;
-  background: var(--ds-success-soft);
+  border: 1px solid color-mix(in srgb, var(--ds-success) 38%, var(--plan-line));
+  border-radius: 0.95rem;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--ds-success-soft) 88%, var(--ds-surface)), var(--ds-surface));
   color: var(--plan-success-ink);
 }
 
-.completionSignal svg {
-  width: 1.25rem;
-  height: 1.25rem;
+.completionSignal > svg {
+  width: 1.15rem;
+  height: 1.15rem;
   justify-self: center;
 }
 
@@ -773,16 +937,9 @@
 }
 
 @media (max-width: 66rem) {
-  .focusAreaList {
+  .artifactGrid,
+  .guidanceList {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .guidancePanel {
-    grid-template-columns: 1fr;
-  }
-
-  .completionSignal {
-    grid-column: auto;
   }
 }
 
@@ -819,13 +976,14 @@
   .focusBrief,
   .focusMap,
   .guidancePanel,
-  .focusAreaList,
-  .focusAreaCard {
+  .focusJourney,
+  .priorityBand,
+  .artifactGrid,
+  .focusArtifact {
     min-width: 0;
   }
 
-  .catalogError,
-  .focusMapHeader {
+  .catalogError {
     align-items: stretch;
     flex-direction: column;
   }
@@ -834,16 +992,19 @@
     width: 100%;
   }
 
-  .focusLegend {
-    justify-content: flex-start;
-  }
-
-  .focusAreaList {
+  .artifactGrid,
+  .guidanceList {
     grid-template-columns: 1fr;
   }
 
-  .focusAreaCard {
-    min-height: auto;
+  .priorityBandHeading {
+    grid-template-columns: 2.35rem minmax(0, 1fr);
+  }
+
+  .priorityBandHeading .focusLevel {
+    grid-column: 1 / -1;
+    width: fit-content;
+    margin-left: 3.05rem;
   }
 
   .focusMap,
@@ -872,10 +1033,32 @@
     padding-inline: 0.72rem;
   }
 
-  .focusLegend span,
   .focusLevel {
     min-width: 0;
     white-space: normal;
+  }
+
+  .artifactSummary {
+    grid-template-columns: 1.9rem minmax(0, 1fr) auto;
+    gap: 0.5rem;
+    padding-inline: 0.6rem;
+  }
+
+  .artifactToggle > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .artifactDetails {
+    padding-inline: 0.6rem;
+  }
+
+  .artifactSubtopicPreview {
+    padding-inline: 0.6rem;
   }
 }
 
@@ -888,7 +1071,9 @@
 
   .primaryButton,
   .secondaryButton,
-  .selectionControl {
+  .selectionControl,
+  .focusArtifact,
+  .artifactToggle svg {
     transition-duration: 0.01ms;
   }
 }
