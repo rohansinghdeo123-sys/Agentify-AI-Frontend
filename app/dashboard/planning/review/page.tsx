@@ -1,10 +1,5 @@
-import PlanningReview from "@/features/planning/PlanningReview";
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Plan Review | AgentifyAI",
-  description: "Use your recorded checkpoint to choose the next learning action.",
-};
-
-export default PlanningReview;
-
+export default function RetiredPlanningReviewPage() {
+  redirect("/dashboard/planning");
+}

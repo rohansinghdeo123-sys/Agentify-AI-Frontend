@@ -62,21 +62,3 @@ export function clearActivePlanningPlan(userId: string) {
     // In-memory state remains authoritative for this visit.
   }
 }
-
-export function readPlanningHistory(userId: string) {
-  const history = readJSON<unknown>(key(userId, "history"));
-  return Array.isArray(history)
-    ? history.map(normalizePlanningPlan).filter((plan): plan is PlanningPlan => Boolean(plan)).slice(0, 12)
-    : [];
-}
-
-export function writePlanningHistory(userId: string, plans: PlanningPlan[]) {
-  writeJSON(key(userId, "history"), plans.slice(0, 12));
-}
-
-export function mergePlanningHistory(history: PlanningPlan[], plan: PlanningPlan) {
-  return [
-    plan,
-    ...history.filter((entry) => entry.mission.mission_id !== plan.mission.mission_id),
-  ].slice(0, 12);
-}

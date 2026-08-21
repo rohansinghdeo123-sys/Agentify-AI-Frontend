@@ -1,7 +1,6 @@
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
-import { useCatalog } from "@/lib/catalog";
 import {
   createContext,
   useCallback,
@@ -13,102 +12,126 @@ import {
   type ReactNode,
 } from "react";
 import {
+  fetchPlanningCatalog,
   generatePlanningMission,
   planningErrorMessage,
-  submitPlanningCheckpoint,
+  type PlanningCatalogChapter,
 } from "./api";
-import {
-  buildPlanningReport,
-  calculatePlanningFocusScore,
-  confidenceToScore,
-  DEFAULT_PLANNING_PROFILE,
-  getMissionQuestion,
-  type PlanningCheckpointResult,
-  type PlanningDraft,
-  type PlanningPlan,
-  type PlanningProfile,
-  type PlanningScope,
-} from "./contracts";
+import { type PlanningDraft, type PlanningPlan, type PlanningScope } from "./contracts";
 import {
   clearActivePlanningPlan,
-  mergePlanningHistory,
   readActivePlanningPlanState,
   readPlanningDraft,
-  readPlanningHistory,
   writeActivePlanningPlan,
   writePlanningDraft,
-  writePlanningHistory,
 } from "./storage";
-
-type CheckpointInput = {
-  answer: string;
-  confidence: string;
-  hintCount: number;
-  retryCount: number;
-  startedAt: string;
-  firstAnswerAt: string | null;
-};
 
 type PlanningExperienceValue = {
   authBusy: boolean;
   hydrated: boolean;
   userId: string;
   draft: PlanningDraft;
-  chapters: ReturnType<typeof useCatalog>["chapters"];
-  catalogSource: "published" | "starter";
+  classOptions: Array<{ label: string; value: string }>;
+  subjectOptions: Array<{ label: string; value: string }>;
+  chapters: PlanningCatalogChapter[];
   catalogSettled: boolean;
-  selectedChapter: ReturnType<typeof useCatalog>["chapters"][number] | undefined;
+  catalogNotice: string;
+  selectedChapter: PlanningCatalogChapter | undefined;
   scope: PlanningScope;
   activePlan: PlanningPlan | null;
-  history: PlanningPlan[];
   generating: boolean;
-  savingCheckpoint: boolean;
   error: string;
   staleNotice: string;
+  setClassLevel: (classLevel: string) => void;
+  setSubject: (subject: string) => void;
   setChapter: (chapter: string) => void;
-  updateProfile: (key: keyof PlanningProfile, value: PlanningProfile[keyof PlanningProfile]) => void;
-  togglePlanStep: (index: number) => void;
+  retryCatalog: () => void;
   createPlan: (signal?: AbortSignal) => Promise<PlanningPlan | null>;
-  submitCheckpoint: (input: CheckpointInput, signal?: AbortSignal) => Promise<PlanningCheckpointResult | null>;
-  loadHistoryPlan: (missionId: string) => PlanningPlan | null;
   clearError: () => void;
 };
 
 const PlanningExperienceContext = createContext<PlanningExperienceValue | null>(null);
 
 const DEFAULT_DRAFT: PlanningDraft = {
-  chapter: "hydrocarbon",
-  profile: DEFAULT_PLANNING_PROFILE,
+  classLevel: "",
+  subject: "",
+  chapter: "",
 };
 
 export function PlanningExperienceProvider({ children }: { children: ReactNode }) {
-  const { userId, loading, claimsLoading, getAuthHeaders } = useAuth();
-  const { chapters, source, settled } = useCatalog();
+  const { userId, loading, claimsLoading, getAuthHeaders, profile } = useAuth();
   const authBusy = loading || claimsLoading;
   const [draft, setDraft] = useState<PlanningDraft>(DEFAULT_DRAFT);
   const [activePlan, setActivePlan] = useState<PlanningPlan | null>(null);
-  const [history, setHistory] = useState<PlanningPlan[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [savingCheckpoint, setSavingCheckpoint] = useState(false);
   const [error, setError] = useState("");
   const [staleNotice, setStaleNotice] = useState("");
+  const [catalogChapters, setCatalogChapters] = useState<PlanningCatalogChapter[]>([]);
+  const [catalogSettled, setCatalogSettled] = useState(false);
+  const [catalogNotice, setCatalogNotice] = useState("");
+  const [catalogReload, setCatalogReload] = useState(0);
   const loadedUserRef = useRef("");
   const generationRef = useRef(0);
   const generationInFlightRef = useRef(false);
   const currentInputRef = useRef("");
 
+  const classOptions = useMemo(() => Array.from(new Set(catalogChapters.map((chapter) => chapter.classLevel)))
+    .map((value) => ({ label: value || "Your class", value }))
+    .sort((left, right) => left.label.localeCompare(right.label, undefined, { numeric: true })), [catalogChapters]);
+  const subjectOptions = useMemo(() => Array.from(new Set(
+    catalogChapters
+      .filter((chapter) => chapter.classLevel === draft.classLevel)
+      .map((chapter) => chapter.subject),
+  )).map((value) => ({ label: value, value }))
+    .sort((left, right) => left.label.localeCompare(right.label)), [catalogChapters, draft.classLevel]);
+  const chapters = useMemo(() => catalogChapters.filter((chapter) => (
+    chapter.classLevel === draft.classLevel && chapter.subject === draft.subject
+  )).sort((left, right) => (
+    (left.order ?? Number.MAX_SAFE_INTEGER) - (right.order ?? Number.MAX_SAFE_INTEGER)
+    || left.label.localeCompare(right.label)
+  )), [catalogChapters, draft.classLevel, draft.subject]);
   const selectedChapter = useMemo(
-    () => chapters.find((chapter) => chapter.value === draft.chapter) || chapters[0],
+    () => chapters.find((chapter) => chapter.value === draft.chapter),
     [chapters, draft.chapter],
   );
   const scope = useMemo<PlanningScope>(() => ({
-    chapter: selectedChapter?.value || draft.chapter,
-    chapterLabel: selectedChapter?.label || draft.chapter.replace(/_/g, " "),
-    subject: selectedChapter?.subject || "Chemistry",
-    classLevel: selectedChapter?.classLevel || "",
-  }), [draft.chapter, selectedChapter]);
-  currentInputRef.current = JSON.stringify({ userId, scope, profile: draft.profile, source });
+    chapter: selectedChapter?.value || "",
+    chapterLabel: selectedChapter?.label || "",
+    subject: selectedChapter?.subject || draft.subject,
+    classLevel: selectedChapter?.classLevel || draft.classLevel,
+  }), [draft.classLevel, draft.subject, selectedChapter]);
+  currentInputRef.current = JSON.stringify({ userId, scope });
+
+  useEffect(() => {
+    if (authBusy) return;
+    const controller = new AbortController();
+    setCatalogSettled(false);
+    setCatalogNotice("");
+
+    if (!userId) {
+      setCatalogChapters([]);
+      setCatalogNotice("Sign in again to load your syllabus chapters.");
+      setCatalogSettled(true);
+      return () => controller.abort();
+    }
+
+    void fetchPlanningCatalog({ userId, getAuthHeaders }, controller.signal)
+      .then((catalog) => {
+        if (controller.signal.aborted) return;
+        setCatalogChapters(catalog.chapters);
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setCatalogChapters([]);
+        setCatalogNotice("Your syllabus could not be loaded. Check your connection and try again.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCatalogSettled(true);
+      });
+
+    return () => controller.abort();
+  }, [authBusy, catalogReload, getAuthHeaders, userId]);
 
   useEffect(() => {
     if (authBusy) return;
@@ -122,15 +145,13 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     if (userId) {
       const savedDraft = readPlanningDraft(userId);
       const savedPlanState = readActivePlanningPlanState(userId);
-      const savedHistory = readPlanningHistory(userId);
       setDraft(savedDraft ?? DEFAULT_DRAFT);
       setActivePlan(savedPlanState.plan);
-      setHistory(savedHistory);
       if (savedPlanState.retired) {
-        setStaleNotice("An older topic-based plan was retired because Planning is now chapter-based. Choose a chapter to build a fresh roadmap.");
+        setStaleNotice("An older detailed plan was retired because Planning now uses quick chapter focus briefs.");
         clearActivePlanningPlan(userId);
       } else if (savedPlanState.invalid) {
-        setStaleNotice("A saved plan could not be restored safely. Choose a chapter to build a fresh roadmap.");
+        setStaleNotice("An older saved plan could not be restored safely. Choose a chapter to create a fresh focus brief.");
         clearActivePlanningPlan(userId);
       } else {
         setStaleNotice("");
@@ -138,19 +159,68 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     } else {
       setDraft(DEFAULT_DRAFT);
       setActivePlan(null);
-      setHistory([]);
       setStaleNotice("");
     }
     setHydrated(true);
   }, [authBusy, userId]);
 
   useEffect(() => {
-    if (!chapters.length) return;
+    if (!catalogSettled || !catalogChapters.length) return;
     setDraft((current) => {
-      if (chapters.some((chapter) => chapter.value === current.chapter)) return current;
-      return { ...current, chapter: chapters[0].value };
+      const exact = catalogChapters.find((chapter) => (
+        chapter.classLevel === current.classLevel
+        && chapter.subject === current.subject
+        && chapter.value === current.chapter
+      ));
+      if (exact) return current;
+      const legacyMatch = current.chapter && !current.classLevel && !current.subject
+        ? catalogChapters.find((chapter) => (
+            chapter.value === current.chapter
+            && (!profile?.classLevel || chapter.classLevel === profile.classLevel)
+          )) || catalogChapters.find((chapter) => chapter.value === current.chapter)
+        : undefined;
+      if (legacyMatch) {
+        return {
+          ...current,
+          classLevel: legacyMatch.classLevel,
+          subject: legacyMatch.subject,
+          chapter: legacyMatch.value,
+        };
+      }
+      const availableClasses = Array.from(new Set(catalogChapters.map((chapter) => chapter.classLevel)));
+      const normalizedProfileClass = profile?.classLevel?.trim() || "";
+      const validCurrentClass = availableClasses.includes(current.classLevel);
+      const classLevel = validCurrentClass
+        ? current.classLevel
+        : availableClasses.includes(normalizedProfileClass)
+          ? normalizedProfileClass
+          : availableClasses.length === 1
+            ? availableClasses[0]
+            : "";
+      const availableSubjects = Array.from(new Set(
+        catalogChapters.filter((chapter) => chapter.classLevel === classLevel).map((chapter) => chapter.subject),
+      ));
+      const subject = availableSubjects.includes(current.subject)
+        ? current.subject
+        : availableSubjects.length === 1
+          ? availableSubjects[0]
+          : "";
+      const availableChapters = catalogChapters.filter((chapter) => (
+        chapter.classLevel === classLevel && chapter.subject === subject
+      ));
+      const chapter = availableChapters.some((item) => item.value === current.chapter)
+        ? current.chapter
+        : availableChapters.length === 1
+          ? availableChapters[0].value
+          : "";
+      if (
+        classLevel === current.classLevel
+        && subject === current.subject
+        && chapter === current.chapter
+      ) return current;
+      return { ...current, classLevel, subject, chapter };
     });
-  }, [chapters]);
+  }, [catalogChapters, catalogSettled, profile?.classLevel]);
 
   useEffect(() => {
     if (!hydrated || !userId) return;
@@ -160,50 +230,63 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
   const retireActivePlan = useCallback(() => {
     if (!activePlan) return;
     setActivePlan(null);
-    setStaleNotice("The previous plan no longer matches this setup. It remains available in device history.");
+    setStaleNotice("The previous focus brief was cleared because the chapter selection changed.");
     if (userId) clearActivePlanningPlan(userId);
   }, [activePlan, userId]);
 
-  const setChapter = useCallback((chapter: string) => {
-    if (chapter === draft.chapter) return;
-    generationRef.current += 1;
-    generationInFlightRef.current = false;
-    setGenerating(false);
-    retireActivePlan();
-    setDraft((current) => ({ ...current, chapter }));
-    setError("");
-  }, [draft.chapter, retireActivePlan]);
+  useEffect(() => {
+    if (!catalogSettled || !activePlan) return;
+    const planStillMatches = Boolean(
+      selectedChapter
+      && activePlan.scope.chapter === selectedChapter.value
+      && activePlan.scope.subject === selectedChapter.subject
+      && activePlan.scope.classLevel === selectedChapter.classLevel,
+    );
+    if (!planStillMatches) retireActivePlan();
+  }, [activePlan, catalogSettled, retireActivePlan, selectedChapter]);
 
-  const updateProfile = useCallback((
-    key: keyof PlanningProfile,
-    value: PlanningProfile[keyof PlanningProfile],
-  ) => {
-    if (draft.profile[key] === value) return;
+  const changeSetup = useCallback((next: Pick<PlanningDraft, "classLevel" | "subject" | "chapter">) => {
+    if (
+      next.classLevel === draft.classLevel
+      && next.subject === draft.subject
+      && next.chapter === draft.chapter
+    ) return;
     generationRef.current += 1;
     generationInFlightRef.current = false;
     setGenerating(false);
     retireActivePlan();
-    setDraft((current) => ({
-      ...current,
-      profile: { ...current.profile, [key]: value },
-    }));
+    setDraft((current) => ({ ...current, ...next }));
     setError("");
-  }, [draft.profile, retireActivePlan]);
+  }, [draft.chapter, draft.classLevel, draft.subject, retireActivePlan]);
+
+  const setClassLevel = useCallback((classLevel: string) => {
+    changeSetup({ classLevel, subject: "", chapter: "" });
+  }, [changeSetup]);
+
+  const setSubject = useCallback((subject: string) => {
+    changeSetup({ classLevel: draft.classLevel, subject, chapter: "" });
+  }, [changeSetup, draft.classLevel]);
+
+  const setChapter = useCallback((chapter: string) => {
+    changeSetup({ classLevel: draft.classLevel, subject: draft.subject, chapter });
+  }, [changeSetup, draft.classLevel, draft.subject]);
 
   const createPlan = useCallback(async (signal?: AbortSignal) => {
     if (!userId || authBusy || generating || generationInFlightRef.current) return null;
+    if (!selectedChapter || !scope.chapter || !scope.subject) {
+      setError("Choose your class, subject, and chapter before generating the focus plan.");
+      return null;
+    }
     const generationId = generationRef.current + 1;
     generationRef.current = generationId;
     generationInFlightRef.current = true;
     const requestInput = currentInputRef.current;
     setGenerating(true);
     setError("");
-    const startedAt = Date.now();
     try {
       const mission = await generatePlanningMission(
         { userId, getAuthHeaders },
         scope,
-        draft.profile,
         signal,
       );
       if (
@@ -214,18 +297,9 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
       const plan: PlanningPlan = {
         mission,
         scope,
-        profile: { ...draft.profile },
-        catalogSource: source === "published" ? "published" : "starter",
-        createdAt: new Date().toISOString(),
-        responseLatencyMs: Date.now() - startedAt,
       };
       setActivePlan(plan);
       setStaleNotice("");
-      setHistory((current) => {
-        const next = mergePlanningHistory(current, plan);
-        writePlanningHistory(userId, next);
-        return next;
-      });
       writeActivePlanningPlan(userId, plan);
       return plan;
     } catch (requestError) {
@@ -242,177 +316,49 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
         setGenerating(false);
       }
     }
-  }, [authBusy, draft.profile, generating, getAuthHeaders, scope, source, userId]);
-
-  const togglePlanStep = useCallback((index: number) => {
-    if (!activePlan || !userId || !Number.isInteger(index) || index < 0) return;
-    const completed = new Set(activePlan.completedStepIndexes || []);
-    if (completed.has(index)) completed.delete(index);
-    else completed.add(index);
-    const nextPlan: PlanningPlan = {
-      ...activePlan,
-      completedStepIndexes: Array.from(completed).sort((left, right) => left - right),
-    };
-    setActivePlan(nextPlan);
-    writeActivePlanningPlan(userId, nextPlan);
-    setHistory((current) => {
-      const next = mergePlanningHistory(current, nextPlan);
-      writePlanningHistory(userId, next);
-      return next;
-    });
-  }, [activePlan, userId]);
-
-  const submitCheckpoint = useCallback(async (input: CheckpointInput, signal?: AbortSignal) => {
-    if (!userId || !activePlan || savingCheckpoint || activePlan.checkpoint) return activePlan?.checkpoint || null;
-    const question = getMissionQuestion(activePlan.mission);
-    if (!question || !input.answer) return null;
-    setSavingCheckpoint(true);
-    setError("");
-    const completedAt = new Date();
-    const startedAtMs = new Date(input.startedAt).getTime();
-    const durationSeconds = Number.isFinite(startedAtMs)
-      ? Math.max(1, Math.round((completedAt.getTime() - startedAtMs) / 1000))
-      : 1;
-    const correct = input.answer === question.correct;
-    const confidenceBefore = confidenceToScore(activePlan.profile.prerequisiteConfidence);
-    const confidenceAfter = confidenceToScore(input.confidence);
-    const focusScore = calculatePlanningFocusScore({
-      correct,
-      durationSeconds,
-      hintCount: input.hintCount,
-      retryCount: input.retryCount,
-      confidenceAfter,
-    });
-    const attemptId = `planning-${userId}-${activePlan.mission.mission_id}`;
-
-    try {
-      await submitPlanningCheckpoint(
-        { userId, getAuthHeaders },
-        {
-          chapter: activePlan.scope.chapter,
-          subject: activePlan.scope.subject,
-          correct,
-          durationSeconds,
-          focusScore,
-          startedAt: input.startedAt,
-          completedAt: completedAt.toISOString(),
-          responseLatencyMs: activePlan.responseLatencyMs || 0,
-          hintCount: input.hintCount,
-          retryCount: input.retryCount,
-          confidenceBefore,
-          confidenceAfter,
-          replayData: {
-            attempt_id: attemptId,
-            plan_id: activePlan.mission.mission_id,
-            source: "planning_checkpoint",
-            scope: activePlan.scope,
-            telemetry: {
-              started_at: input.startedAt,
-              first_answer_at: input.firstAnswerAt,
-              completed_at: completedAt.toISOString(),
-              duration_seconds: durationSeconds,
-              hint_count: input.hintCount,
-              retry_count: input.retryCount,
-              confidence_before: confidenceBefore,
-              confidence_after: confidenceAfter,
-              focus_score: focusScore,
-            },
-            questions: [{
-              id: question.id,
-              text: question.question,
-              topic: question.topic || activePlan.scope.chapter,
-              subtopic: question.subtopic || "",
-              options: question.options,
-              correct_answer: question.correct,
-              user_answer: input.answer,
-              is_correct: correct,
-              ai_explanation: question.explanation || "",
-            }],
-          },
-        },
-        signal,
-      );
-
-      const checkpoint: PlanningCheckpointResult = {
-        answer: input.answer,
-        confidence: input.confidence,
-        correct,
-        focusScore,
-        savedAt: completedAt.toISOString(),
-        report: buildPlanningReport(activePlan.mission, correct, activePlan.scope.chapterLabel),
-      };
-      const nextPlan = { ...activePlan, checkpoint };
-      setActivePlan(nextPlan);
-      writeActivePlanningPlan(userId, nextPlan);
-      setHistory((current) => {
-        const next = mergePlanningHistory(current, nextPlan);
-        writePlanningHistory(userId, next);
-        return next;
-      });
-      return checkpoint;
-    } catch (requestError) {
-      if (signal?.aborted) return null;
-      setError(planningErrorMessage(requestError));
-      return null;
-    } finally {
-      setSavingCheckpoint(false);
-    }
-  }, [activePlan, getAuthHeaders, savingCheckpoint, userId]);
-
-  const loadHistoryPlan = useCallback((missionId: string) => {
-    const plan = history.find((entry) => entry.mission.mission_id === missionId) || null;
-    if (!plan) return null;
-    setActivePlan(plan);
-    setDraft({ chapter: plan.scope.chapter, profile: { ...plan.profile } });
-    setStaleNotice("");
-    if (userId) writeActivePlanningPlan(userId, plan);
-    return plan;
-  }, [history, userId]);
+  }, [authBusy, generating, getAuthHeaders, scope, selectedChapter, userId]);
 
   const value = useMemo<PlanningExperienceValue>(() => ({
     authBusy,
     hydrated,
     userId,
     draft,
+    classOptions,
+    subjectOptions,
     chapters,
-    catalogSource: source === "published" ? "published" : "starter",
-    catalogSettled: settled,
+    catalogSettled,
+    catalogNotice,
     selectedChapter,
     scope,
     activePlan,
-    history,
     generating,
-    savingCheckpoint,
     error,
     staleNotice,
+    setClassLevel,
+    setSubject,
     setChapter,
-    updateProfile,
-    togglePlanStep,
+    retryCatalog: () => setCatalogReload((value) => value + 1),
     createPlan,
-    submitCheckpoint,
-    loadHistoryPlan,
     clearError: () => setError(""),
   }), [
     activePlan,
     authBusy,
+    catalogNotice,
+    catalogSettled,
     chapters,
+    classOptions,
     createPlan,
     draft,
     error,
     generating,
-    history,
     hydrated,
-    loadHistoryPlan,
-    savingCheckpoint,
     scope,
     selectedChapter,
+    setClassLevel,
     setChapter,
-    settled,
-    source,
+    setSubject,
     staleNotice,
-    submitCheckpoint,
-    togglePlanStep,
-    updateProfile,
+    subjectOptions,
     userId,
   ]);
 

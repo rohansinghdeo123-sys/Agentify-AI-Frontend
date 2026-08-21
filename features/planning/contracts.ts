@@ -1,85 +1,48 @@
-export interface MissionPlanStep {
-  sequence: number;
+export type PlanningFocusLevel = "high" | "medium" | "light";
+
+export interface PlanningFocusArea {
+  focus_area_id: string;
+  unit_ids: string[];
   unit_id: string;
+  unit_titles: string[];
   title: string;
-  duration: string;
-  detail: string;
-  focus: string;
-  prerequisite_check: {
-    status: "repair_first" | "ready" | "connect_previous";
-    question: string;
-    guidance: string;
-  };
-  completion_check: {
-    question: string;
-    expected_outcome: string;
-  };
+  subtopics: string[];
+  focus_level: PlanningFocusLevel;
+  reason: string;
+  guidance: string;
 }
 
-export interface MissionQuestion {
-  id?: string;
-  topic?: string;
-  subtopic?: string;
-  question: string;
-  options: string[];
-  correct: string;
-  explanation?: string;
+export interface PlanningGuidanceStep {
+  sequence: number;
+  title: string;
+  instruction: string;
+  focus_unit_ids: string[];
 }
 
 export interface AutonomousMission {
   mission_id: string;
-  status: string;
+  status?: string;
   subject: string;
   chapter?: string;
   target_topic: string;
-  target_source: string;
-  plan_scope?: "chapter" | string;
-  learning_unit_count?: number;
-  mission_type?: string;
-  priority?: string;
-  mastery_band?: string;
-  estimated_minutes?: number;
-  mission_goal?: string;
-  prerequisite_check?: {
-    status?: string;
-    question?: string;
-    action?: string;
+  target_source?: string;
+  plan_scope: "chapter";
+  brief_version: "chapter_focus_v1";
+  chapter_summary: string;
+  focus_areas: PlanningFocusArea[];
+  guidance_steps: PlanningGuidanceStep[];
+  completion_signal: string;
+  coverage: {
+    status: "complete";
+    included_unit_ids: string[];
+    unit_count: number;
   };
-  high_priority_concepts?: string[];
-  fast_revision_strategy?: string[];
-  weakness_detection_points?: string[];
-  final_confidence_check?: string[];
-  fast_track_strategy?: string[];
-  objective: string;
-  why: string;
-  steps: string[];
-  next_actions: string[];
-  success_criteria?: string[];
-  study_plan?: MissionPlanStep[];
-  diagnostic_question?: MissionQuestion;
-  result?: {
-    data?: {
-      questions?: MissionQuestion[];
-      study_plan?: MissionPlanStep[];
-    };
-  };
-}
-
-export type PlanningKnowledge = "new" | "some_idea" | "know_basics";
-export type PlanningGoal = "deep_understanding" | "exam" | "fast_track";
-export type PlanningStyle = "examples_first" | "short_explanations" | "conceptual_detail";
-export type PlanningPrerequisiteConfidence = "low" | "medium" | "high";
-
-export interface PlanningProfile {
-  currentKnowledge: PlanningKnowledge;
-  learningGoal: PlanningGoal;
-  preferredStyle: PlanningStyle;
-  prerequisiteConfidence: PlanningPrerequisiteConfidence;
 }
 
 export interface PlanningDraft {
+  classLevel: string;
+  subject: string;
   chapter: string;
-  profile: PlanningProfile;
 }
 
 export interface PlanningScope {
@@ -89,149 +52,41 @@ export interface PlanningScope {
   classLevel: string;
 }
 
-export interface PlanningCheckpointResult {
-  answer: string;
-  confidence: string;
-  correct: boolean;
-  focusScore: number;
-  savedAt: string;
-  report: PlanningReport;
-}
-
-export interface PlanningReport {
-  title: string;
-  summary: string;
-  next: string[];
-}
-
 export interface PlanningPlan {
   mission: AutonomousMission;
   scope: PlanningScope;
-  profile: PlanningProfile;
-  catalogSource: "published" | "starter";
-  createdAt: string;
-  responseLatencyMs?: number;
-  checkpoint?: PlanningCheckpointResult;
-  completedStepIndexes?: number[];
 }
-
-export const DEFAULT_PLANNING_PROFILE: PlanningProfile = {
-  currentKnowledge: "some_idea",
-  learningGoal: "exam",
-  preferredStyle: "examples_first",
-  prerequisiteConfidence: "medium",
-};
-
-export const KNOWLEDGE_OPTIONS: ReadonlyArray<{ label: string; value: PlanningKnowledge }> = [
-  { label: "New to this", value: "new" },
-  { label: "Some idea", value: "some_idea" },
-  { label: "Know basics", value: "know_basics" },
-];
-
-export const GOAL_OPTIONS: ReadonlyArray<{ label: string; value: PlanningGoal }> = [
-  { label: "Deep understanding", value: "deep_understanding" },
-  { label: "Exam scoring", value: "exam" },
-  { label: "Fast track", value: "fast_track" },
-];
-
-export const STYLE_OPTIONS: ReadonlyArray<{ label: string; value: PlanningStyle }> = [
-  { label: "Examples first", value: "examples_first" },
-  { label: "Short explanations", value: "short_explanations" },
-  { label: "Conceptual detail", value: "conceptual_detail" },
-];
-
-export const CONFIDENCE_OPTIONS = [
-  { label: "Low", value: "low", score: 35 },
-  { label: "Okay", value: "medium", score: 62 },
-  { label: "Strong", value: "high", score: 82 },
-];
-
-export const PREREQUISITE_OPTIONS: ReadonlyArray<{ label: string; value: PlanningPrerequisiteConfidence }> = [
-  { label: "Low", value: "low" },
-  { label: "Medium", value: "medium" },
-  { label: "High", value: "high" },
-];
-
-const KNOWLEDGE_VALUES = new Set<PlanningKnowledge>(KNOWLEDGE_OPTIONS.map((option) => option.value));
-const GOAL_VALUES = new Set<PlanningGoal>(GOAL_OPTIONS.map((option) => option.value));
-const STYLE_VALUES = new Set<PlanningStyle>(STYLE_OPTIONS.map((option) => option.value));
-const PREREQUISITE_VALUES = new Set<PlanningPrerequisiteConfidence>(PREREQUISITE_OPTIONS.map((option) => option.value));
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
-function profileValue<T extends string>(
-  value: unknown,
-  supported: ReadonlySet<T>,
-  fallback: T,
-): T {
-  return typeof value === "string" && supported.has(value as T) ? value as T : fallback;
-}
-
-/**
- * Converts device snapshots from earlier Planning versions into the current
- * compact profile. Reconstructing the object also drops retired setup fields.
- */
-export function normalizePlanningProfile(value: unknown): PlanningProfile {
-  const profile = isRecord(value) ? value : {};
-  const rawGoal = profile.learningGoal;
-  return {
-    currentKnowledge: profileValue(
-      profile.currentKnowledge,
-      KNOWLEDGE_VALUES,
-      DEFAULT_PLANNING_PROFILE.currentKnowledge,
-    ),
-    learningGoal: rawGoal === "quick_revision"
-      ? "fast_track"
-      : profileValue(rawGoal, GOAL_VALUES, DEFAULT_PLANNING_PROFILE.learningGoal),
-    preferredStyle: profileValue(
-      profile.preferredStyle,
-      STYLE_VALUES,
-      DEFAULT_PLANNING_PROFILE.preferredStyle,
-    ),
-    prerequisiteConfidence: profileValue(
-      profile.prerequisiteConfidence,
-      PREREQUISITE_VALUES,
-      DEFAULT_PLANNING_PROFILE.prerequisiteConfidence,
-    ),
-  };
-}
-
 export function normalizePlanningDraft(value: unknown): PlanningDraft | null {
   if (!isRecord(value) || typeof value.chapter !== "string") return null;
   return {
+    classLevel: typeof value.classLevel === "string" ? value.classLevel : "",
+    subject: typeof value.subject === "string" ? value.subject : "",
     chapter: value.chapter,
-    profile: normalizePlanningProfile(value.profile),
   };
 }
 
 export function normalizePlanningPlan(value: unknown): PlanningPlan | null {
   if (!isRecord(value) || !isChapterPlanningMission(value.mission) || !isRecord(value.scope)) return null;
+  const mission = value.mission;
   const scope = value.scope;
   if (typeof scope.chapter !== "string") return null;
 
   const plan: PlanningPlan = {
-    mission: value.mission,
+    mission,
     scope: {
       chapter: scope.chapter,
       chapterLabel: typeof scope.chapterLabel === "string"
         ? scope.chapterLabel
-        : formatPlanningLabel(value.mission.chapter || scope.chapter),
-      subject: typeof scope.subject === "string" ? scope.subject : value.mission.subject,
+        : formatPlanningLabel(mission.chapter || scope.chapter),
+      subject: typeof scope.subject === "string" ? scope.subject : mission.subject,
       classLevel: typeof scope.classLevel === "string" ? scope.classLevel : "",
     },
-    profile: normalizePlanningProfile(value.profile),
-    catalogSource: value.catalogSource === "published" ? "published" : "starter",
-    createdAt: typeof value.createdAt === "string" ? value.createdAt : new Date(0).toISOString(),
   };
-  if (typeof value.responseLatencyMs === "number") plan.responseLatencyMs = value.responseLatencyMs;
-  if (isRecord(value.checkpoint)) plan.checkpoint = value.checkpoint as unknown as PlanningCheckpointResult;
-  if (Array.isArray(value.completedStepIndexes)) {
-    plan.completedStepIndexes = Array.from(new Set(
-      value.completedStepIndexes.filter((index): index is number => Number.isInteger(index) && index >= 0),
-    ));
-  }
   return plan;
 }
 
@@ -240,144 +95,89 @@ export function formatPlanningLabel(value?: string | number) {
   return String(value).replace(/_/g, " ");
 }
 
-export function confidenceToScore(value: string) {
-  const normalized = value === "weak" || value === "not_confident" ? "low" : value;
-  return CONFIDENCE_OPTIONS.find((option) => option.value === normalized)?.score ?? 62;
+export function getPlanningFocusAreas(mission?: AutonomousMission | null): PlanningFocusArea[] {
+  return mission?.focus_areas?.filter(isPlanningFocusArea) || [];
 }
 
-export function clampMetric(value: number, min = 0, max = 100) {
-  return Math.max(min, Math.min(max, Math.round(value)));
-}
-
-export function calculatePlanningFocusScore({
-  correct,
-  durationSeconds,
-  hintCount,
-  retryCount,
-  confidenceAfter,
-}: {
-  correct: boolean;
-  durationSeconds: number;
-  hintCount: number;
-  retryCount: number;
-  confidenceAfter: number;
-}) {
-  const durationPenalty = durationSeconds > 900 ? 10 : durationSeconds > 420 ? 5 : 0;
-  const supportPenalty = Math.min(18, hintCount * 6 + retryCount * 4);
-  const confidenceBonus = confidenceAfter >= 75 ? 6 : confidenceAfter <= 40 ? -6 : 0;
-  return clampMetric((correct ? 78 : 58) + confidenceBonus - durationPenalty - supportPenalty);
-}
-
-export function getMissionPlan(mission?: AutonomousMission | null): MissionPlanStep[] {
-  if (!mission) return [];
-  const plan = mission.study_plan || mission.result?.data?.study_plan || [];
-  return plan.length && plan.every(isMissionPlanStep) ? plan : [];
-}
-
-export function getMissionQuestion(mission?: AutonomousMission | null) {
-  const question = mission?.diagnostic_question || mission?.result?.data?.questions?.[0];
-  return isMissionQuestion(question) ? question : null;
-}
-
-export function parsePlanningMinutes(value?: string | number) {
-  const match = String(value || "").match(/\d+/);
-  return match ? Math.max(0, Number(match[0])) : 0;
-}
-
-export function getEstimatedPlanMinutes(plan?: PlanningPlan | null) {
-  const steps = getMissionPlan(plan?.mission);
-  const plannedFromSteps = steps.reduce((sum, step) => sum + parsePlanningMinutes(step.duration), 0);
-  return plannedFromSteps || Math.max(0, Number(plan?.mission.estimated_minutes || 0));
-}
-
-export function buildPlanningReport(
-  mission: AutonomousMission,
-  correct: boolean,
-  chapterLabel = formatPlanningLabel(mission.chapter || mission.target_topic),
-): PlanningReport {
-  return {
-    title: correct ? "Strong first signal" : "Weak point detected",
-    summary: correct
-      ? `You understood the chapter check for ${chapterLabel}. Use the result to finish the remaining steps with confidence.`
-      : `The chapter check found a gap in ${chapterLabel}. Revisit the matching roadmap step before adding more practice.`,
-    next: correct
-      ? [
-          `Try two exam-style application questions from ${chapterLabel}.`,
-          "Explain the concept once in your own words.",
-          "Use revision after the next learning block to protect recall.",
-        ]
-      : [
-          `Revisit the clearest explanation in your ${chapterLabel} roadmap.`,
-          "Learn one worked example and one common mistake.",
-          "Retry a similar question before increasing difficulty.",
-        ],
-  };
+export function getPlanningGuidanceSteps(mission?: AutonomousMission | null): PlanningGuidanceStep[] {
+  return mission?.guidance_steps?.filter(isPlanningGuidanceStep) || [];
 }
 
 function nonEmptyString(value: unknown): value is string {
   return typeof value === "string" && Boolean(value.trim());
 }
 
-function isMissionPlanStep(value: unknown, index: number): value is MissionPlanStep {
-  if (!isRecord(value)) return false;
-  const prerequisite = value.prerequisite_check;
-  const completion = value.completion_check;
-  return (
-    value.sequence === index + 1
+function isPlanningFocusArea(value: unknown): value is PlanningFocusArea {
+  return Boolean(
+    isRecord(value)
+    && nonEmptyString(value.focus_area_id)
+    && Array.isArray(value.unit_ids)
+    && value.unit_ids.length > 0
+    && value.unit_ids.every(nonEmptyString)
     && nonEmptyString(value.unit_id)
+    && value.unit_id === value.unit_ids[0]
+    && Array.isArray(value.unit_titles)
+    && value.unit_titles.length === value.unit_ids.length
+    && value.unit_titles.every(nonEmptyString)
     && nonEmptyString(value.title)
-    && nonEmptyString(value.duration)
-    && nonEmptyString(value.detail)
-    && nonEmptyString(value.focus)
-    && isRecord(prerequisite)
-    && ["repair_first", "ready", "connect_previous"].includes(String(prerequisite.status))
-    && nonEmptyString(prerequisite.question)
-    && nonEmptyString(prerequisite.guidance)
-    && isRecord(completion)
-    && nonEmptyString(completion.question)
-    && nonEmptyString(completion.expected_outcome)
+    && Array.isArray(value.subtopics)
+    && value.subtopics.length >= 1
+    && value.subtopics.length <= 4
+    && value.subtopics.every(nonEmptyString)
+    && ["high", "medium", "light"].includes(String(value.focus_level))
+    && nonEmptyString(value.reason)
+    && nonEmptyString(value.guidance),
   );
 }
 
-function isMissionQuestion(value: unknown): value is MissionQuestion {
-  if (!isRecord(value) || !nonEmptyString(value.question) || !nonEmptyString(value.correct)) return false;
-  if (!Array.isArray(value.options) || value.options.length < 2 || !value.options.every(nonEmptyString)) return false;
-  return value.options.includes(value.correct);
+function isPlanningGuidanceStep(value: unknown, index?: number): value is PlanningGuidanceStep {
+  return Boolean(
+    isRecord(value)
+    && (index === undefined || value.sequence === index + 1)
+    && Number.isInteger(value.sequence)
+    && nonEmptyString(value.title)
+    && nonEmptyString(value.instruction)
+    && Array.isArray(value.focus_unit_ids)
+    && value.focus_unit_ids.length > 0
+    && value.focus_unit_ids.every(nonEmptyString),
+  );
 }
 
 export function isChapterPlanningMission(value: unknown): value is AutonomousMission {
-  if (!isRecord(value) || value.plan_scope !== "chapter") return false;
-  const plan = Array.isArray(value.study_plan)
-    ? value.study_plan
-    : isRecord(value.result) && isRecord(value.result.data) && Array.isArray(value.result.data.study_plan)
-      ? value.result.data.study_plan
-      : [];
-  if (!plan.length || !plan.every(isMissionPlanStep)) return false;
-  if (value.learning_unit_count !== plan.length) return false;
-  const unitIds = new Set(plan.map((step) => step.unit_id));
-  const prerequisiteQuestions = new Set(plan.map((step) => (
-    String(step.prerequisite_check?.question)
-      .trim()
-      .toLocaleLowerCase()
-  )));
-  if (unitIds.size !== plan.length || prerequisiteQuestions.size !== plan.length) return false;
+  if (!isRecord(value) || value.plan_scope !== "chapter" || value.brief_version !== "chapter_focus_v1") return false;
+  if (!Array.isArray(value.focus_areas) || !value.focus_areas.length || value.focus_areas.length > 5) return false;
+  if (!value.focus_areas.every(isPlanningFocusArea)) return false;
+  if (!Array.isArray(value.guidance_steps) || value.guidance_steps.length < 3 || value.guidance_steps.length > 5) return false;
+  if (!value.guidance_steps.every(isPlanningGuidanceStep)) return false;
+  if (!isRecord(value.coverage) || value.coverage.status !== "complete") return false;
 
-  const diagnostic = isRecord(value.diagnostic_question)
-    ? value.diagnostic_question
-    : isRecord(value.result) && isRecord(value.result.data) && Array.isArray(value.result.data.questions)
-      ? value.result.data.questions[0]
-      : null;
+  const areaIds = value.focus_areas.map((area) => area.focus_area_id);
+  const focusLevels = new Set(value.focus_areas.map((area) => area.focus_level));
+  if (!focusLevels.has("high")) return false;
+  if (value.focus_areas.length >= 2 && !focusLevels.has("medium")) return false;
+  if (value.focus_areas.length >= 3 && !focusLevels.has("light")) return false;
+  const unitIds = value.focus_areas.flatMap((area) => area.unit_ids);
+  const unitIdSet = new Set(unitIds);
+  const includedIds = Array.isArray(value.coverage.included_unit_ids)
+    ? value.coverage.included_unit_ids.filter(nonEmptyString)
+    : [];
+  if (new Set(areaIds).size !== areaIds.length || unitIdSet.size !== unitIds.length) return false;
+  if (includedIds.length !== unitIds.length || new Set(includedIds).size !== unitIds.length) return false;
+  if (value.coverage.unit_count !== unitIds.length || includedIds.some((id) => !unitIdSet.has(id))) return false;
+  const guidedIds = new Set(value.guidance_steps.flatMap((step) => step.focus_unit_ids));
+  if (Array.from(guidedIds).some((id) => !unitIdSet.has(id))) return false;
+  if (unitIds.some((id) => !guidedIds.has(id))) return false;
+
   return Boolean(
     nonEmptyString(value.mission_id)
     && nonEmptyString(value.subject)
     && nonEmptyString(value.target_topic)
-    && nonEmptyString(value.objective)
-    && nonEmptyString(value.why)
-    && isMissionQuestion(diagnostic),
+    && nonEmptyString(value.chapter_summary)
+    && nonEmptyString(value.completion_signal),
   );
 }
 
 export function isRetiredTopicPlanningSnapshot(value: unknown) {
   if (!isRecord(value) || !isRecord(value.mission)) return false;
-  return value.mission.plan_scope !== "chapter";
+  return !isChapterPlanningMission(value.mission);
 }

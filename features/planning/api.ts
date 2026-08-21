@@ -2,7 +2,6 @@ import { ApiRequestError, apiJson } from "@/lib/apiClient";
 import {
   isChapterPlanningMission,
   type AutonomousMission,
-  type PlanningProfile,
   type PlanningScope,
 } from "./contracts";
 
@@ -10,6 +9,18 @@ export type PlanningRequestContext = {
   backendURL?: string;
   getAuthHeaders: () => Promise<HeadersInit>;
   userId: string;
+};
+
+export type PlanningCatalogChapter = {
+  label: string;
+  value: string;
+  subject: string;
+  classLevel: string;
+  order?: number;
+};
+
+export type PlanningCatalog = {
+  chapters: PlanningCatalogChapter[];
 };
 
 export type PlanningApiErrorCode =
@@ -45,6 +56,52 @@ async function jsonHeaders(getAuthHeaders: () => Promise<HeadersInit>) {
   return headers;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+export async function fetchPlanningCatalog(
+  context: PlanningRequestContext,
+  signal?: AbortSignal,
+): Promise<PlanningCatalog> {
+  const payload = await apiJson<unknown>(`${getBackendURL(context.backendURL)}/catalog`, {
+    headers: await context.getAuthHeaders(),
+    cacheKey: `planning-catalog:${context.userId}`,
+    cacheTtlMs: 300000,
+    retries: 1,
+    timeoutMs: 10000,
+    signal,
+  });
+  if (!isRecord(payload) || !Array.isArray(payload.subjects)) {
+    throw new PlanningApiError("The syllabus catalog could not be read.", "invalid_response");
+  }
+
+  const chapters: PlanningCatalogChapter[] = [];
+  const seen = new Set<string>();
+  payload.subjects.forEach((rawGroup) => {
+    if (!isRecord(rawGroup) || !Array.isArray(rawGroup.chapters)) return;
+    const subject = typeof rawGroup.subject === "string" ? rawGroup.subject.trim() : "";
+    const classLevel = typeof rawGroup.class_level === "string" ? rawGroup.class_level.trim() : "";
+    if (!subject || !classLevel) return;
+    rawGroup.chapters.forEach((rawChapter) => {
+      if (!isRecord(rawChapter)) return;
+      const value = typeof rawChapter.slug === "string" ? rawChapter.slug.trim() : "";
+      const label = typeof rawChapter.name === "string" ? rawChapter.name.trim() : value;
+      const order = typeof rawChapter.chapter_number === "number" ? rawChapter.chapter_number : undefined;
+      const identity = `${classLevel}\u0000${subject}\u0000${value}`;
+      if (!value || seen.has(identity)) return;
+      seen.add(identity);
+      chapters.push({ label, value, subject, classLevel, order });
+    });
+  });
+  if (!chapters.length) {
+    throw new PlanningApiError("No chapters are available in the syllabus catalog yet.", "invalid_response");
+  }
+  return {
+    chapters,
+  };
+}
+
 function normalizePlanningError(error: unknown, fallback: string) {
   if (error instanceof PlanningApiError) return error;
   if (error instanceof ApiRequestError) {
@@ -74,7 +131,6 @@ function normalizePlanningError(error: unknown, fallback: string) {
 export async function generatePlanningMission(
   context: PlanningRequestContext,
   scope: PlanningScope,
-  profile: PlanningProfile,
   signal?: AbortSignal,
 ): Promise<AutonomousMission> {
   try {
@@ -87,10 +143,6 @@ export async function generatePlanningMission(
           current_chapter: scope.chapter,
           subject: scope.subject,
           class_level: scope.classLevel,
-          current_knowledge: profile.currentKnowledge,
-          learning_goal: profile.learningGoal,
-          preferred_style: profile.preferredStyle,
-          prerequisite_confidence: profile.prerequisiteConfidence,
         }),
         retries: 0,
         timeoutMs: 45000,
@@ -105,62 +157,6 @@ export async function generatePlanningMission(
     return mission;
   } catch (error) {
     throw normalizePlanningError(error, "Your plan could not be created.");
-  }
-}
-
-export type PlanningCheckpointSubmission = {
-  chapter: string;
-  subject: string;
-  correct: boolean;
-  durationSeconds: number;
-  focusScore: number;
-  startedAt: string;
-  completedAt: string;
-  responseLatencyMs: number;
-  hintCount: number;
-  retryCount: number;
-  confidenceBefore: number;
-  confidenceAfter: number;
-  replayData: Record<string, unknown>;
-};
-
-export async function submitPlanningCheckpoint(
-  context: PlanningRequestContext,
-  submission: PlanningCheckpointSubmission,
-  signal?: AbortSignal,
-) {
-  try {
-    return await apiJson<{ message?: string; session?: unknown }>(
-      `${getBackendURL(context.backendURL)}/submit-session`,
-      {
-        method: "POST",
-        headers: await jsonHeaders(context.getAuthHeaders),
-        body: JSON.stringify({
-          user_id: context.userId,
-          topic: submission.chapter,
-          subject: submission.subject,
-          score: submission.correct ? 1 : 0,
-          total_questions: 1,
-          time_spent_seconds: submission.durationSeconds,
-          focus_score: submission.focusScore,
-          session_type: "planning_checkpoint",
-          started_at: submission.startedAt,
-          completed_at: submission.completedAt,
-          response_latency_ms: submission.responseLatencyMs,
-          hint_count: submission.hintCount,
-          retry_count: submission.retryCount,
-          confidence_before: submission.confidenceBefore,
-          confidence_after: submission.confidenceAfter,
-          replay_data: submission.replayData,
-        }),
-        retries: 0,
-        timeoutMs: 18000,
-        forceFresh: true,
-        signal,
-      },
-    );
-  } catch (error) {
-    throw normalizePlanningError(error, "Your checkpoint could not be recorded.");
   }
 }
 

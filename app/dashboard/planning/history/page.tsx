@@ -1,10 +1,5 @@
-import PlanningHistory from "@/features/planning/PlanningHistory";
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Plan History | AgentifyAI",
-  description: "Reopen planning snapshots saved on this device.",
-};
-
-export default PlanningHistory;
-
+export default function RetiredPlanningHistoryPage() {
+  redirect("/dashboard/planning");
+}

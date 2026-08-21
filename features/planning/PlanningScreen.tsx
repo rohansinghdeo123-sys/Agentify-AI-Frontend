@@ -1,6 +1,5 @@
 "use client";
 
-import { AppIcon } from "@/components/ui/Polished";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, type ReactNode } from "react";
@@ -12,7 +11,6 @@ export function PlanningScreen({
   intro,
   backHref,
   backLabel = "Planning Home",
-  actions,
   children,
 }: {
   eyebrow: string;
@@ -20,7 +18,6 @@ export function PlanningScreen({
   intro: string;
   backHref?: string;
   backLabel?: string;
-  actions?: ReactNode;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -52,13 +49,8 @@ export function PlanningScreen({
               <h1 ref={headingRef} tabIndex={-1}>{title}</h1>
               <p className={styles.intro}>{intro}</p>
             </div>
-            {actions ? <div className={styles.headerActions}>{actions}</div> : null}
           </header>
           {children}
-          <footer className={styles.footerNote}>
-            <AppIcon name="history" />
-            <span>Plan snapshots are kept on this device. Verified learning activity is recorded only after the learning service confirms it.</span>
-          </footer>
         </div>
       </div>
     </section>
