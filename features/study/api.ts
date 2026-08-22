@@ -58,6 +58,16 @@ export type CoachTurnResult = {
   blocks: AdaptiveAnswerBlock[];
   sources?: CoachSources;
   socratic?: boolean;
+  interactionId?: string;
+};
+
+export type PlanningStudyEvidenceResult = {
+  recorded: boolean;
+  idempotent: boolean;
+  event_count: number;
+  status: "learning";
+  curriculum_key: string;
+  unit_id: string;
 };
 
 type StreamCallbacks = {
@@ -128,6 +138,9 @@ export function parseStudyStreamFrame(raw: string): ParsedFrame {
           blocks: Array.isArray(parsed.blocks) ? parsed.blocks as AdaptiveAnswerBlock[] : [],
           sources: parsed.sources && typeof parsed.sources === "object" ? parsed.sources as unknown as CoachSources : undefined,
           socratic: typeof parsed.socratic === "boolean" ? parsed.socratic : undefined,
+          interactionId: typeof parsed.interaction_id === "string" && parsed.interaction_id.trim()
+            ? parsed.interaction_id.trim()
+            : undefined,
         },
         semantic: true,
       };
@@ -374,6 +387,7 @@ export async function streamCoachTurn(
               : "open_tutor_reasoning_first",
           selected_subject: syllabusGrounded ? payload.scope.subject : "",
           catalog_source: syllabusGrounded ? payload.scope.catalogSource || "starter" : "",
+          class_level: syllabusGrounded ? payload.scope.classLevel || "" : "",
           selected_chapter_id: syllabusGrounded ? payload.scope.chapterId : "",
           selected_chapter: syllabusGrounded ? payload.scope.chapterLabel : "",
           selected_topic_id: syllabusGrounded ? payload.scope.topicId : "",
@@ -436,6 +450,7 @@ export async function streamCoachTurn(
       blocks: result?.blocks || [],
       sources: result?.sources,
       socratic: result?.socratic,
+      interactionId: result?.interactionId,
     };
   } catch (error) {
     if (connectionTimedOut) {
@@ -448,6 +463,32 @@ export async function streamCoachTurn(
   } finally {
     globalThis.clearTimeout(connectionTimeout);
     callbacks.signal?.removeEventListener("abort", abortStream);
+  }
+}
+
+/**
+ * Records backend-issued Planning evidence. The interaction receipt is
+ * server-validated, so retries cannot fabricate progress or double count.
+ */
+export async function recordPlanningStudyEvidence(
+  context: StudyApiContext,
+  interactionId: string,
+): Promise<PlanningStudyEvidenceResult> {
+  const receipt = interactionId.trim();
+  if (!receipt || receipt.length > 240) {
+    throw new StudyApiError("The learning receipt could not be verified.", "invalid_response");
+  }
+  try {
+    return await apiJson<PlanningStudyEvidenceResult>(`${apiBase(context.backendURL)}/planning/learning-events`, {
+      method: "POST",
+      headers: context.headers,
+      body: JSON.stringify({ interaction_id: receipt, event_type: "study_answer" }),
+      forceFresh: true,
+      retries: 1,
+      timeoutMs: 8000,
+    });
+  } catch (error) {
+    throw normalizeError(error);
   }
 }
 

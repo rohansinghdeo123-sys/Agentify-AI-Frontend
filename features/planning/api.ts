@@ -1,7 +1,8 @@
 import { ApiRequestError, apiJson } from "@/lib/apiClient";
 import {
-  isChapterPlanningMission,
-  type AutonomousMission,
+  normalizePlanningRoadmap,
+  type PlanningPlan,
+  type PlanningRoadmap,
   type PlanningScope,
 } from "./contracts";
 
@@ -17,6 +18,9 @@ export type PlanningCatalogChapter = {
   subject: string;
   classLevel: string;
   order?: number;
+  aliases?: string[];
+  planningSupported: true;
+  roadmapVersion: "planning_roadmap_v2";
 };
 
 export type PlanningCatalog = {
@@ -60,6 +64,67 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
+const CURRENT_PLANNING_CHAPTER = {
+  value: "some_basic_concepts_of_chemistry",
+  label: "Some Basic Concepts of Chemistry",
+  classLevel: "Class 11",
+  subject: "Chemistry",
+  aliases: ["matter", "Basic Concepts of Chemistry", "basic-concepts-of-chemistry"],
+} as const;
+
+function normalizeCatalogIdentity(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
+
+function normalizePlanningClass(value: string) {
+  const identity = normalizeCatalogIdentity(value).replace(/^class_/, "");
+  return identity === "xi" ? "11" : identity;
+}
+
+function isCurrentPlanningChapter(
+  chapter: { value: string; label: string; aliases: string[] },
+  classLevel: string,
+  subject: string,
+) {
+  const knownChapterIdentities = [
+    CURRENT_PLANNING_CHAPTER.value,
+    CURRENT_PLANNING_CHAPTER.label,
+    ...CURRENT_PLANNING_CHAPTER.aliases,
+  ].map(normalizeCatalogIdentity);
+  const chapterIdentities = [chapter.value, chapter.label, ...chapter.aliases].map(normalizeCatalogIdentity);
+  return normalizePlanningClass(classLevel) === "11"
+    && normalizeCatalogIdentity(subject) === "chemistry"
+    && chapterIdentities.some((identity) => knownChapterIdentities.includes(identity));
+}
+
+export function planningCatalogChapterMatches(chapter: PlanningCatalogChapter, requested: string) {
+  const identity = normalizeCatalogIdentity(requested);
+  return Boolean(
+    identity
+    && (
+      normalizeCatalogIdentity(chapter.value) === identity
+      || normalizeCatalogIdentity(chapter.label) === identity
+      || chapter.aliases?.some((alias) => normalizeCatalogIdentity(alias) === identity)
+    ),
+  );
+}
+
+/** Prevent saved/deep-linked roadmaps from rendering outside the supported Planning catalog. */
+export function isPlanningPlanSupported(plan: PlanningPlan, chapters: PlanningCatalogChapter[]) {
+  const chapter = chapters.find((candidate) => (
+    candidate.planningSupported === true
+    && normalizePlanningClass(candidate.classLevel) === normalizePlanningClass(plan.scope.classLevel)
+    && normalizeCatalogIdentity(candidate.subject) === normalizeCatalogIdentity(plan.scope.subject)
+    && planningCatalogChapterMatches(candidate, plan.scope.chapter)
+  ));
+  return Boolean(
+    chapter
+    && planningCatalogChapterMatches(chapter, plan.roadmap.chapter_slug)
+    && normalizePlanningClass(chapter.classLevel) === normalizePlanningClass(plan.roadmap.class_level)
+    && normalizeCatalogIdentity(chapter.subject) === normalizeCatalogIdentity(plan.roadmap.subject)
+  );
+}
+
 export async function fetchPlanningCatalog(
   context: PlanningRequestContext,
   signal?: AbortSignal,
@@ -72,30 +137,121 @@ export async function fetchPlanningCatalog(
     timeoutMs: 10000,
     signal,
   });
-  if (!isRecord(payload) || !Array.isArray(payload.subjects)) {
+  if (!isRecord(payload)) {
     throw new PlanningApiError("The syllabus catalog could not be read.", "invalid_response");
   }
 
   const chapters: PlanningCatalogChapter[] = [];
   const seen = new Set<string>();
-  payload.subjects.forEach((rawGroup) => {
-    if (!isRecord(rawGroup) || !Array.isArray(rawGroup.chapters)) return;
-    const subject = typeof rawGroup.subject === "string" ? rawGroup.subject.trim() : "";
-    const classLevel = typeof rawGroup.class_level === "string" ? rawGroup.class_level.trim() : "";
-    if (!subject || !classLevel) return;
-    rawGroup.chapters.forEach((rawChapter) => {
-      if (!isRecord(rawChapter)) return;
-      const value = typeof rawChapter.slug === "string" ? rawChapter.slug.trim() : "";
-      const label = typeof rawChapter.name === "string" ? rawChapter.name.trim() : value;
-      const order = typeof rawChapter.chapter_number === "number" ? rawChapter.chapter_number : undefined;
-      const identity = `${classLevel}\u0000${subject}\u0000${value}`;
-      if (!value || seen.has(identity)) return;
-      seen.add(identity);
-      chapters.push({ label, value, subject, classLevel, order });
+
+  const addChapter = ({
+    value,
+    label,
+    subject,
+    classLevel,
+    order,
+    aliases,
+  }: Omit<PlanningCatalogChapter, "planningSupported" | "roadmapVersion">) => {
+    if (!value || !label || !subject || !classLevel) return;
+    const identity = `${normalizePlanningClass(classLevel)}\u0000${normalizeCatalogIdentity(subject)}\u0000${normalizeCatalogIdentity(value)}`;
+    if (seen.has(identity)) return;
+    seen.add(identity);
+    chapters.push({
+      label,
+      value,
+      subject,
+      classLevel,
+      order,
+      ...(aliases?.length ? { aliases } : {}),
+      planningSupported: true,
+      roadmapVersion: "planning_roadmap_v2",
     });
-  });
+  };
+
+  const manifestContainer = isRecord(payload.planning) ? payload.planning : null;
+  const manifestEntries = Array.isArray(payload.planning_chapters)
+    ? payload.planning_chapters
+    : manifestContainer && Array.isArray(manifestContainer.chapters)
+      ? manifestContainer.chapters
+      : null;
+
+  if (manifestEntries) {
+    manifestEntries.forEach((rawEntry) => {
+      if (!isRecord(rawEntry) || rawEntry.supported !== true || rawEntry.roadmap_version !== "planning_roadmap_v2") return;
+      const value = typeof rawEntry.canonical_slug === "string" ? rawEntry.canonical_slug.trim() : "";
+      const label = typeof rawEntry.name === "string" ? rawEntry.name.trim() : value;
+      const subject = typeof rawEntry.subject === "string" ? rawEntry.subject.trim() : "";
+      const classLevel = typeof rawEntry.class_level === "string" ? rawEntry.class_level.trim() : "";
+      const aliases = Array.isArray(rawEntry.aliases)
+        ? rawEntry.aliases.filter((alias): alias is string => typeof alias === "string" && Boolean(alias.trim()))
+        : [];
+      addChapter({
+        value,
+        label,
+        subject,
+        classLevel,
+        order: typeof rawEntry.chapter_number === "number" ? rawEntry.chapter_number : undefined,
+        aliases,
+      });
+    });
+  } else if (Array.isArray(payload.subjects)) {
+    // Short rollout bridge for catalogs deployed before `planning_chapters`.
+    // Missing capability metadata never exposes arbitrary shared chapters.
+    payload.subjects.forEach((rawGroup) => {
+      if (!isRecord(rawGroup) || !Array.isArray(rawGroup.chapters)) return;
+      const subject = typeof rawGroup.subject === "string" ? rawGroup.subject.trim() : "";
+      const classLevel = typeof rawGroup.class_level === "string" ? rawGroup.class_level.trim() : "";
+      if (!subject || !classLevel) return;
+      rawGroup.chapters.forEach((rawChapter) => {
+        if (!isRecord(rawChapter)) return;
+        const rawValue = typeof rawChapter.slug === "string" ? rawChapter.slug.trim() : "";
+        const rawLabel = typeof rawChapter.name === "string" ? rawChapter.name.trim() : rawValue;
+        const rawAliases = Array.isArray(rawChapter.aliases)
+          ? rawChapter.aliases.filter((alias): alias is string => typeof alias === "string" && Boolean(alias.trim()))
+          : [];
+        const canonicalFallback = isCurrentPlanningChapter(
+          { value: rawValue, label: rawLabel, aliases: rawAliases },
+          classLevel,
+          subject,
+        );
+        const capability = isRecord(rawChapter.planning) ? rawChapter.planning : null;
+        const attachedSupported = capability
+          ? capability.supported === true
+            && capability.roadmap_version === "planning_roadmap_v2"
+            && typeof capability.canonical_slug === "string"
+            && Boolean(capability.canonical_slug.trim())
+          : rawChapter.planning_supported === true && canonicalFallback;
+        const legacyFallback = !capability
+          && rawChapter.planning_supported === undefined
+          && canonicalFallback;
+        if (!rawValue || (!attachedSupported && !legacyFallback)) return;
+
+        const capabilitySlug = capability && typeof capability.canonical_slug === "string"
+          ? capability.canonical_slug.trim()
+          : "";
+        const value = capabilitySlug || (canonicalFallback ? CURRENT_PLANNING_CHAPTER.value : rawValue);
+        const label = canonicalFallback ? CURRENT_PLANNING_CHAPTER.label : rawLabel;
+        const aliases = Array.from(new Set([
+          ...rawAliases,
+          rawValue,
+          ...(canonicalFallback ? [rawLabel, ...CURRENT_PLANNING_CHAPTER.aliases] : []),
+        ])).filter((alias) => normalizeCatalogIdentity(alias) !== normalizeCatalogIdentity(value));
+        addChapter({
+          value,
+          label,
+          subject,
+          classLevel,
+          order: typeof rawChapter.chapter_number === "number" ? rawChapter.chapter_number : undefined,
+          aliases,
+        });
+      });
+    });
+  }
   if (!chapters.length) {
-    throw new PlanningApiError("No chapters are available in the syllabus catalog yet.", "invalid_response");
+    throw new PlanningApiError(
+      "Planning is currently available for Class 11 Chemistry — Some Basic Concepts of Chemistry.",
+      "invalid_response",
+    );
   }
   return {
     chapters,
@@ -128,11 +284,11 @@ function normalizePlanningError(error: unknown, fallback: string) {
   );
 }
 
-export async function generatePlanningMission(
+export async function generatePlanningRoadmap(
   context: PlanningRequestContext,
   scope: PlanningScope,
   signal?: AbortSignal,
-): Promise<AutonomousMission> {
+): Promise<PlanningRoadmap> {
   try {
     const mission = await apiJson<unknown>(
       `${getBackendURL(context.backendURL)}/coach/autonomous-study/${encodeURIComponent(context.userId)}`,
@@ -143,6 +299,7 @@ export async function generatePlanningMission(
           current_chapter: scope.chapter,
           subject: scope.subject,
           class_level: scope.classLevel,
+          ...(scope.studyTimeToday ? { study_time_today: scope.studyTimeToday } : {}),
         }),
         retries: 0,
         timeoutMs: 45000,
@@ -151,10 +308,11 @@ export async function generatePlanningMission(
       },
     );
 
-    if (!isChapterPlanningMission(mission)) {
-      throw new PlanningApiError("The planner returned an incomplete plan. Please try again.", "invalid_response");
+    const roadmap = normalizePlanningRoadmap(mission);
+    if (!roadmap) {
+      throw new PlanningApiError("The planner returned an incomplete roadmap. Please try again.", "invalid_response");
     }
-    return mission;
+    return roadmap;
   } catch (error) {
     throw normalizePlanningError(error, "Your plan could not be created.");
   }

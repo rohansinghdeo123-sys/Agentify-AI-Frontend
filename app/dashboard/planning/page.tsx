@@ -3,7 +3,7 @@ import PlanningHome from "@/features/planning/PlanningHome";
 
 export const metadata: Metadata = {
   title: "Planning | AgentifyAI",
-  description: "Choose a class, subject, and chapter to see a short, prioritised focus brief.",
+  description: "Choose a class, subject, and chapter to build an achievable NCERT-ordered learning roadmap.",
   alternates: { canonical: "/dashboard/planning" },
 };
 

@@ -1,15 +1,16 @@
 import {
   normalizePlanningDraft,
   normalizePlanningPlan,
-  isRetiredTopicPlanningSnapshot,
+  isRetiredPlanningSnapshot,
   type PlanningDraft,
   type PlanningPlan,
 } from "./contracts";
 
-const VERSION = "v3";
+const VERSION = "v4";
+const LEGACY_VERSION = "v3";
 
-function key(userId: string, part: string) {
-  return `agentify:planning:${VERSION}:${encodeURIComponent(userId)}:${part}`;
+function key(userId: string, part: string, version = VERSION) {
+  return `agentify:planning:${version}:${encodeURIComponent(userId)}:${part}`;
 }
 
 function readJSON<T>(storageKey: string): T | null {
@@ -32,7 +33,12 @@ function writeJSON(storageKey: string, value: unknown) {
 }
 
 export function readPlanningDraft(userId: string) {
-  return normalizePlanningDraft(readJSON<unknown>(key(userId, "draft")));
+  const current = normalizePlanningDraft(readJSON<unknown>(key(userId, "draft")));
+  if (current) return current;
+
+  const legacy = normalizePlanningDraft(readJSON<unknown>(key(userId, "draft", LEGACY_VERSION)));
+  if (legacy) writeJSON(key(userId, "draft"), legacy);
+  return legacy;
 }
 
 export function writePlanningDraft(userId: string, draft: PlanningDraft) {
@@ -40,9 +46,11 @@ export function writePlanningDraft(userId: string, draft: PlanningDraft) {
 }
 
 export function readActivePlanningPlanState(userId: string) {
-  const raw = readJSON<unknown>(key(userId, "active"));
+  const currentRaw = readJSON<unknown>(key(userId, "active"));
+  const legacyRaw = currentRaw ? null : readJSON<unknown>(key(userId, "active", LEGACY_VERSION));
+  const raw = currentRaw ?? legacyRaw;
   const plan = normalizePlanningPlan(raw);
-  const retired = !plan && isRetiredTopicPlanningSnapshot(raw);
+  const retired = !plan && isRetiredPlanningSnapshot(raw);
   return {
     plan,
     retired,
@@ -58,6 +66,7 @@ export function clearActivePlanningPlan(userId: string) {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.removeItem(key(userId, "active"));
+    window.localStorage.removeItem(key(userId, "active", LEGACY_VERSION));
   } catch {
     // In-memory state remains authoritative for this visit.
   }

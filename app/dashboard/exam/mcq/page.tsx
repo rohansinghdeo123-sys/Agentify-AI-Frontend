@@ -5,6 +5,7 @@ import { AppIcon } from "@/components/ui/Polished";
 import { useAuth } from "@/context/AuthContext";
 import { examApiRequest } from "@/features/exam/api";
 import { type ExamQuestion, normalizeExamQuestion } from "@/features/exam/contracts";
+import { readPlanningMcqScope } from "@/features/exam/mcq/planningScope";
 import {
   MCQ_DRAFT_VERSION,
   clearMcqDraft,
@@ -13,7 +14,7 @@ import {
   writeMcqDraft,
   type McqDifficulty,
 } from "@/features/exam/mcq/draft";
-import { BUILTIN_CHAPTERS, findChapterForTopic, reconcileSelection, useCatalog } from "@/lib/catalog";
+import { BUILTIN_CHAPTERS, findChapterForTopic, reconcileSelection, useCatalog, type CatalogChapter } from "@/lib/catalog";
 import { invalidateApiCache } from "@/lib/apiClient";
 import {
   DEFAULT_CLASS_LEVEL,
@@ -88,9 +89,11 @@ export default function McqExamPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const searchKey = searchParams.toString();
+  const planningScope = useMemo(() => readPlanningMcqScope(searchParams), [searchParams]);
 
-  const requestedTopic = normalizeTopicValue(searchParams.get("topic") || "alkanes") || "alkanes";
+  const requestedTopic = planningScope?.topic || normalizeTopicValue(searchParams.get("topic") || "alkanes") || "alkanes";
   const requestedChapter =
+    planningScope?.chapter ||
     searchParams.get("chapter") ||
     findChapterForTopic(BUILTIN_CHAPTERS, requestedTopic) ||
     BUILTIN_CHAPTERS[0]?.value ||
@@ -99,9 +102,18 @@ export default function McqExamPage() {
     () => reconcileSelection(chapters, requestedChapter, requestedTopic),
     [chapters, requestedChapter, requestedTopic],
   );
-  const selectedChapter = chapters.find((item) => item.value === selection.chapter) || chapters[0];
-  const selectedTopic =
-    selectedChapter?.topics.find((item) => item.value === selection.topic) || selectedChapter?.topics[0];
+  const selectedCatalogChapter = chapters.find((item) => item.value === selection.chapter) || chapters[0];
+  const planningChapter = useMemo<CatalogChapter | undefined>(() => planningScope ? ({
+    label: planningScope.chapterLabel,
+    value: planningScope.chapter,
+    subject: planningScope.subject,
+    classLevel: planningScope.classLevel,
+    topics: [{ label: planningScope.topicLabel, value: planningScope.topic }],
+  }) : undefined, [planningScope]);
+  const selectedChapter = planningChapter || selectedCatalogChapter;
+  const selectedTopic = planningScope
+    ? planningChapter?.topics[0]
+    : selectedChapter?.topics.find((item) => item.value === selection.topic) || selectedChapter?.topics[0];
 
   const [stage, setStage] = useState<McqStage>("configure");
   const [attemptScope, setAttemptScope] = useState<AttemptScope | null>(null);
@@ -126,7 +138,8 @@ export default function McqExamPage() {
   const liveConfigureScopeRef = useRef("");
   const savingResultRef = useRef(false);
 
-  const classLevel = profile?.classLevel || DEFAULT_CLASS_LEVEL;
+  const classLevel = planningScope?.classLevel || profile?.classLevel || DEFAULT_CLASS_LEVEL;
+  const activeSubject = planningScope?.subject || SUBJECT;
   const chapterValue = selectedChapter?.value || requestedChapter;
   const topicValue = selectedTopic?.value || requestedTopic;
   const activeChapterValue = attemptScope?.chapterValue || chapterValue;
@@ -189,6 +202,7 @@ export default function McqExamPage() {
   // Keep chapter and topic in the URL. Published catalog updates can correct
   // an obsolete value, and every focused Exam route remains deep-linkable.
   useEffect(() => {
+    if (planningScope) return;
     if (!selectedChapter || !selectedTopic || stage !== "configure") return;
     if (requestedChapter !== selectedChapter.value || requestedTopic !== selectedTopic.value) {
       replaceScope(selectedChapter.value, selectedTopic.value);
@@ -197,6 +211,7 @@ export default function McqExamPage() {
     replaceScope,
     requestedChapter,
     requestedTopic,
+    planningScope,
     selectedChapter,
     selectedTopic,
     stage,
@@ -352,8 +367,12 @@ export default function McqExamPage() {
           session_id: `exam-${sessionSeed}`,
           difficulty,
           count: questionCount,
-          subject: SUBJECT,
-          chapter: selectedChapter.label,
+          subject: activeSubject,
+          chapter: planningScope?.chapter || selectedChapter.label,
+          ...(planningScope ? {
+            class_level: classLevel,
+            catalog_source: planningScope.catalogSource,
+          } : {}),
           strict_grounding: true,
           retrieval_required: true,
           fallback_to_general_knowledge: false,
@@ -485,8 +504,14 @@ export default function McqExamPage() {
     const firstReview = questions.findIndex((question) => answers[question.id] !== question.correct);
     const submissionPayload: Record<string, unknown> = {
       user_id: userId,
-      topic: activeTopicLabel,
-      subject: SUBJECT,
+      topic: planningScope ? activeTopicValue : activeTopicLabel,
+      ...(planningScope ? {
+        topic_label: activeTopicLabel,
+        catalog_source: planningScope.catalogSource,
+        class_level: classLevel,
+        chapter: activeChapterValue,
+      } : {}),
+      subject: activeSubject,
       score,
       total_questions: questions.length,
       xp_earned: score * 10,
@@ -499,8 +524,15 @@ export default function McqExamPage() {
       hint_count: 0,
       retry_count: retryCount,
       replay_data: {
-        topic: activeTopicLabel,
-        source: "exam_mode",
+        topic: planningScope ? activeTopicValue : activeTopicLabel,
+        ...(planningScope ? { topic_label: activeTopicLabel } : {}),
+        source: planningScope ? "planning" : "exam_mode",
+        ...(planningScope ? {
+          catalog_source: planningScope.catalogSource,
+          class_level: classLevel,
+          chapter: activeChapterValue,
+          chapter_label: activeChapterLabel,
+        } : {}),
         telemetry: {
           started_at: startedAt,
           completed_at: completedAt.toISOString(),
@@ -512,7 +544,8 @@ export default function McqExamPage() {
         questions: questions.map((question) => ({
           id: question.id,
           text: question.question,
-          topic: activeTopicLabel,
+          topic: planningScope ? activeTopicValue : activeTopicLabel,
+          ...(planningScope ? { topic_label: activeTopicLabel } : {}),
           options: question.options,
           correct_answer: question.correct,
           user_answer: answers[question.id] || "",
@@ -582,7 +615,7 @@ export default function McqExamPage() {
       description={
         stage === "configure"
           ? "Choose one course scope, then practise with source-grounded questions."
-          : `${SUBJECT} · ${classLevel} · ${activeChapterLabel} · ${activeTopicLabel}`
+          : `${activeSubject} · ${classLevel} · ${activeChapterLabel} · ${activeTopicLabel}`
       }
       backHref={hubHref}
       backLabel="Exam Mode"
@@ -631,15 +664,15 @@ export default function McqExamPage() {
               <div className={styles.selectGrid}>
                 <label>
                   <span>Chapter</span>
-                  <select value={chapterValue} onChange={changeChapter} disabled={generating}>
-                    {chapters.map((chapter) => (
+                  <select value={chapterValue} onChange={changeChapter} disabled={generating || Boolean(planningScope)}>
+                    {(planningScope && selectedChapter ? [selectedChapter] : chapters).map((chapter) => (
                       <option key={chapter.value} value={chapter.value}>{chapter.label}</option>
                     ))}
                   </select>
                 </label>
                 <label>
                   <span>Topic</span>
-                  <select value={topicValue} onChange={changeTopic} disabled={generating}>
+                  <select value={topicValue} onChange={changeTopic} disabled={generating || Boolean(planningScope)}>
                     {(selectedChapter?.topics || []).map((topic) => (
                       <option key={topic.value} value={topic.value}>{topic.label}</option>
                     ))}

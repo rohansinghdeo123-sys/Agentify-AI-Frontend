@@ -60,7 +60,14 @@ export function normalizeServerConversation(value: unknown): StudyConversation |
       ? {
           scope: {
             source: value.scope.source === "syllabus" ? "syllabus" : "open",
-            catalogSource: value.scope.catalogSource === "published" ? "published" : "starter",
+            catalogSource: value.scope.catalogSource === "planning_manifest"
+              ? "planning_manifest"
+              : value.scope.catalogSource === "published"
+                ? "published"
+                : "starter",
+            ...(typeof value.scope.classLevel === "string" && value.scope.classLevel.trim()
+              ? { classLevel: value.scope.classLevel.trim() }
+              : {}),
             subject: String(value.scope.subject || ""),
             chapterId: String(value.scope.chapterId || ""),
             chapterLabel: String(value.scope.chapterLabel || "Open tutor"),

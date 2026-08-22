@@ -13,11 +13,19 @@ import {
 } from "react";
 import {
   fetchPlanningCatalog,
-  generatePlanningMission,
+  generatePlanningRoadmap,
+  isPlanningPlanSupported,
+  planningCatalogChapterMatches,
   planningErrorMessage,
+  PlanningApiError,
   type PlanningCatalogChapter,
 } from "./api";
-import { type PlanningDraft, type PlanningPlan, type PlanningScope } from "./contracts";
+import {
+  type PlanningDraft,
+  type PlanningPlan,
+  type PlanningScope,
+  type PlanningStudyTime,
+} from "./contracts";
 import {
   clearActivePlanningPlan,
   readActivePlanningPlanState,
@@ -40,13 +48,17 @@ type PlanningExperienceValue = {
   scope: PlanningScope;
   activePlan: PlanningPlan | null;
   generating: boolean;
+  refreshingPlan: boolean;
+  refreshNotice: string;
   error: string;
   staleNotice: string;
   setClassLevel: (classLevel: string) => void;
   setSubject: (subject: string) => void;
   setChapter: (chapter: string) => void;
+  setStudyTimeToday: (studyTimeToday: PlanningStudyTime | "") => void;
   retryCatalog: () => void;
   createPlan: (signal?: AbortSignal) => Promise<PlanningPlan | null>;
+  refreshActivePlan: (options?: { force?: boolean }) => Promise<void>;
   clearError: () => void;
 };
 
@@ -56,6 +68,7 @@ const DEFAULT_DRAFT: PlanningDraft = {
   classLevel: "",
   subject: "",
   chapter: "",
+  studyTimeToday: "",
 };
 
 export function PlanningExperienceProvider({ children }: { children: ReactNode }) {
@@ -65,6 +78,8 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
   const [activePlan, setActivePlan] = useState<PlanningPlan | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [refreshingPlan, setRefreshingPlan] = useState(false);
+  const [refreshNotice, setRefreshNotice] = useState("");
   const [error, setError] = useState("");
   const [staleNotice, setStaleNotice] = useState("");
   const [catalogChapters, setCatalogChapters] = useState<PlanningCatalogChapter[]>([]);
@@ -74,6 +89,10 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
   const loadedUserRef = useRef("");
   const generationRef = useRef(0);
   const generationInFlightRef = useRef(false);
+  const refreshIdRef = useRef(0);
+  const refreshInFlightRef = useRef(false);
+  const refreshAbortRef = useRef<AbortController | null>(null);
+  const lastRefreshAtRef = useRef(0);
   const currentInputRef = useRef("");
 
   const classOptions = useMemo(() => Array.from(new Set(catalogChapters.map((chapter) => chapter.classLevel)))
@@ -92,7 +111,7 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     || left.label.localeCompare(right.label)
   )), [catalogChapters, draft.classLevel, draft.subject]);
   const selectedChapter = useMemo(
-    () => chapters.find((chapter) => chapter.value === draft.chapter),
+    () => chapters.find((chapter) => planningCatalogChapterMatches(chapter, draft.chapter)),
     [chapters, draft.chapter],
   );
   const scope = useMemo<PlanningScope>(() => ({
@@ -100,7 +119,8 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     chapterLabel: selectedChapter?.label || "",
     subject: selectedChapter?.subject || draft.subject,
     classLevel: selectedChapter?.classLevel || draft.classLevel,
-  }), [draft.classLevel, draft.subject, selectedChapter]);
+    studyTimeToday: draft.studyTimeToday,
+  }), [draft.classLevel, draft.studyTimeToday, draft.subject, selectedChapter]);
   currentInputRef.current = JSON.stringify({ userId, scope });
 
   useEffect(() => {
@@ -121,10 +141,14 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
         if (controller.signal.aborted) return;
         setCatalogChapters(catalog.chapters);
       })
-      .catch(() => {
+      .catch((catalogError: unknown) => {
         if (controller.signal.aborted) return;
         setCatalogChapters([]);
-        setCatalogNotice("Your syllabus could not be loaded. Check your connection and try again.");
+        setCatalogNotice(
+          catalogError instanceof PlanningApiError && catalogError.message
+            ? catalogError.message
+            : "Planning chapters could not be loaded. Check your connection and try again.",
+        );
       })
       .finally(() => {
         if (!controller.signal.aborted) setCatalogSettled(true);
@@ -140,7 +164,14 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     loadedUserRef.current = accountKey;
     generationRef.current += 1;
     generationInFlightRef.current = false;
+    refreshIdRef.current += 1;
+    refreshInFlightRef.current = false;
+    refreshAbortRef.current?.abort();
+    refreshAbortRef.current = null;
+    lastRefreshAtRef.current = 0;
     setGenerating(false);
+    setRefreshingPlan(false);
+    setRefreshNotice("");
     setHydrated(false);
     if (userId) {
       const savedDraft = readPlanningDraft(userId);
@@ -148,10 +179,10 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
       setDraft(savedDraft ?? DEFAULT_DRAFT);
       setActivePlan(savedPlanState.plan);
       if (savedPlanState.retired) {
-        setStaleNotice("An older detailed plan was retired because Planning now uses quick chapter focus briefs.");
+        setStaleNotice("Your chapter choice is safe. An older focus brief was retired so you can build the new NCERT-ordered roadmap.");
         clearActivePlanningPlan(userId);
       } else if (savedPlanState.invalid) {
-        setStaleNotice("An older saved plan could not be restored safely. Choose a chapter to create a fresh focus brief.");
+        setStaleNotice("An older saved plan could not be restored safely. Choose a chapter to create a fresh learning roadmap.");
         clearActivePlanningPlan(userId);
       } else {
         setStaleNotice("");
@@ -170,14 +201,16 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
       const exact = catalogChapters.find((chapter) => (
         chapter.classLevel === current.classLevel
         && chapter.subject === current.subject
-        && chapter.value === current.chapter
+        && planningCatalogChapterMatches(chapter, current.chapter)
       ));
-      if (exact) return current;
+      if (exact) {
+        return exact.value === current.chapter ? current : { ...current, chapter: exact.value };
+      }
       const legacyMatch = current.chapter && !current.classLevel && !current.subject
         ? catalogChapters.find((chapter) => (
-            chapter.value === current.chapter
+            planningCatalogChapterMatches(chapter, current.chapter)
             && (!profile?.classLevel || chapter.classLevel === profile.classLevel)
-          )) || catalogChapters.find((chapter) => chapter.value === current.chapter)
+          )) || catalogChapters.find((chapter) => planningCatalogChapterMatches(chapter, current.chapter))
         : undefined;
       if (legacyMatch) {
         return {
@@ -208,8 +241,9 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
       const availableChapters = catalogChapters.filter((chapter) => (
         chapter.classLevel === classLevel && chapter.subject === subject
       ));
-      const chapter = availableChapters.some((item) => item.value === current.chapter)
-        ? current.chapter
+      const matchedChapter = availableChapters.find((item) => planningCatalogChapterMatches(item, current.chapter));
+      const chapter = matchedChapter
+        ? matchedChapter.value
         : availableChapters.length === 1
           ? availableChapters[0].value
           : "";
@@ -227,29 +261,33 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     writePlanningDraft(userId, draft);
   }, [draft, hydrated, userId]);
 
-  const retireActivePlan = useCallback(() => {
+  const retireActivePlan = useCallback((notice = "The previous roadmap was cleared because your planning choices changed.") => {
     if (!activePlan) return;
+    refreshIdRef.current += 1;
+    refreshInFlightRef.current = false;
+    refreshAbortRef.current?.abort();
+    refreshAbortRef.current = null;
+    setRefreshingPlan(false);
+    setRefreshNotice("");
     setActivePlan(null);
-    setStaleNotice("The previous focus brief was cleared because the chapter selection changed.");
+    setStaleNotice(notice);
     if (userId) clearActivePlanningPlan(userId);
   }, [activePlan, userId]);
 
   useEffect(() => {
     if (!catalogSettled || !activePlan) return;
-    const planStillMatches = Boolean(
-      selectedChapter
-      && activePlan.scope.chapter === selectedChapter.value
-      && activePlan.scope.subject === selectedChapter.subject
-      && activePlan.scope.classLevel === selectedChapter.classLevel,
-    );
-    if (!planStillMatches) retireActivePlan();
-  }, [activePlan, catalogSettled, retireActivePlan, selectedChapter]);
+    const planStillMatches = isPlanningPlanSupported(activePlan, catalogChapters);
+    if (!planStillMatches) {
+      retireActivePlan("That saved roadmap is not available in Planning yet. Choose the supported chapter to continue.");
+    }
+  }, [activePlan, catalogChapters, catalogSettled, retireActivePlan]);
 
-  const changeSetup = useCallback((next: Pick<PlanningDraft, "classLevel" | "subject" | "chapter">) => {
+  const changeSetup = useCallback((next: PlanningDraft) => {
     if (
       next.classLevel === draft.classLevel
       && next.subject === draft.subject
       && next.chapter === draft.chapter
+      && next.studyTimeToday === draft.studyTimeToday
     ) return;
     generationRef.current += 1;
     generationInFlightRef.current = false;
@@ -257,34 +295,44 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     retireActivePlan();
     setDraft((current) => ({ ...current, ...next }));
     setError("");
-  }, [draft.chapter, draft.classLevel, draft.subject, retireActivePlan]);
+  }, [draft.chapter, draft.classLevel, draft.studyTimeToday, draft.subject, retireActivePlan]);
 
   const setClassLevel = useCallback((classLevel: string) => {
-    changeSetup({ classLevel, subject: "", chapter: "" });
-  }, [changeSetup]);
+    changeSetup({ ...draft, classLevel, subject: "", chapter: "" });
+  }, [changeSetup, draft]);
 
   const setSubject = useCallback((subject: string) => {
-    changeSetup({ classLevel: draft.classLevel, subject, chapter: "" });
-  }, [changeSetup, draft.classLevel]);
+    changeSetup({ ...draft, subject, chapter: "" });
+  }, [changeSetup, draft]);
 
   const setChapter = useCallback((chapter: string) => {
-    changeSetup({ classLevel: draft.classLevel, subject: draft.subject, chapter });
-  }, [changeSetup, draft.classLevel, draft.subject]);
+    changeSetup({ ...draft, chapter });
+  }, [changeSetup, draft]);
+
+  const setStudyTimeToday = useCallback((studyTimeToday: PlanningStudyTime | "") => {
+    changeSetup({ ...draft, studyTimeToday });
+  }, [changeSetup, draft]);
 
   const createPlan = useCallback(async (signal?: AbortSignal) => {
     if (!userId || authBusy || generating || generationInFlightRef.current) return null;
     if (!selectedChapter || !scope.chapter || !scope.subject) {
-      setError("Choose your class, subject, and chapter before generating the focus plan.");
+      setError("Choose your class, subject, and chapter before generating the learning roadmap.");
       return null;
     }
     const generationId = generationRef.current + 1;
+    refreshIdRef.current += 1;
+    refreshInFlightRef.current = false;
+    refreshAbortRef.current?.abort();
+    refreshAbortRef.current = null;
+    setRefreshingPlan(false);
+    setRefreshNotice("");
     generationRef.current = generationId;
     generationInFlightRef.current = true;
     const requestInput = currentInputRef.current;
     setGenerating(true);
     setError("");
     try {
-      const mission = await generatePlanningMission(
+      const roadmap = await generatePlanningRoadmap(
         { userId, getAuthHeaders },
         scope,
         signal,
@@ -295,10 +343,15 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
         || requestInput !== currentInputRef.current
       ) return null;
       const plan: PlanningPlan = {
-        mission,
+        roadmap,
         scope,
       };
+      if (!isPlanningPlanSupported(plan, catalogChapters)) {
+        setError("The planner returned a chapter that is not available in Planning yet. Please try again.");
+        return null;
+      }
       setActivePlan(plan);
+      lastRefreshAtRef.current = Date.now();
       setStaleNotice("");
       writeActivePlanningPlan(userId, plan);
       return plan;
@@ -316,7 +369,62 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
         setGenerating(false);
       }
     }
-  }, [authBusy, generating, getAuthHeaders, scope, selectedChapter, userId]);
+  }, [authBusy, catalogChapters, generating, getAuthHeaders, scope, selectedChapter, userId]);
+
+  const refreshActivePlan = useCallback(async (options?: { force?: boolean }) => {
+    if (
+      !activePlan
+      || !userId
+      || authBusy
+      || !catalogSettled
+      || refreshInFlightRef.current
+      || !isPlanningPlanSupported(activePlan, catalogChapters)
+    ) return;
+    if (!options?.force && Date.now() - lastRefreshAtRef.current < 30_000) return;
+
+    const refreshId = refreshIdRef.current + 1;
+    refreshIdRef.current = refreshId;
+    refreshInFlightRef.current = true;
+    lastRefreshAtRef.current = Date.now();
+    refreshAbortRef.current?.abort();
+    const controller = new AbortController();
+    refreshAbortRef.current = controller;
+    const savedScope = activePlan.scope;
+    setRefreshingPlan(true);
+    setRefreshNotice("");
+    try {
+      const roadmap = await generatePlanningRoadmap(
+        { userId, getAuthHeaders },
+        savedScope,
+        controller.signal,
+      );
+      const refreshedPlan: PlanningPlan = { roadmap, scope: savedScope };
+      if (
+        controller.signal.aborted
+        || refreshId !== refreshIdRef.current
+      ) return;
+      if (!isPlanningPlanSupported(refreshedPlan, catalogChapters)) {
+        setRefreshNotice("Your saved roadmap is still available, but its latest progress could not be verified. Try again.");
+        return;
+      }
+      setActivePlan(refreshedPlan);
+      writeActivePlanningPlan(userId, refreshedPlan);
+      setRefreshNotice("");
+    } catch (refreshError) {
+      if (controller.signal.aborted || refreshId !== refreshIdRef.current) return;
+      setRefreshNotice(`${planningErrorMessage(refreshError)} Your saved roadmap is still available.`);
+    } finally {
+      if (refreshId === refreshIdRef.current) {
+        refreshInFlightRef.current = false;
+        refreshAbortRef.current = null;
+        setRefreshingPlan(false);
+      }
+    }
+  }, [activePlan, authBusy, catalogChapters, catalogSettled, getAuthHeaders, userId]);
+
+  useEffect(() => () => {
+    refreshAbortRef.current?.abort();
+  }, []);
 
   const value = useMemo<PlanningExperienceValue>(() => ({
     authBusy,
@@ -330,19 +438,26 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     catalogNotice,
     selectedChapter,
     scope,
-    activePlan,
+    activePlan: activePlan && catalogSettled && isPlanningPlanSupported(activePlan, catalogChapters)
+      ? activePlan
+      : null,
     generating,
+    refreshingPlan,
+    refreshNotice,
     error,
     staleNotice,
     setClassLevel,
     setSubject,
     setChapter,
+    setStudyTimeToday,
     retryCatalog: () => setCatalogReload((value) => value + 1),
     createPlan,
+    refreshActivePlan,
     clearError: () => setError(""),
   }), [
     activePlan,
     authBusy,
+    catalogChapters,
     catalogNotice,
     catalogSettled,
     chapters,
@@ -352,11 +467,15 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     error,
     generating,
     hydrated,
+    refreshingPlan,
+    refreshNotice,
+    refreshActivePlan,
     scope,
     selectedChapter,
     setClassLevel,
     setChapter,
     setSubject,
+    setStudyTimeToday,
     staleNotice,
     subjectOptions,
     userId,

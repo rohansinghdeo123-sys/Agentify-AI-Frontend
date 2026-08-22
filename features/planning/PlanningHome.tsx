@@ -3,6 +3,7 @@
 import { AppIcon } from "@/components/ui/Polished";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
+import { PLANNING_STUDY_TIME_OPTIONS } from "./contracts";
 import { usePlanningExperience } from "./PlanningExperience";
 import { PlanningLoading, PlanningScreen, planningStyles as styles } from "./PlanningScreen";
 import { PLANNING_ROUTES } from "./routes";
@@ -73,6 +74,7 @@ export default function PlanningHome() {
     setClassLevel,
     setSubject,
     setChapter,
+    setStudyTimeToday,
     retryCatalog,
     createPlan,
     clearError,
@@ -105,8 +107,8 @@ export default function PlanningHome() {
   return (
     <PlanningScreen
       eyebrow="Planning Lab"
-      title="Find your chapter focus."
-      intro="Choose your class, subject, and chapter. AgentifyAI will show what deserves attention and the shortest clear way through it."
+      title="Know exactly what to learn next."
+      intro="Choose one chapter. AgentifyAI will keep the NCERT order, make the next step clear, and fit today’s route around you."
     >
       <div className={styles.selectionStage}>
         <form
@@ -170,7 +172,7 @@ export default function PlanningHome() {
               id="planning-chapter"
               number="03"
               label="Chapter"
-              helper="Pick one chapter to get its focus map."
+              helper="Pick one chapter to get its learning roadmap."
               value={selectedChapter?.value || ""}
               placeholder="Choose chapter"
               options={chapters.map((chapter) => ({ label: chapter.label, value: chapter.value }))}
@@ -182,16 +184,51 @@ export default function PlanningHome() {
             />
           </fieldset>
 
+          {selectedChapter ? (
+            <fieldset
+              className={styles.todayTimeField}
+              disabled={generating}
+              aria-describedby="planning-time-help"
+            >
+              <legend>
+                <span className={styles.timeLegendIcon} aria-hidden="true"><AppIcon name="clock" /></span>
+                <span>
+                  <strong>How much time would you like to study today?</strong>
+                  <small id="planning-time-help">Optional. This shapes today’s route, not a deadline for the chapter.</small>
+                </span>
+              </legend>
+              <div className={styles.timeOptions} aria-label="Study time today">
+                {PLANNING_STUDY_TIME_OPTIONS.map((option) => {
+                  const selected = draft.studyTimeToday === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={styles.timeOption}
+                      aria-pressed={selected}
+                      onClick={() => {
+                        clearError();
+                        setStudyTimeToday(selected ? "" : option.value);
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+          ) : null}
+
           {error ? <div className={styles.catalogError} role="alert">{error}</div> : null}
 
           <button type="submit" className={`${styles.primaryButton} ${styles.generateFocusButton}`} disabled={!canGenerate}>
             <AppIcon name={generating ? "clock" : "spark"} />
-            {generating ? "Finding the chapter focus…" : "Show my focus plan"}
+            {generating ? "Building your learning roadmap…" : "Build my roadmap"}
             {!generating ? <AppIcon name="arrowRight" /> : null}
           </button>
           <p className={styles.generateHint} aria-live="polite">
             {generating
-              ? "Reading the selected chapter and prioritising its learning units."
+              ? "Reading the selected chapter and preserving its NCERT learning order."
               : selectedChapter
                 ? `Ready for ${selectedChapter.label}.`
                 : "Choose all three fields to continue."}

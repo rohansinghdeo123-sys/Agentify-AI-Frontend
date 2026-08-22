@@ -6,6 +6,7 @@ import { AppIcon, LoadingState } from "@/components/ui/Polished";
 import { useAuth } from "@/context/AuthContext";
 import {
   getStudyCoachName,
+  recordPlanningStudyEvidence,
   streamCoachTurn,
   studyErrorMessage,
 } from "@/features/study/api";
@@ -375,6 +376,7 @@ function StudyComposer({
   menuRef,
   menuTriggerRef,
   firstMenuActionRef,
+  planningAskTopic,
   onChange,
   onKeyDown,
   onAttachmentSelect,
@@ -399,6 +401,7 @@ function StudyComposer({
   menuRef: RefObject<HTMLDivElement | null>;
   menuTriggerRef: RefObject<HTMLButtonElement | null>;
   firstMenuActionRef: RefObject<HTMLButtonElement | null>;
+  planningAskTopic?: string;
   onChange: (value: string) => void;
   onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   onAttachmentSelect: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -430,10 +433,17 @@ function StudyComposer({
               className={styles.studyTextarea}
               onChange={(event) => onChange(event.target.value)}
               onKeyDown={onKeyDown}
-              placeholder={listening ? "Listening…" : `Ask ${coachName} anything…`}
+              placeholder={listening
+                ? "Listening…"
+                : planningAskTopic
+                  ? `Ask ${coachName} about ${planningAskTopic}…`
+                  : `Ask ${coachName} anything…`}
               aria-describedby="study-session-message-help"
             />
-            <p id="study-session-message-help" className="sr-only">Press Enter to send or Shift+Enter to start a new line.</p>
+            <p id="study-session-message-help" className="sr-only">
+              {planningAskTopic ? `Planning opened Ask AI for ${planningAskTopic}. ` : ""}
+              Press Enter to send or Shift+Enter to start a new line.
+            </p>
           </div>
           <div className={styles.composerToolbar}>
             <div className={styles.toolCluster}>
@@ -524,6 +534,7 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
     [routeScope, savedScope],
   );
   const freshSession = searchParams.get("fresh") === "1";
+  const planningAskEntry = searchParams.get("entry") === "ask_ai" && scope.catalogSource === "planning_manifest";
   const authBusy = loading || authLoading;
   const [coachName, setCoachName] = useState("Aria");
   const [messages, setMessages] = useState<CoachMessage[]>([]);
@@ -637,6 +648,12 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
     return () => window.clearTimeout(timer);
   }, [conversationId]);
 
+  useEffect(() => {
+    if (!planningAskEntry || !hydrated) return;
+    const timer = window.setTimeout(() => inputRef.current?.focus({ preventScroll: false }), 0);
+    return () => window.clearTimeout(timer);
+  }, [hydrated, planningAskEntry]);
+
   const updateLastCoachMessage = (patch: Partial<CoachMessage>) => {
     setMessages((current) => {
       const next = [...current];
@@ -743,6 +760,14 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
         socratic: result.socratic,
       });
       setStages((current) => current.map((stage) => ({ ...stage, status: "done" })));
+      if (scope.catalogSource === "planning_manifest" && result.interactionId) {
+        void getAuthHeaders()
+          .then((headers) => recordPlanningStudyEvidence(
+            { backendURL: process.env.NEXT_PUBLIC_BACKEND_URL, headers },
+            result.interactionId!,
+          ))
+          .catch(() => undefined);
+      }
       if (options?.fromVoice) speakTutorResponse(result.answer);
     } catch (requestError) {
       if (controller.signal.aborted) return;
@@ -851,7 +876,9 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
 
   const latestCoachIndex = messages.reduce((latest, message, index) => message.role === "coach" ? index : latest, -1);
   const sourceLabel = scope.source === "syllabus"
-    ? scope.catalogSource === "published" ? "Published syllabus" : "Starter syllabus"
+    ? scope.catalogSource === "planning_manifest"
+      ? "NCERT roadmap"
+      : scope.catalogSource === "published" ? "Published syllabus" : "Starter syllabus"
     : "Open tutor";
 
   return (
@@ -961,6 +988,7 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
           menuRef={menuRef}
           menuTriggerRef={menuTriggerRef}
           firstMenuActionRef={firstMenuActionRef}
+          planningAskTopic={planningAskEntry ? scope.topicLabel : undefined}
           onChange={setInput}
           onKeyDown={handleComposerKeyDown}
           onAttachmentSelect={(event) => void handleAttachmentSelect(event)}

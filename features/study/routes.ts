@@ -1,5 +1,5 @@
 import type { CatalogChapter } from "@/lib/catalog";
-import type { StudyScope } from "@/features/study/types";
+import type { StudyCatalogSource, StudyScope } from "@/features/study/types";
 
 export const STUDY_ROUTES = {
   home: "/dashboard/study",
@@ -32,17 +32,23 @@ export function openStudyScope(): StudyScope {
 export function syllabusStudyScope(
   chapter: CatalogChapter,
   topic: CatalogChapter["topics"][number],
-  catalogSource: "published" | "starter" = "starter",
+  catalogSource: StudyCatalogSource = "starter",
 ): StudyScope {
   return {
     source: "syllabus",
     catalogSource,
+    classLevel: chapter.classLevel || "",
     subject: chapter.subject || "Chemistry",
     chapterId: chapter.value,
     chapterLabel: chapter.label,
     topicId: topic.value,
     topicLabel: topic.label,
   };
+}
+
+function readCatalogSource(value: string | null): StudyCatalogSource {
+  if (value === "planning_manifest") return "planning_manifest";
+  return value === "published" ? "published" : "starter";
 }
 
 export function readStudyScope(searchParams?: SearchParamsReader | null): StudyScope {
@@ -54,7 +60,8 @@ export function readStudyScope(searchParams?: SearchParamsReader | null): StudyS
 
   return {
     source: "syllabus",
-    catalogSource: searchParams.get("catalogSource") === "published" ? "published" : "starter",
+    catalogSource: readCatalogSource(searchParams.get("catalogSource")),
+    classLevel: searchParams.get("classLevel")?.trim() || "",
     subject: searchParams.get("subject")?.trim() || "Chemistry",
     chapterId,
     chapterLabel: searchParams.get("chapterLabel")?.trim() || chapterId.replace(/_/g, " "),
@@ -73,7 +80,8 @@ export function studySessionHref(
   if (options?.fresh) params.set("fresh", "1");
   if (scope.source === "syllabus") {
     params.set("source", "syllabus");
-    params.set("catalogSource", scope.catalogSource === "published" ? "published" : "starter");
+    params.set("catalogSource", scope.catalogSource || "starter");
+    if (scope.classLevel) params.set("classLevel", scope.classLevel);
     params.set("subject", scope.subject);
     params.set("chapter", scope.chapterId);
     params.set("chapterLabel", scope.chapterLabel);
@@ -88,13 +96,14 @@ export function studyHistoryHref(scope?: StudyScope | null) {
   if (!scope || scope.source === "open") return STUDY_ROUTES.history;
   const params = new URLSearchParams({
     source: "syllabus",
-    catalogSource: scope.catalogSource === "published" ? "published" : "starter",
+    catalogSource: scope.catalogSource || "starter",
     subject: scope.subject,
     chapter: scope.chapterId,
     chapterLabel: scope.chapterLabel,
     topic: scope.topicId,
     topicLabel: scope.topicLabel,
   });
+  if (scope.classLevel) params.set("classLevel", scope.classLevel);
   return `${STUDY_ROUTES.history}?${params.toString()}`;
 }
 

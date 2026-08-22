@@ -1,7 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { parseStudyStreamFrame, streamCoachTurn } from "@/features/study/api";
+import {
+  parseStudyStreamFrame,
+  recordPlanningStudyEvidence,
+  streamCoachTurn,
+} from "@/features/study/api";
 import { catalogCacheKey, findCatalogTopic, reconcileSelection } from "@/lib/catalog";
 import {
   legacyStudyHandoff,
@@ -86,6 +90,7 @@ describe("focused Study Lab architecture", () => {
       value: "chemical_bonding",
       label: "Chemical Bonding",
       subject: "Chemistry",
+      classLevel: "Class 11",
       topics: [{ value: "vsepr_theory", label: "VSEPR Theory" }],
     };
     const scope = syllabusStudyScope(chapter, chapter.topics[0], "published");
@@ -97,6 +102,47 @@ describe("focused Study Lab architecture", () => {
     expect(studySessionHref("open-1", openStudyScope(), { fresh: true })).toBe(
       "/dashboard/study/session/open-1?fresh=1",
     );
+  });
+
+  it("preserves Planning manifest source and class through a Study deep link and tutor request", async () => {
+    const planningScope = {
+      source: "syllabus" as const,
+      catalogSource: "planning_manifest" as const,
+      classLevel: "Class 11",
+      subject: "Chemistry",
+      chapterId: "some_basic_concepts_of_chemistry",
+      chapterLabel: "Some Basic Concepts of Chemistry",
+      topicId: "mole_concept",
+      topicLabel: "The Mole and Molar Mass",
+    };
+    const href = studySessionHref("planning-study", planningScope, { fresh: true });
+    const url = new URL(href, "https://agentifyai.in");
+    expect(readStudyScope(url.searchParams)).toEqual(planningScope);
+
+    const responseText = [
+      'data: {"type":"turn_event","event":"answer.completed","answer":"Grounded answer","blocks":[],"interaction_id":"planning-receipt-1"}',
+      "",
+      "data: [DONE]",
+      "",
+    ].join("\n");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(responseText, {
+      status: 200,
+      headers: { "Content-Type": "text/event-stream" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await streamCoachTurn(
+      { backendURL: "https://backend.test", headers: {} },
+      { ...coachTurnPayload(), scope: planningScope },
+    );
+    expect(result.interactionId).toBe("planning-receipt-1");
+    const [, request] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(request.body));
+    expect(body.learning_context).toMatchObject({
+      catalog_source: "planning_manifest",
+      class_level: "Class 11",
+      selected_chapter_id: "some_basic_concepts_of_chemistry",
+      selected_topic_id: "mole_concept",
+    });
   });
 
   it("hands legacy revision and exam deep links to their dedicated labs", () => {
@@ -120,7 +166,7 @@ describe("focused Study Lab architecture", () => {
     });
     expect(parseStudyStreamFrame('data: {"type":"turn_event","event":"answer.completed","answer":"Clear answer","blocks":[]}')).toEqual({
       kind: "answer",
-      result: { answer: "Clear answer", blocks: [], sources: undefined, socratic: undefined },
+      result: { answer: "Clear answer", blocks: [], sources: undefined, socratic: undefined, interactionId: undefined },
       semantic: true,
     });
     expect(parseStudyStreamFrame("data: VGVzdCBhbnN3ZXI=")).toEqual({
@@ -164,6 +210,31 @@ describe("focused Study Lab architecture", () => {
     );
   });
 
+  it("records a server-issued Planning answer receipt idempotently without client-authored mastery", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      recorded: true,
+      idempotent: false,
+      event_count: 1,
+      status: "learning",
+      curriculum_key: "ncert_class_11_chemistry_unit_1",
+      unit_id: "chem11_u01_lu08_mole_and_molar_mass",
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await recordPlanningStudyEvidence(
+      { backendURL: "https://backend.test", headers: { Authorization: "Bearer test" } },
+      "planning-receipt-1",
+    );
+
+    const [url, request] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://backend.test/planning/learning-events");
+    expect(JSON.parse(String(request.body))).toEqual({
+      interaction_id: "planning-receipt-1",
+      event_type: "study_answer",
+    });
+    expect(String(request.body)).not.toContain("mastered");
+  });
+
   it("finishes on the backend DONE frame while the socket is open and preserves the semantic answer", async () => {
     const encoder = new TextEncoder();
     const cancel = vi.fn();
@@ -203,6 +274,14 @@ describe("focused Study Lab architecture", () => {
     expect(api).toContain("selected_topic_id:");
     expect(api).toContain("selected_chapter:");
     expect(api).toContain("selected_topic:");
+    expect(api).toContain("class_level:");
+    const workspace = source("components/study/StudySessionWorkspace.tsx");
+    expect(workspace).toContain('searchParams.get("entry") === "ask_ai"');
+    expect(workspace).toContain("planningAskTopic");
+    expect(workspace).toContain('scope.catalogSource === "planning_manifest" && result.interactionId');
+    expect(workspace).toContain("recordPlanningStudyEvidence");
+    expect(workspace).toContain('scope.catalogSource === "planning_manifest"');
+    expect(workspace).toContain('"NCERT roadmap"');
   });
 
   it("isolates authenticated catalog caches by account and normalized class", () => {

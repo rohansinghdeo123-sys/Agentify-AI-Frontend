@@ -18,6 +18,7 @@ export type CatalogTopic = { label: string; value: string; memberIds?: string[] 
 export type CatalogChapter = {
   label: string;
   value: string;
+  aliases?: string[];
   topics: CatalogTopic[];
   subject?: string;
   classLevel?: string;
@@ -81,6 +82,16 @@ export function findChapterForTopic(chapters: CatalogChapter[], topicValue: stri
   );
 }
 
+export function findCatalogChapter(chapters: CatalogChapter[], rawChapter: string) {
+  const requested = normalizeCatalogKey(rawChapter);
+  if (!requested) return undefined;
+  return chapters.find((chapter) => (
+    normalizeCatalogKey(chapter.value) === requested
+    || normalizeCatalogKey(chapter.label) === requested
+    || chapter.aliases?.some((alias) => normalizeCatalogKey(alias) === requested)
+  ));
+}
+
 /** Correct a (chapter, topic) pair against the active catalog. */
 export function reconcileSelection(
   chapters: CatalogChapter[],
@@ -88,7 +99,7 @@ export function reconcileSelection(
   topicValue: string,
 ): { chapter: string; topic: string; changed: boolean } {
   const fallback = chapters[0];
-  const chapter = chapters.find((item) => item.value === chapterValue) || fallback;
+  const chapter = findCatalogChapter(chapters, chapterValue) || fallback;
   if (!chapter) return { chapter: chapterValue, topic: topicValue, changed: false };
   const topic = findCatalogTopic(chapter, topicValue) || chapter.topics[0];
   const next = { chapter: chapter.value, topic: topic?.value || "" };
@@ -103,6 +114,7 @@ type BackendCatalog = {
     chapters?: Array<{
       slug?: string;
       name?: string;
+      aliases?: string[];
       topics?: Array<{ id?: string; label?: string; concept_ids?: string[] }>;
     }>;
   }>;
@@ -136,6 +148,9 @@ function mapBackendCatalog(payload: BackendCatalog, preferredClassLevel: string)
     .map((chapter) => ({
       label: String(chapter.name || chapter.slug || ""),
       value: String(chapter.slug || ""),
+      aliases: Array.isArray(chapter.aliases)
+        ? chapter.aliases.map((alias) => String(alias)).filter(Boolean)
+        : undefined,
       subject,
       classLevel,
       topics: (chapter.topics || [])

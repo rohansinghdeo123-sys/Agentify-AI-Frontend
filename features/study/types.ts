@@ -3,6 +3,7 @@ export type AgentStageId = "received" | "understanding" | "drafting" | "reviewin
 export type AgentStageStatus = "pending" | "active" | "done";
 export type ArtifactType = "concept_map" | "flip_cards" | "formula_lab" | "mistake_cards";
 export type StudySourceMode = "open" | "syllabus";
+export type StudyCatalogSource = "published" | "starter" | "planning_manifest";
 export type LearningIntent = "concept" | "exam" | "revision" | "practice" | "planning" | "curiosity";
 export type LearningLevel = "beginner" | "intermediate" | "advanced";
 export type EmotionalState = "steady" | "confused" | "anxious" | "curious" | "confident";
@@ -27,7 +28,8 @@ export interface CoachMessage {
 
 export interface StudyScope {
   source: StudySourceMode;
-  catalogSource?: "published" | "starter";
+  catalogSource?: StudyCatalogSource;
+  classLevel?: string;
   subject: string;
   chapterId: string;
   chapterLabel: string;
