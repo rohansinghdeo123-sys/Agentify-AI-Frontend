@@ -8,14 +8,16 @@ import {
   normalizePlanningDraft,
   normalizePlanningPlan,
   normalizePlanningRoadmap,
+  PLANNING_PROFICIENCY_OPTIONS,
+  type PlanningChapterProficiency,
   type PlanningLearningUnit,
   type PlanningPlan,
   type PlanningRoadmap,
-  type PlanningStudyTime,
 } from "@/features/planning/contracts";
 import { PLANNING_ROUTES } from "@/features/planning/routes";
 import { planningMcqHref, readPlanningMcqScope } from "@/features/exam/mcq/planningScope";
 import {
+  BUILTIN_PLANNING_CHAPTERS,
   fetchPlanningCatalog,
   generatePlanningRoadmap,
   isPlanningPlanSupported,
@@ -25,6 +27,7 @@ import {
   readActivePlanningPlanState,
   readPlanningDraft,
   writeActivePlanningPlan,
+  writePlanningDraft,
 } from "@/features/planning/storage";
 import { resetApiClientForTests } from "@/lib/apiClient";
 import { BUILTIN_CHAPTERS, findCatalogChapter, reconcileSelection } from "@/lib/catalog";
@@ -48,13 +51,15 @@ const UNIT_IDENTITIES = [
 
 function unit(index: number): PlanningLearningUnit {
   const [id, title, primaryTopicId] = UNIT_IDENTITIES[index];
-  const status = index === 0 ? "learning" : "not_started";
+  const status = index === 0 ? "recommended" : "not_started";
+  const sectionId = index === 0 ? "intro.development_of_chemistry" : `1.${index + 1}`;
   return {
     id,
     order: index + 1,
     title,
     short_description: `A clear learning unit for ${title}.`,
-    ncert_sections: [{ id: index === 0 ? "intro.development_of_chemistry" : `1.${index + 1}`, title }],
+    ncert_sections: [{ id: sectionId, title }],
+    ncert_subtopics: [{ id: `${primaryTopicId}_ncert`, title: `${title} NCERT focus`, section_id: sectionId }],
     concepts: [{ id: `${primaryTopicId}_concept`, title: `${title} concept`, status, evidence_count: 0 }],
     skills: index >= 2 ? [`Apply ${title}`] : [],
     practice: index >= 2 ? [`One ${title} check`] : [],
@@ -75,20 +80,96 @@ function unit(index: number): PlanningLearningUnit {
   };
 }
 
-function roadmap(time: PlanningStudyTime = "30"): PlanningRoadmap {
+function roadmap({
+  proficiency = "new_to_it",
+  sessionDurationMinutes = null,
+  chapter = "Some Basic Concepts of Chemistry",
+  chapterSlug = "some_basic_concepts_of_chemistry",
+  chapterNumber = 1,
+}: {
+  proficiency?: PlanningChapterProficiency;
+  sessionDurationMinutes?: number | null;
+  chapter?: string;
+  chapterSlug?: string;
+  chapterNumber?: number;
+} = {}): PlanningRoadmap {
   const learningUnits = UNIT_IDENTITIES.map((_identity, index) => unit(index));
+  const dailyRoute = sessionDurationMinutes === 60
+    ? {
+        source: "session_state" as const,
+        budget_minutes: 60,
+        estimated_minutes: { min: 50, max: 60 },
+        total_minutes: 60,
+        items: [
+          {
+            unit_id: learningUnits[0].id,
+            title: learningUnits[0].title,
+            activity: "Understand the core idea through one guided example.",
+            reason: "This is the first incomplete prerequisite in NCERT order.",
+            role: "main_focus" as const,
+            minutes: 25,
+            scope: "full_unit" as const,
+          },
+          {
+            unit_id: learningUnits[0].id,
+            title: learningUnits[0].title,
+            activity: "Recall the key idea without notes.",
+            reason: "A short retrieval check makes the new learning durable.",
+            role: "quick_check" as const,
+            minutes: 10,
+            scope: "partial" as const,
+          },
+          {
+            unit_id: learningUnits[1].id,
+            title: learningUnits[1].title,
+            activity: "Preview the next connected NCERT idea.",
+            reason: "The longer session has room for the next dependency-safe step.",
+            role: "main_focus" as const,
+            minutes: 25,
+            scope: "partial" as const,
+          },
+        ],
+      }
+    : {
+        source: "default_focus" as const,
+        budget_minutes: 25,
+        estimated_minutes: { min: 20, max: 30 },
+        total_minutes: 25,
+        items: [
+          {
+            unit_id: learningUnits[0].id,
+            title: learningUnits[0].title,
+            activity: "Understand the core idea through one guided example.",
+            reason: "This is the first incomplete prerequisite in NCERT order.",
+            role: "main_focus" as const,
+            minutes: 20,
+            scope: "partial" as const,
+          },
+          {
+            unit_id: learningUnits[0].id,
+            title: learningUnits[0].title,
+            activity: "Recall the key idea without notes.",
+            reason: "A short retrieval check makes the new learning durable.",
+            role: "quick_check" as const,
+            minutes: 5,
+            scope: "partial" as const,
+          },
+        ],
+      };
   return {
     roadmap_version: "planning_roadmap_v2",
     class_level: "Class 11",
     subject: "Chemistry",
-    chapter: "Some Basic Concepts of Chemistry",
-    chapter_slug: "some_basic_concepts_of_chemistry",
-    study_time_today: time,
+    chapter,
+    chapter_slug: chapterSlug,
+    chapter_proficiency: proficiency,
+    session_duration_minutes: sessionDurationMinutes,
     curriculum: {
-      key: "ncert_class_11_chemistry_unit_1",
+      key: `ncert_class_11_chemistry_unit_${chapterNumber}`,
       source: "NCERT Class XI Chemistry",
+      source_reference: { document: `Class XI Chemistry Chapter ${chapterNumber}` },
       edition: "2025-26",
-      chapter_number: 1,
+      chapter_number: chapterNumber,
       content_order_locked: true,
     },
     learning_units: learningUnits,
@@ -97,24 +178,18 @@ function roadmap(time: PlanningStudyTime = "30"): PlanningRoadmap {
       title: learningUnits[0].title,
       reason: "Begin with the first incomplete NCERT learning unit.",
       estimated_minutes: learningUnits[0].estimated_minutes,
+      importance: learningUnits[0].importance,
+      learning_types: learningUnits[0].learning_types,
+      approach: ["Understand the NCERT idea.", "Try one guided example.", "Finish with a quick recall check."],
+      outcome: `Explain ${learningUnits[0].title} and use it in a simple example.`,
     },
-    daily_route: {
-      time_preference: time,
-      budget_minutes: time === "no_limit" ? null : time === "120_plus" ? 120 : Number(time),
-      total_minutes: time === "15" ? 15 : 20,
-      items: [{
-        unit_id: learningUnits[0].id,
-        title: learningUnits[0].title,
-        activity: "Understand the core idea and recall it once.",
-        minutes: time === "15" ? 15 : 20,
-        scope: time === "15" ? "partial" : "complete",
-      }],
-    },
+    daily_route: dailyRoute,
     progress: {
       mastered_units: 0,
-      learning_units: 1,
+      learning_units: 0,
       practising_units: 0,
       needs_review_units: 0,
+      recommended_units: 1,
       total_units: learningUnits.length,
       percentage: 0,
     },
@@ -135,7 +210,7 @@ function plan(): PlanningPlan {
       chapterLabel: "Some Basic Concepts of Chemistry",
       subject: "Chemistry",
       classLevel: "Class 11",
-      studyTimeToday: "30",
+      chapterProficiency: "new_to_it",
     },
   };
 }
@@ -183,24 +258,39 @@ describe("NCERT-ordered Planning roadmap", () => {
     });
   });
 
-  it("keeps Class, Subject, Chapter and one optional today-time choice on the landing screen", () => {
+  it("keeps the exact Class → Subject → Chapter → Chapter Proficiency → Build My Roadmap setup", () => {
     const home = readSource("features/planning/PlanningHome.tsx");
-    expect(home).toContain('label="Class"');
-    expect(home).toContain('label="Subject"');
-    expect(home).toContain('label="Chapter"');
-    expect(home).toContain("How much time would you like to study today?");
+    const setupMarkers = [
+      'label="Class"',
+      'label="Subject"',
+      'label="Chapter"',
+      "How well do you know this chapter?",
+      "Build My Roadmap",
+    ];
+    setupMarkers.reduce((previousIndex, marker) => {
+      const index = home.indexOf(marker);
+      expect(index, `${marker} is present after the previous setup step`).toBeGreaterThan(previousIndex);
+      return index;
+    }, -1);
     expect(home).toContain("{selectedChapter ? (");
-    ["15 min", "30 min", "1 hour", "2+ hours", "No limit"].forEach((label) => {
-      expect(readSource("features/planning/contracts.ts")).toContain(`label: "${label}"`);
-    });
-    expect(home).toContain("aria-pressed={selected}");
-    expect(home).toContain("Build my roadmap");
-    expect(home).not.toContain("Exam target");
-    expect(home).not.toContain("Personalise");
+    expect(home).toContain("This helps Agentify personalize your route.");
+    expect(home).toContain('role="radiogroup" aria-label="Chapter proficiency"');
+    expect(home).not.toMatch(/Available Time|How much time|Exam Target/i);
+    expect(home).not.toMatch(/Weak Basics|Fast Track|Quick Revision|Visual Intuition/i);
   });
 
-  it("sends optional study time as today's guidance, never chapter-duration input", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(roadmap("30")), {
+  it("offers exactly the four student-friendly proficiency choices", () => {
+    expect(PLANNING_PROFICIENCY_OPTIONS).toEqual([
+      { value: "new_to_it", label: "New to It", description: "I haven’t studied this chapter before." },
+      { value: "know_a_little", label: "Know a Little", description: "I’ve seen it, but I’m not confident." },
+      { value: "know_the_basics", label: "Know the Basics", description: "I understand the fundamentals but need stronger practice." },
+      { value: "mostly_confident", label: "Mostly Confident", description: "I mainly need revision, practice and gap-finding." },
+    ]);
+  });
+
+  it.each(PLANNING_PROFICIENCY_OPTIONS)("sends $label proficiency without removed setup fields", async ({ value }) => {
+    const response = roadmap({ proficiency: value });
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(response), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     }));
@@ -210,31 +300,45 @@ describe("NCERT-ordered Planning roadmap", () => {
       backendURL: "https://planning.test",
       getAuthHeaders: async () => ({ Authorization: "Bearer test" }),
       userId: "student-1",
-    }, plan().scope)).resolves.toEqual(roadmap("30"));
+    }, { ...plan().scope, chapterProficiency: value })).resolves.toEqual(response);
 
     const [, request] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(JSON.parse(String(request.body))).toEqual({
       current_chapter: "some_basic_concepts_of_chemistry",
       subject: "Chemistry",
       class_level: "Class 11",
-      study_time_today: "30",
+      chapter_proficiency: value,
     });
   });
 
-  it("omits study_time_today when the student leaves the optional choice untouched", async () => {
-    const response = roadmap("no_limit");
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(response), {
+  it("accepts optional 60-minute session context without exposing a setup time field", async () => {
+    const response = roadmap({ proficiency: "know_the_basics", sessionDurationMinutes: 60 });
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(response), {
       status: 200,
       headers: { "Content-Type": "application/json" },
-    })));
-    await generatePlanningRoadmap({
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(generatePlanningRoadmap({
       backendURL: "https://planning.test",
       getAuthHeaders: async () => ({}),
       userId: "student-1",
-    }, { ...plan().scope, studyTimeToday: "" });
-    const fetchMock = vi.mocked(fetch);
+    }, { ...plan().scope, chapterProficiency: "know_the_basics", sessionDurationMinutes: 60 })).resolves.toEqual(response);
+
     const [, request] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(JSON.parse(String(request.body))).not.toHaveProperty("study_time_today");
+    expect(JSON.parse(String(request.body))).toEqual({
+      current_chapter: "some_basic_concepts_of_chemistry",
+      subject: "Chemistry",
+      class_level: "Class 11",
+      chapter_proficiency: "know_the_basics",
+      session_duration_minutes: 60,
+    });
+    expect(response.daily_route).toMatchObject({
+      source: "session_state",
+      budget_minutes: 60,
+      estimated_minutes: { min: 50, max: 60 },
+      total_minutes: 60,
+    });
   });
 
   it("loads only the independent Planning manifest and ignores shared Study/Exam chapters", async () => {
@@ -249,6 +353,15 @@ describe("NCERT-ordered Planning roadmap", () => {
         name: "Some Basic Concepts of Chemistry",
         chapter_number: 1,
         aliases: ["matter"],
+      }, {
+        supported: true,
+        roadmap_version: "planning_roadmap_v2",
+        class_level: "Class 11",
+        subject: "Chemistry",
+        canonical_slug: "structure_of_atom",
+        name: "Structure of Atom",
+        chapter_number: 2,
+        aliases: ["Atomic Structure"],
       }],
       subjects: [
         { class_level: "Class 10", subject: "Science", chapters: [{ slug: "light", name: "Light", chapter_number: 10 }] },
@@ -267,6 +380,16 @@ describe("NCERT-ordered Planning roadmap", () => {
         classLevel: "Class 11",
         order: 1,
         aliases: ["matter"],
+        planningSupported: true,
+        roadmapVersion: "planning_roadmap_v2",
+      },
+      {
+        label: "Structure of Atom",
+        value: "structure_of_atom",
+        subject: "Chemistry",
+        classLevel: "Class 11",
+        order: 2,
+        aliases: ["Atomic Structure"],
         planningSupported: true,
         roadmapVersion: "planning_roadmap_v2",
       },
@@ -326,7 +449,7 @@ describe("NCERT-ordered Planning roadmap", () => {
     expect(isPlanningPlanSupported(unsupported, supportedPlanningCatalog())).toBe(false);
     const provider = readSource("features/planning/PlanningExperience.tsx");
     expect(provider).toContain("isPlanningPlanSupported(activePlan, catalogChapters)");
-    expect(provider).toContain("activePlan && catalogSettled && isPlanningPlanSupported");
+    expect(provider).toContain("isPlanningPlanSupported(activePlan, supportCatalog)");
   });
 
   it.each([
@@ -393,6 +516,48 @@ describe("NCERT-ordered Planning roadmap", () => {
     expect(value.learning_units[7].exam_relevance).toBe("very_high");
   });
 
+  it("keeps Recommended, Next Step, Today’s Route, and progress on one consistent source of truth", () => {
+    const value = roadmap();
+    const recommended = value.learning_units[0];
+
+    expect(isPlanningRoadmap(value)).toBe(true);
+    expect(value.session_duration_minutes).toBeNull();
+    expect(value.daily_route).toMatchObject({
+      source: "default_focus",
+      budget_minutes: 25,
+      estimated_minutes: { min: 20, max: 30 },
+      total_minutes: 25,
+    });
+    expect(recommended.status).toBe("recommended");
+    expect(value.progress).toMatchObject({ recommended_units: 1, mastered_units: 0, percentage: 0 });
+    expect(value.next_step).toMatchObject({
+      unit_id: recommended.id,
+      title: recommended.title,
+      estimated_minutes: recommended.estimated_minutes,
+      importance: recommended.importance,
+      learning_types: recommended.learning_types,
+    });
+    expect(value.next_step.approach).toHaveLength(3);
+    expect(value.next_step.outcome).toContain(recommended.title);
+    expect(value.daily_route.items[0]).toMatchObject({
+      unit_id: recommended.id,
+      role: "main_focus",
+    });
+    expect(value.daily_route.items.map((item) => item.role)).toEqual(["main_focus", "quick_check"]);
+    expect(value.daily_route.items.some((item) => /complete/i.test(item.activity))).toBe(false);
+  });
+
+  it("preserves detailed NCERT subsection mapping beneath every scannable learning unit", () => {
+    const value = roadmap();
+    expect(value.learning_units).toHaveLength(10);
+    value.learning_units.forEach((learningUnit) => {
+      expect(learningUnit.ncert_subtopics.length).toBeGreaterThan(0);
+      learningUnit.ncert_subtopics.forEach((subtopic) => {
+        expect(learningUnit.ncert_sections.map((section) => section.id)).toContain(subtopic.section_id);
+      });
+    });
+  });
+
   it("rejects forward dependencies, cycles, reverse-edge mismatches, and dishonest progress", () => {
     const value = roadmap();
     expect(isPlanningRoadmap({
@@ -422,25 +587,17 @@ describe("NCERT-ordered Planning roadmap", () => {
   });
 
   it("rejects reordered, duplicated, over-budget, and arithmetically inconsistent daily routes", () => {
-    const value = roadmap("30");
-    const first = value.daily_route!.items[0];
-    const second = {
-      unit_id: value.learning_units[1].id,
-      title: value.learning_units[1].title,
-      activity: "Continue in NCERT order.",
-      reason: "This follows the first unit.",
-      minutes: 10,
-      scope: "partial" as const,
-    };
-    const validRoute = { ...value.daily_route!, total_minutes: 30, items: [first, second] };
-    expect(isPlanningRoadmap({ ...value, daily_route: validRoute })).toBe(true);
+    const value = roadmap();
+    const [first, second] = value.daily_route.items;
+    const validRoute = value.daily_route;
+    expect(isPlanningRoadmap(value)).toBe(true);
     expect(isPlanningRoadmap({ ...value, daily_route: { ...validRoute, items: [second, first] } })).toBe(false);
     expect(isPlanningRoadmap({ ...value, daily_route: { ...validRoute, items: [first, first] } })).toBe(false);
-    expect(isPlanningRoadmap({ ...value, daily_route: { ...validRoute, total_minutes: 29 } })).toBe(false);
-    expect(isPlanningRoadmap({ ...value, daily_route: { ...validRoute, budget_minutes: 15 } })).toBe(false);
+    expect(isPlanningRoadmap({ ...value, daily_route: { ...validRoute, total_minutes: 24 } })).toBe(false);
+    expect(isPlanningRoadmap({ ...value, daily_route: { ...validRoute, budget_minutes: 20 } })).toBe(false);
     expect(isPlanningRoadmap({
       ...value,
-      daily_route: { ...validRoute, items: [{ ...first, minutes: 25 }, second], total_minutes: 35 },
+      daily_route: { ...validRoute, items: [{ ...first, minutes: 25 }, second], total_minutes: 30 },
     })).toBe(false);
   });
 
@@ -463,7 +620,42 @@ describe("NCERT-ordered Planning roadmap", () => {
     expect(isRetiredPlanningSnapshot(legacy)).toBe(true);
   });
 
-  it("preserves a v3 class-subject-chapter draft while moving storage to v4", () => {
+  it("restores roadmap scope from one canonical source of truth", () => {
+    const saved = plan();
+    saved.scope = {
+      chapter: "structure_of_atom",
+      chapterLabel: "Structure of Atom",
+      subject: "Physics",
+      classLevel: "Class 12",
+      chapterProficiency: "mostly_confident",
+      sessionDurationMinutes: 60,
+    };
+
+    expect(normalizePlanningPlan(saved)?.scope).toEqual({
+      chapter: saved.roadmap.chapter_slug,
+      chapterLabel: saved.roadmap.chapter,
+      subject: saved.roadmap.subject,
+      classLevel: saved.roadmap.class_level,
+      chapterProficiency: saved.roadmap.chapter_proficiency,
+    });
+  });
+
+  it("preserves saved roadmaps through catalog retries and resets proficiency on replacement", () => {
+    const provider = readSource("features/planning/PlanningExperience.tsx");
+    expect(provider).toContain("const [catalogLoaded, setCatalogLoaded]");
+    expect(provider).toContain("if (!catalogLoaded || !activePlan || !catalogChapters.length) return;");
+    expect(provider).toContain("return { ...current, classLevel, subject, chapter, chapterProficiency: \"\" };");
+    expect(isPlanningPlanSupported(plan(), BUILTIN_PLANNING_CHAPTERS)).toBe(true);
+    const unsupported = plan();
+    unsupported.roadmap = {
+      ...unsupported.roadmap,
+      chapter: "Hydrocarbons",
+      chapter_slug: "hydrocarbons",
+    };
+    expect(isPlanningPlanSupported(unsupported, BUILTIN_PLANNING_CHAPTERS)).toBe(false);
+  });
+
+  it("preserves a v3 class-subject-chapter draft while moving storage to v5", () => {
     const userId = "student-1";
     const oldKey = `agentify:planning:v3:${encodeURIComponent(userId)}:draft`;
     const storage = memoryStorage({
@@ -474,12 +666,30 @@ describe("NCERT-ordered Planning roadmap", () => {
       classLevel: "Class 11",
       subject: "Chemistry",
       chapter: "matter",
-      studyTimeToday: "",
+      chapterProficiency: "",
     });
-    expect(storage.getItem(`agentify:planning:v4:${encodeURIComponent(userId)}:draft`)).toBeTruthy();
+    expect(storage.getItem(`agentify:planning:v5:${encodeURIComponent(userId)}:draft`)).toBeTruthy();
   });
 
-  it("reports a v1 active snapshot as retired during v4 restoration", () => {
+  it("persists chapter proficiency and restores it on refresh", () => {
+    const userId = "student-1";
+    const storage = memoryStorage();
+    vi.stubGlobal("window", { localStorage: storage });
+    writePlanningDraft(userId, {
+      classLevel: "Class 11",
+      subject: "Chemistry",
+      chapter: "structure_of_atom",
+      chapterProficiency: "mostly_confident",
+    });
+    expect(readPlanningDraft(userId)).toEqual({
+      classLevel: "Class 11",
+      subject: "Chemistry",
+      chapter: "structure_of_atom",
+      chapterProficiency: "mostly_confident",
+    });
+  });
+
+  it("reports a v1 active snapshot as retired during v5 restoration", () => {
     const userId = "student-1";
     const oldKey = `agentify:planning:v3:${encodeURIComponent(userId)}:active`;
     vi.stubGlobal("window", { localStorage: memoryStorage({
@@ -492,13 +702,6 @@ describe("NCERT-ordered Planning roadmap", () => {
     const userId = "student-1";
     vi.stubGlobal("window", { localStorage: memoryStorage() });
     const initial = plan();
-    initial.roadmap = {
-      ...initial.roadmap,
-      learning_units: initial.roadmap.learning_units.map((item, index) => index === 0
-        ? { ...item, status: "not_started", concepts: item.concepts.map((concept) => ({ ...concept, status: "not_started" })) }
-        : item),
-      progress: { ...initial.roadmap.progress, learning_units: 0 },
-    };
     expect(isPlanningRoadmap(initial.roadmap)).toBe(true);
     writeActivePlanningPlan(userId, initial);
 
@@ -506,30 +709,49 @@ describe("NCERT-ordered Planning roadmap", () => {
     refreshed.roadmap.learning_units[0].status = "mastered";
     refreshed.roadmap.learning_units[0].concepts = refreshed.roadmap.learning_units[0].concepts
       .map((concept) => ({ ...concept, status: "mastered", evidence_count: 1 }));
-    refreshed.roadmap.learning_units[1].status = "learning";
+    refreshed.roadmap.learning_units[1].status = "recommended";
+    refreshed.roadmap.learning_units[1].concepts = refreshed.roadmap.learning_units[1].concepts
+      .map((concept) => ({ ...concept, status: "recommended" }));
     refreshed.roadmap.next_step = {
       unit_id: refreshed.roadmap.learning_units[1].id,
       title: refreshed.roadmap.learning_units[1].title,
       reason: "Your latest assessment mastered unit one, so continue in NCERT order.",
       estimated_minutes: refreshed.roadmap.learning_units[1].estimated_minutes,
+      importance: refreshed.roadmap.learning_units[1].importance,
+      learning_types: refreshed.roadmap.learning_units[1].learning_types,
+      approach: ["Scan the concept.", "Try one example.", "Check recall."],
+      outcome: `Explain ${refreshed.roadmap.learning_units[1].title} without notes.`,
     };
     refreshed.roadmap.daily_route = {
-      ...refreshed.roadmap.daily_route!,
-      total_minutes: 20,
-      items: [{
-        unit_id: refreshed.roadmap.learning_units[1].id,
-        title: refreshed.roadmap.learning_units[1].title,
-        activity: "Begin the next concept in the chapter sequence.",
-        reason: "Unit one is now mastered.",
-        minutes: 20,
-        scope: "partial",
-      }],
+      ...refreshed.roadmap.daily_route,
+      total_minutes: 25,
+      items: [
+        {
+          unit_id: refreshed.roadmap.learning_units[1].id,
+          title: refreshed.roadmap.learning_units[1].title,
+          activity: "Begin the next concept in the chapter sequence.",
+          reason: "Unit one is now mastered.",
+          role: "main_focus",
+          minutes: 20,
+          scope: "partial",
+        },
+        {
+          unit_id: refreshed.roadmap.learning_units[1].id,
+          title: refreshed.roadmap.learning_units[1].title,
+          activity: "Recall the new idea once.",
+          reason: "A quick check confirms the next step has landed.",
+          role: "quick_check",
+          minutes: 5,
+          scope: "partial",
+        },
+      ],
     };
     refreshed.roadmap.progress = {
       mastered_units: 1,
-      learning_units: 1,
+      learning_units: 0,
       practising_units: 0,
       needs_review_units: 0,
+      recommended_units: 1,
       total_units: 10,
       percentage: 10,
     };
@@ -540,6 +762,7 @@ describe("NCERT-ordered Planning roadmap", () => {
       next_step: { unit_id: UNIT_IDENTITIES[1][0] },
       progress: { mastered_units: 1, percentage: 10 },
     });
+    expect(readActivePlanningPlanState(userId).plan?.scope.chapterProficiency).toBe("new_to_it");
     const provider = readSource("features/planning/PlanningExperience.tsx");
     const active = readSource("features/planning/PlanningActive.tsx");
     expect(provider).toContain("writeActivePlanningPlan(userId, refreshedPlan)");
@@ -548,19 +771,37 @@ describe("NCERT-ordered Planning roadmap", () => {
     expect(active).toContain("Refreshing your latest learning progress");
   });
 
-  it("normalizes only the four current draft fields", () => {
+  it("normalizes only the four current setup fields and drops obsolete time/target/style fields", () => {
     expect(normalizePlanningDraft({
       classLevel: "Class 11",
       subject: "Chemistry",
       chapter: "some_basic_concepts_of_chemistry",
+      chapterProficiency: "know_the_basics",
       studyTimeToday: "60",
+      availableTime: "60",
       examTarget: "school_exam",
+      currentKnowledge: "weak_basics",
       learningGoal: "deep_learning",
+      preferredStyle: "visual_intuition",
     })).toEqual({
       classLevel: "Class 11",
       subject: "Chemistry",
       chapter: "some_basic_concepts_of_chemistry",
-      studyTimeToday: "60",
+      chapterProficiency: "know_the_basics",
+    });
+  });
+
+  it.each(["Fast Track", "Quick Revision"])("migrates legacy %s intent to Mostly Confident", (legacyGoal) => {
+    expect(normalizePlanningDraft({
+      classLevel: "Class 11",
+      subject: "Chemistry",
+      chapter: "some_basic_concepts_of_chemistry",
+      planGoal: legacyGoal,
+    })).toEqual({
+      classLevel: "Class 11",
+      subject: "Chemistry",
+      chapter: "some_basic_concepts_of_chemistry",
+      chapterProficiency: "mostly_confident",
     });
   });
 
@@ -570,19 +811,32 @@ describe("NCERT-ordered Planning roadmap", () => {
     expect(active).toContain("showTodayRoute");
     expect(active).toContain("Start today’s route");
     expect(active).toContain("item.reason");
+    expect(active).toContain('item.role === "main_focus" ? "Main focus" : "Quick check"');
+    expect(active).not.toContain('item.role === "main_focus" ? "Complete"');
     expect(active).toContain('role="progressbar"');
-    expect(active).toContain("Progress changes with learning and practice—not simply opening a card.");
+    expect(active).toContain("Mastery comes from learning, recall and demonstrated practice—not simply opening a card.");
+    expect(active).toContain("Your first win starts with one clear step");
+    expect(active).toContain("How to approach it");
+    expect(active).toContain("roadmap.next_step.approach.map");
+    expect(active).toContain("Afterward:");
+    expect(active).toContain("roadmap.next_step.outcome");
+    expect(active).toContain("Continue");
+    expect(active).toContain("Done for Today");
     expect(active).toContain("getPlanningLearningUnits(roadmap)");
     expect(active).toContain("aria-expanded={isOpen}");
-    expect(active).toContain("Why this matters");
-    expect(active).toContain("Before you start");
+    expect(active).toContain("Why this topic?");
+    expect(active).toContain("Prerequisites");
     expect(active).toContain("NCERT coverage");
+    expect(active).toContain("NCERT subtopics");
+    expect(active).toContain("unit.ncert_subtopics.map");
     expect(active).toContain("ncertSectionLabel(section.id, section.title)");
     expect(active).toContain("Opening context ·");
-    expect(active).toContain("Learning route");
+    expect(active).toContain("How to study it");
     expect(active).toContain("unit.learning_route.map");
     expect(active).toContain('title="Unlocks"');
-    expect(active).toContain("Done when");
+    expect(active).toContain("Mastery criteria");
+    expect(active).toContain("Practice requirements");
+    expect(active).toContain("Depth required");
     expect(active).toContain("concept.title");
     expect(active).toContain("STATUS_LABELS[concept.status]");
     expect(active).toContain("unit.learning_types.map(learningTypeLabel)");

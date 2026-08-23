@@ -11,7 +11,6 @@ import { useEffect, useState } from "react";
 import {
   getPlanningLearningUnits,
   getPlanningUnit,
-  planningTimeLabel,
   type PlanningDepth,
   type PlanningDifficulty,
   type PlanningImportance,
@@ -38,6 +37,7 @@ const DIFFICULTY_LABELS: Record<PlanningDifficulty, string> = {
 
 const STATUS_LABELS: Record<PlanningUnitStatus, string> = {
   not_started: "Not started",
+  recommended: "Recommended",
   learning: "Learning",
   practising: "Practising",
   needs_review: "Needs review",
@@ -120,6 +120,17 @@ function ConceptList({ concepts }: { concepts: PlanningLearningUnit["concepts"] 
   );
 }
 
+function roadmapPosition(
+  unit: PlanningLearningUnit,
+  index: number,
+  currentIndex: number,
+) {
+  if (unit.status === "mastered") return { key: "completed", label: "Completed" } as const;
+  if (index === currentIndex) return { key: "current", label: "You are here" } as const;
+  if (index === currentIndex + 1) return { key: "next", label: "Next" } as const;
+  return { key: "upcoming", label: "Upcoming" } as const;
+}
+
 function RoadmapUnitDetail({
   unit,
   roadmap,
@@ -142,12 +153,12 @@ function RoadmapUnitDetail({
       <div className={styles.detailGrid}>
         <section>
           <span className={styles.detailIcon} aria-hidden="true"><AppIcon name="spark" /></span>
-          <div><h4>Why this matters</h4><p>{unit.why_it_matters}</p></div>
+          <div><h4>Why this topic?</h4><p>{unit.why_it_matters}</p></div>
         </section>
         <section>
           <span className={styles.detailIcon} aria-hidden="true"><AppIcon name="book" /></span>
           <div>
-            <h4>Before you start</h4>
+            <h4>Prerequisites</h4>
             {prerequisites.length ? (
               <ul>{prerequisites.map((item) => <li key={item.id}>{item.title}</li>)}</ul>
             ) : <p>No prerequisite—this is a clear starting point.</p>}
@@ -160,13 +171,13 @@ function RoadmapUnitDetail({
             <h4>What you’ll learn</h4>
             <ConceptList concepts={unit.concepts} />
             <DetailList title="Skills" items={unit.skills} />
-            <DetailList title="Practice" items={unit.practice} />
+            <DetailList title="Practice requirements" items={unit.practice} />
           </div>
         </section>
         <section>
           <span className={styles.detailIcon} aria-hidden="true"><AppIcon name="arrowRight" /></span>
           <div>
-            <h4>Learning route</h4>
+            <h4>How to study it</h4>
             <ol className={styles.learningRoute}>
               {unit.learning_route.map((step) => <li key={step}>{step}</li>)}
             </ol>
@@ -175,7 +186,7 @@ function RoadmapUnitDetail({
         <section>
           <span className={styles.detailIcon} aria-hidden="true"><AppIcon name="mission" /></span>
           <div>
-            <h4>Learning depth</h4>
+            <h4>Depth required</h4>
             <p>{DEPTH_LABELS[unit.depth]} · {IMPORTANCE_LABELS[unit.exam_relevance]} for exams</p>
           </div>
         </section>
@@ -184,12 +195,13 @@ function RoadmapUnitDetail({
           <div>
             <h4>NCERT coverage</h4>
             <ul>{unit.ncert_sections.map((section) => <li key={section.id}>{ncertSectionLabel(section.id, section.title)}</li>)}</ul>
+            <DetailList title="NCERT subtopics" items={unit.ncert_subtopics.map((subtopic) => subtopic.title)} />
           </div>
         </section>
         <section>
           <span className={styles.detailIcon} aria-hidden="true"><AppIcon name="check" /></span>
           <div>
-            <h4>Done when</h4>
+            <h4>Mastery criteria</h4>
             <ul>{unit.mastery_criteria.map((criterion) => <li key={criterion}>{criterion}</li>)}</ul>
           </div>
         </section>
@@ -218,6 +230,7 @@ function LearningRoadmap({
 }) {
   const units = getPlanningLearningUnits(roadmap);
   const [openUnitId, setOpenUnitId] = useState<string | null>(null);
+  const currentIndex = Math.max(0, units.findIndex((unit) => unit.id === roadmap.next_step.unit_id));
 
   return (
     <section className={styles.roadmapPanel} aria-labelledby="roadmap-heading">
@@ -231,12 +244,19 @@ function LearningRoadmap({
       </div>
 
       <ol className={styles.roadmapList}>
-        {units.map((unit) => {
+        {units.map((unit, index) => {
           const isOpen = openUnitId === unit.id;
+          const position = roadmapPosition(unit, index, currentIndex);
           const panelId = `planning-unit-${unit.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
           return (
             <li key={unit.id}>
-              <article className={styles.roadmapUnit} data-importance={unit.importance} data-status={unit.status} data-open={isOpen || undefined}>
+              <article
+                className={styles.roadmapUnit}
+                data-importance={unit.importance}
+                data-status={unit.status}
+                data-position={position.key}
+                data-open={isOpen || undefined}
+              >
                 <button
                   type="button"
                   className={styles.unitSummary}
@@ -247,6 +267,7 @@ function LearningRoadmap({
                   <span className={styles.unitNumber} aria-hidden="true">{String(unit.order).padStart(2, "0")}</span>
                   <span className={styles.unitTitle}>{unit.title}</span>
                   <span className={styles.unitMetadata}>
+                    <span className={styles.positionBadge} data-position={position.key}>{position.label}</span>
                     <span className={styles.importanceBadge} data-importance={unit.importance}>{IMPORTANCE_LABELS[unit.importance]}</span>
                     <span>{DIFFICULTY_LABELS[unit.difficulty]}</span>
                     <span><AppIcon name="clock" /> {timeRange(unit.estimated_minutes)}</span>
@@ -320,11 +341,23 @@ export default function PlanningActive() {
 
   const { roadmap, scope } = activePlan;
   const nextUnit = getPlanningUnit(roadmap, roadmap.next_step.unit_id);
-  const showTodayRoute = Boolean(scope.studyTimeToday && roadmap.daily_route);
+  const showTodayRoute = Boolean(roadmap.daily_route?.items.length);
   const firstRouteUnit = roadmap.daily_route?.items[0]
     ? getPlanningUnit(roadmap, roadmap.daily_route.items[0].unit_id)
     : undefined;
   const activeUnits = roadmap.progress.learning_units + roadmap.progress.practising_units;
+  const chapterComplete = roadmap.progress.mastered_units === roadmap.progress.total_units;
+  const hasLearningEvidence = chapterComplete
+    || roadmap.progress.mastered_units > 0
+    || activeUnits > 0
+    || roadmap.progress.needs_review_units > 0;
+  const progressHeadline = chapterComplete
+    ? "Chapter mastery demonstrated"
+    : roadmap.progress.mastered_units > 0
+      ? `${roadmap.progress.mastered_units} strong ${roadmap.progress.mastered_units === 1 ? "step" : "steps"} secured`
+      : activeUnits > 0
+        ? "You’ve started building this chapter"
+        : "Your first win starts with one clear step";
 
   const openStudy = (unit: PlanningLearningUnit, intent: "learn" | "ask") => {
     const studyScope: StudyScope = {
@@ -372,6 +405,13 @@ export default function PlanningActive() {
                 <span>{nextUnit.learning_types.map(learningTypeLabel).join(" + ")}</span>
                 <span className={styles.statusBadge} data-status={nextUnit.status}>{STATUS_LABELS[nextUnit.status]}</span>
               </div>
+              <div className={styles.nextStepApproach}>
+                <strong>How to approach it</strong>
+                <ol>
+                  {roadmap.next_step.approach.map((step) => <li key={step}>{step}</li>)}
+                </ol>
+              </div>
+              <p className={styles.nextStepOutcome}><strong>Afterward:</strong> {roadmap.next_step.outcome}</p>
               {nextUnit.prerequisite_unit_ids.length ? (
                 <p className={styles.prerequisiteLine}>
                   <strong>Before this:</strong> {nextUnit.prerequisite_unit_ids
@@ -391,19 +431,23 @@ export default function PlanningActive() {
           {showTodayRoute && roadmap.daily_route ? (
             <div className={styles.todayRoute}>
               <div className={styles.compactHeading}>
-                <div><p className={styles.eyebrow}>Today</p><h2>Your {scope.studyTimeToday === "no_limit" ? "flexible" : planningTimeLabel(scope.studyTimeToday)} route</h2></div>
-                <span>{roadmap.daily_route.total_minutes} min planned</span>
+                <div>
+                  <p className={styles.eyebrow}>Today’s route</p>
+                  <h2>{roadmap.daily_route.source === "default_focus" ? "A focused first win" : "Your available-session route"}</h2>
+                </div>
+                <span>{timeRange(roadmap.daily_route.estimated_minutes)}</span>
               </div>
               <ol>
                 {roadmap.daily_route.items.map((item, index) => (
                   <li key={`${item.unit_id}-${index}`}>
                     <span>{String(index + 1).padStart(2, "0")}</span>
                     <div>
+                      <span className={styles.routeRole} data-role={item.role}>{item.role === "main_focus" ? "Main focus" : "Quick check"}</span>
                       <strong>{item.title}</strong>
                       <p>{item.activity}</p>
                       {item.reason ? <p className={styles.routeReason}>{item.reason}</p> : null}
                     </div>
-                    <small>{item.minutes} min · {item.scope === "partial" ? "Small step" : "Complete"}</small>
+                    <small>{item.minutes} min</small>
                   </li>
                 ))}
               </ol>
@@ -417,7 +461,7 @@ export default function PlanningActive() {
 
           <div className={styles.chapterProgress} data-solo={!showTodayRoute || undefined}>
             <div className={styles.compactHeading}>
-              <div><p className={styles.eyebrow}>Chapter progress</p><h2>{roadmap.progress.mastered_units} of {roadmap.progress.total_units} mastered</h2></div>
+              <div><p className={styles.eyebrow}>Chapter progress</p><h2>{progressHeadline}</h2></div>
               <strong>{roadmap.progress.percentage}%</strong>
             </div>
             <span
@@ -430,9 +474,28 @@ export default function PlanningActive() {
             >
               <span style={{ width: `${roadmap.progress.percentage}%` }} />
             </span>
-            <p>{activeUnits ? `${activeUnits} currently active. ` : ""}Progress changes with learning and practice—not simply opening a card.</p>
+            <p>{activeUnits ? `${activeUnits} learning ${activeUnits === 1 ? "unit is" : "units are"} active. ` : ""}Mastery comes from learning, recall and demonstrated practice—not simply opening a card.</p>
           </div>
         </section>
+
+        {hasLearningEvidence && nextUnit ? (
+          <section className={styles.sessionCompletion} aria-labelledby="session-completion-heading">
+            <span className={styles.selectionMark} aria-hidden="true"><AppIcon name="check" /></span>
+            <div>
+              <p className={styles.eyebrow}>{chapterComplete ? "Chapter complete" : "Good progress"}</p>
+              <h2 id="session-completion-heading">
+                {chapterComplete ? "You have demonstrated this chapter." : "Your route has adapted to what you demonstrated."}
+              </h2>
+              <p>{chapterComplete ? "Use a short recall check whenever you want to keep it fresh." : `Your next recommended step is ${nextUnit.title}.`}</p>
+            </div>
+            <div className={styles.sessionActions}>
+              <button type="button" className={styles.primaryButton} onClick={() => openStudy(nextUnit, "learn")}>
+                <AppIcon name="study" /> Continue
+              </button>
+              <Link href="/dashboard" className={styles.secondaryButton}>Done for Today</Link>
+            </div>
+          </section>
+        ) : null}
 
         <LearningRoadmap key={roadmap.curriculum.key} roadmap={roadmap} onOpenStudy={openStudy} />
 

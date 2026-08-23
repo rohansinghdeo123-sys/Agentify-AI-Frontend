@@ -3,7 +3,7 @@
 import { AppIcon } from "@/components/ui/Polished";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { PLANNING_STUDY_TIME_OPTIONS } from "./contracts";
+import { PLANNING_PROFICIENCY_OPTIONS } from "./contracts";
 import { usePlanningExperience } from "./PlanningExperience";
 import { PlanningLoading, PlanningScreen, planningStyles as styles } from "./PlanningScreen";
 import { PLANNING_ROUTES } from "./routes";
@@ -74,7 +74,7 @@ export default function PlanningHome() {
     setClassLevel,
     setSubject,
     setChapter,
-    setStudyTimeToday,
+    setChapterProficiency,
     retryCatalog,
     createPlan,
     clearError,
@@ -92,6 +92,7 @@ export default function PlanningHome() {
     && classSelected
     && subjectSelected
     && selectedChapter
+    && draft.chapterProficiency
     && !generating,
   );
 
@@ -120,7 +121,9 @@ export default function PlanningHome() {
             void buildPlan();
           }}
         >
-          <h2 id="planning-selection-heading" className={styles.srOnly}>Choose class, subject, and chapter</h2>
+          <h2 id="planning-selection-heading" className={styles.srOnly}>
+            Choose class, subject, chapter, and chapter proficiency
+          </h2>
 
           {!catalogSettled ? (
             <div className={styles.catalogState} role="status" aria-live="polite">
@@ -186,33 +189,46 @@ export default function PlanningHome() {
 
           {selectedChapter ? (
             <fieldset
-              className={styles.todayTimeField}
+              className={styles.proficiencyField}
               disabled={generating}
-              aria-describedby="planning-time-help"
+              aria-describedby="planning-proficiency-help"
             >
               <legend>
-                <span className={styles.timeLegendIcon} aria-hidden="true"><AppIcon name="clock" /></span>
+                <span className={styles.proficiencyNumber} aria-hidden="true">04</span>
                 <span>
-                  <strong>How much time would you like to study today?</strong>
-                  <small id="planning-time-help">Optional. This shapes today’s route, not a deadline for the chapter.</small>
+                  <strong>How well do you know this chapter?</strong>
+                  <small id="planning-proficiency-help">This helps Agentify personalize your route.</small>
                 </span>
               </legend>
-              <div className={styles.timeOptions} aria-label="Study time today">
-                {PLANNING_STUDY_TIME_OPTIONS.map((option) => {
-                  const selected = draft.studyTimeToday === option.value;
+              <div className={styles.proficiencyOptions} role="radiogroup" aria-label="Chapter proficiency">
+                {PLANNING_PROFICIENCY_OPTIONS.map((option) => {
+                  const selected = draft.chapterProficiency === option.value;
+                  const descriptionId = `planning-proficiency-${option.value}-description`;
                   return (
-                    <button
+                    <label
                       key={option.value}
-                      type="button"
-                      className={styles.timeOption}
-                      aria-pressed={selected}
-                      onClick={() => {
-                        clearError();
-                        setStudyTimeToday(selected ? "" : option.value);
-                      }}
+                      className={styles.proficiencyOption}
+                      data-selected={selected || undefined}
                     >
-                      {option.label}
-                    </button>
+                      <input
+                        type="radio"
+                        name="chapter-proficiency"
+                        value={option.value}
+                        checked={selected}
+                        required
+                        aria-describedby={descriptionId}
+                        onChange={() => {
+                          clearError();
+                          setChapterProficiency(option.value);
+                        }}
+                      />
+                      <span className={styles.proficiencyCopy}>
+                        <strong>{option.label}</strong>
+                        <small id={descriptionId}>
+                          {option.description}
+                        </small>
+                      </span>
+                    </label>
                   );
                 })}
               </div>
@@ -223,14 +239,16 @@ export default function PlanningHome() {
 
           <button type="submit" className={`${styles.primaryButton} ${styles.generateFocusButton}`} disabled={!canGenerate}>
             <AppIcon name={generating ? "clock" : "spark"} />
-            {generating ? "Building your learning roadmap…" : "Build my roadmap"}
+            {generating ? "Building your learning roadmap…" : "Build My Roadmap"}
             {!generating ? <AppIcon name="arrowRight" /> : null}
           </button>
           <p className={styles.generateHint} aria-live="polite">
             {generating
               ? "Reading the selected chapter and preserving its NCERT learning order."
-              : selectedChapter
-                ? `Ready for ${selectedChapter.label}.`
+              : selectedChapter && draft.chapterProficiency
+                ? `Ready to personalize ${selectedChapter.label}.`
+                : selectedChapter
+                  ? "Choose how well you know this chapter to continue."
                 : "Choose all three fields to continue."}
           </p>
         </form>

@@ -1,20 +1,41 @@
-export const PLANNING_STUDY_TIME_OPTIONS = [
-  { value: "15", label: "15 min" },
-  { value: "30", label: "30 min" },
-  { value: "60", label: "1 hour" },
-  { value: "120_plus", label: "2+ hours" },
-  { value: "no_limit", label: "No limit" },
+export const PLANNING_PROFICIENCY_OPTIONS = [
+  {
+    value: "new_to_it",
+    label: "New to It",
+    description: "I haven’t studied this chapter before.",
+  },
+  {
+    value: "know_a_little",
+    label: "Know a Little",
+    description: "I’ve seen it, but I’m not confident.",
+  },
+  {
+    value: "know_the_basics",
+    label: "Know the Basics",
+    description: "I understand the fundamentals but need stronger practice.",
+  },
+  {
+    value: "mostly_confident",
+    label: "Mostly Confident",
+    description: "I mainly need revision, practice and gap-finding.",
+  },
 ] as const;
 
-export type PlanningStudyTime = (typeof PLANNING_STUDY_TIME_OPTIONS)[number]["value"];
+export type PlanningChapterProficiency = (typeof PLANNING_PROFICIENCY_OPTIONS)[number]["value"];
 export type PlanningImportance = "very_high" | "high" | "moderate" | "low";
 export type PlanningDifficulty = "foundation" | "steady" | "challenging";
 export type PlanningDepth = "overview" | "working" | "mastery";
-export type PlanningUnitStatus = "not_started" | "learning" | "practising" | "needs_review" | "mastered";
+export type PlanningUnitStatus = "not_started" | "recommended" | "learning" | "practising" | "needs_review" | "mastered";
 
 export interface PlanningNcertSection {
   id: string;
   title: string;
+}
+
+export interface PlanningNcertSubtopic {
+  id: string;
+  title: string;
+  section_id: string;
 }
 
 export interface PlanningConceptDetail {
@@ -35,6 +56,7 @@ export interface PlanningLearningUnit {
   title: string;
   short_description: string;
   ncert_sections: PlanningNcertSection[];
+  ncert_subtopics: PlanningNcertSubtopic[];
   concepts: PlanningConceptDetail[];
   skills: string[];
   practice: string[];
@@ -59,20 +81,26 @@ export interface PlanningNextStep {
   title: string;
   reason: string;
   estimated_minutes: PlanningTimeRange;
+  importance: PlanningImportance;
+  learning_types: string[];
+  approach: string[];
+  outcome: string;
 }
 
 export interface PlanningDailyRouteItem {
   unit_id: string;
   title: string;
   activity: string;
-  reason?: string;
+  reason: string;
+  role: "main_focus" | "quick_check";
   minutes: number;
-  scope: "partial" | "complete";
+  scope: "partial" | "full_unit";
 }
 
 export interface PlanningDailyRoute {
-  time_preference: PlanningStudyTime;
-  budget_minutes: number | null;
+  source: "default_focus" | "session_state";
+  budget_minutes: number;
+  estimated_minutes: PlanningTimeRange;
   total_minutes: number;
   items: PlanningDailyRouteItem[];
 }
@@ -82,6 +110,7 @@ export interface PlanningProgress {
   learning_units: number;
   practising_units: number;
   needs_review_units: number;
+  recommended_units: number;
   total_units: number;
   percentage: number;
 }
@@ -89,6 +118,7 @@ export interface PlanningProgress {
 export interface PlanningCurriculum {
   key: string;
   source: string;
+  source_reference: Record<string, unknown>;
   edition: string;
   chapter_number: number;
   content_order_locked: true;
@@ -106,7 +136,8 @@ export interface PlanningRoadmap {
   subject: string;
   chapter: string;
   chapter_slug: string;
-  study_time_today: PlanningStudyTime;
+  chapter_proficiency: PlanningChapterProficiency;
+  session_duration_minutes: number | null;
   curriculum: PlanningCurriculum;
   learning_units: PlanningLearningUnit[];
   next_step: PlanningNextStep;
@@ -120,7 +151,7 @@ export interface PlanningDraft {
   classLevel: string;
   subject: string;
   chapter: string;
-  studyTimeToday: PlanningStudyTime | "";
+  chapterProficiency: PlanningChapterProficiency | "";
 }
 
 export interface PlanningScope {
@@ -128,7 +159,9 @@ export interface PlanningScope {
   chapterLabel: string;
   subject: string;
   classLevel: string;
-  studyTimeToday: PlanningStudyTime | "";
+  chapterProficiency: PlanningChapterProficiency;
+  /** Optional context supplied by an existing learning session, never setup UI. */
+  sessionDurationMinutes?: number;
 }
 
 export interface PlanningPlan {
@@ -156,12 +189,8 @@ function isIntegerInRange(value: unknown, minimum: number, maximum = Number.MAX_
   return Number.isInteger(value) && Number(value) >= minimum && Number(value) <= maximum;
 }
 
-function isNumberInRange(value: unknown, minimum: number, maximum = Number.MAX_SAFE_INTEGER) {
-  return typeof value === "number" && Number.isFinite(value) && value >= minimum && value <= maximum;
-}
-
-function isPlanningStudyTime(value: unknown): value is PlanningStudyTime {
-  return PLANNING_STUDY_TIME_OPTIONS.some((option) => option.value === value);
+export function isPlanningChapterProficiency(value: unknown): value is PlanningChapterProficiency {
+  return PLANNING_PROFICIENCY_OPTIONS.some((option) => option.value === value);
 }
 
 function isPlanningImportance(value: unknown): value is PlanningImportance {
@@ -177,19 +206,28 @@ function isPlanningDepth(value: unknown): value is PlanningDepth {
 }
 
 function isPlanningUnitStatus(value: unknown): value is PlanningUnitStatus {
-  return ["not_started", "learning", "practising", "needs_review", "mastered"].includes(String(value));
+  return ["not_started", "recommended", "learning", "practising", "needs_review", "mastered"].includes(String(value));
 }
 
 function isPlanningTimeRange(value: unknown): value is PlanningTimeRange {
   return Boolean(
     isRecord(value)
-    && isNumberInRange(value.min, 1)
-    && isNumberInRange(value.max, Number(value.min)),
+    && isIntegerInRange(value.min, 5, 180)
+    && isIntegerInRange(value.max, Number(value.min), 180),
   );
 }
 
 function isPlanningNcertSection(value: unknown): value is PlanningNcertSection {
   return Boolean(isRecord(value) && nonEmptyString(value.id) && nonEmptyString(value.title));
+}
+
+function isPlanningNcertSubtopic(value: unknown): value is PlanningNcertSubtopic {
+  return Boolean(
+    isRecord(value)
+    && nonEmptyString(value.id)
+    && nonEmptyString(value.title)
+    && nonEmptyString(value.section_id),
+  );
 }
 
 function isPlanningConceptDetail(value: unknown): value is PlanningConceptDetail {
@@ -212,12 +250,20 @@ function isPlanningLearningUnit(value: unknown): value is PlanningLearningUnit {
     && Array.isArray(value.ncert_sections)
     && value.ncert_sections.length > 0
     && value.ncert_sections.every(isPlanningNcertSection)
+    && Array.isArray(value.ncert_subtopics)
+    && value.ncert_subtopics.length > 0
+    && value.ncert_subtopics.every(isPlanningNcertSubtopic)
+    && value.ncert_subtopics.every((subtopic) => (
+      (value.ncert_sections as PlanningNcertSection[]).some((section) => section.id === subtopic.section_id)
+    ))
     && Array.isArray(value.concepts)
     && value.concepts.length > 0
     && value.concepts.every(isPlanningConceptDetail)
     && isStringArray(value.skills)
     && isStringArray(value.practice)
     && isStringArray(value.learning_route, { nonEmpty: true })
+    && value.learning_route.length >= 2
+    && value.learning_route.length <= 4
     && isPlanningImportance(value.importance)
     && isPlanningDifficulty(value.difficulty)
     && isPlanningTimeRange(value.estimated_minutes)
@@ -240,7 +286,13 @@ function isPlanningNextStep(value: unknown): value is PlanningNextStep {
     && nonEmptyString(value.unit_id)
     && nonEmptyString(value.title)
     && nonEmptyString(value.reason)
-    && isPlanningTimeRange(value.estimated_minutes),
+    && isPlanningTimeRange(value.estimated_minutes)
+    && isPlanningImportance(value.importance)
+    && isStringArray(value.learning_types, { nonEmpty: true })
+    && isStringArray(value.approach, { nonEmpty: true })
+    && value.approach.length >= 2
+    && value.approach.length <= 4
+    && nonEmptyString(value.outcome),
   );
 }
 
@@ -250,18 +302,22 @@ function isPlanningDailyRouteItem(value: unknown): value is PlanningDailyRouteIt
     && nonEmptyString(value.unit_id)
     && nonEmptyString(value.title)
     && nonEmptyString(value.activity)
-    && (value.reason === undefined || nonEmptyString(value.reason))
-    && isIntegerInRange(value.minutes, 1)
-    && ["partial", "complete"].includes(String(value.scope)),
+    && nonEmptyString(value.reason)
+    && ["main_focus", "quick_check"].includes(String(value.role))
+    && isIntegerInRange(value.minutes, 5, 180)
+    && ["partial", "full_unit"].includes(String(value.scope)),
   );
 }
 
 function isPlanningDailyRoute(value: unknown): value is PlanningDailyRoute {
   return Boolean(
     isRecord(value)
-    && isPlanningStudyTime(value.time_preference)
-    && (value.budget_minutes === null || isIntegerInRange(value.budget_minutes, 1))
-    && isIntegerInRange(value.total_minutes, 1)
+    && ["default_focus", "session_state"].includes(String(value.source))
+    && isIntegerInRange(value.budget_minutes, 20, 120)
+    && isPlanningTimeRange(value.estimated_minutes)
+    && isIntegerInRange(value.estimated_minutes.min, 20, 120)
+    && isIntegerInRange(value.estimated_minutes.max, 20, 120)
+    && isIntegerInRange(value.total_minutes, 20, 120)
     && Array.isArray(value.items)
     && value.items.length > 0
     && value.items.every(isPlanningDailyRouteItem),
@@ -275,14 +331,17 @@ function isPlanningProgress(value: unknown): value is PlanningProgress {
     value.learning_units,
     value.practising_units,
     value.needs_review_units,
+    value.recommended_units,
     value.total_units,
   ];
   if (!fields.every((field) => isIntegerInRange(field, 0))) return false;
-  if (!isNumberInRange(value.percentage, 0, 100)) return false;
+  if (!isIntegerInRange(value.recommended_units, 0, 1)) return false;
+  if (!isIntegerInRange(value.percentage, 0, 100)) return false;
   return Number(value.mastered_units)
     + Number(value.learning_units)
     + Number(value.practising_units)
-    + Number(value.needs_review_units) <= Number(value.total_units);
+    + Number(value.needs_review_units)
+    + Number(value.recommended_units) <= Number(value.total_units);
 }
 
 function isPlanningCurriculum(value: unknown): value is PlanningCurriculum {
@@ -290,6 +349,7 @@ function isPlanningCurriculum(value: unknown): value is PlanningCurriculum {
     isRecord(value)
     && nonEmptyString(value.key)
     && nonEmptyString(value.source)
+    && isRecord(value.source_reference)
     && nonEmptyString(value.edition)
     && isIntegerInRange(value.chapter_number, 1)
     && value.content_order_locked === true,
@@ -311,15 +371,48 @@ export function normalizePlanningDraft(value: unknown): PlanningDraft | null {
     classLevel: typeof value.classLevel === "string" ? value.classLevel : "",
     subject: typeof value.subject === "string" ? value.subject : "",
     chapter: value.chapter,
-    studyTimeToday: isPlanningStudyTime(value.studyTimeToday) ? value.studyTimeToday : "",
+    chapterProficiency: planningProficiencyFromRecord(value),
   };
+}
+
+function normalizePlanningChoice(value: unknown) {
+  return typeof value === "string"
+    ? value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "")
+    : "";
+}
+
+function legacyPlanningProficiency(value: unknown): PlanningChapterProficiency | "" {
+  const normalized = normalizePlanningChoice(value);
+  if (isPlanningChapterProficiency(normalized)) return normalized;
+  return {
+    new: "new_to_it",
+    weak_basics: "know_a_little",
+    some_idea: "know_a_little",
+    know_basics: "know_the_basics",
+    fast_track: "mostly_confident",
+    quick_revision: "mostly_confident",
+  }[normalized] as PlanningChapterProficiency | undefined || "";
+}
+
+function planningProficiencyFromRecord(value: Record<string, unknown>): PlanningChapterProficiency | "" {
+  const explicit = legacyPlanningProficiency(
+    value.chapterProficiency ?? value.chapter_proficiency,
+  );
+  if (explicit) return explicit;
+  const legacyGoal = legacyPlanningProficiency(
+    value.planGoal ?? value.plan_goal ?? value.learningGoal ?? value.learning_goal,
+  );
+  if (legacyGoal) return legacyGoal;
+  return legacyPlanningProficiency(value.currentKnowledge ?? value.current_knowledge);
 }
 
 export function isPlanningRoadmap(value: unknown): value is PlanningRoadmap {
   if (!isRecord(value) || value.roadmap_version !== "planning_roadmap_v2") return false;
   if (!nonEmptyString(value.class_level) || !nonEmptyString(value.subject)) return false;
   if (!nonEmptyString(value.chapter) || !nonEmptyString(value.chapter_slug)) return false;
-  if (!isPlanningStudyTime(value.study_time_today) || !isPlanningCurriculum(value.curriculum)) return false;
+  if (!isPlanningChapterProficiency(value.chapter_proficiency)) return false;
+  if (value.session_duration_minutes !== null && !isIntegerInRange(value.session_duration_minutes, 20, 120)) return false;
+  if (!isPlanningCurriculum(value.curriculum)) return false;
   if (!Array.isArray(value.learning_units) || !value.learning_units.length) return false;
   if (!value.learning_units.every(isPlanningLearningUnit)) return false;
   if (!isPlanningNextStep(value.next_step) || !isPlanningProgress(value.progress)) return false;
@@ -337,7 +430,13 @@ export function isPlanningRoadmap(value: unknown): value is PlanningRoadmap {
   const nextStep = value.next_step as PlanningNextStep;
   const nextUnit = units.find((unit) => unit.id === nextStep.unit_id);
   if (!nextUnit || nextStep.title !== nextUnit.title) return false;
+  if (nextStep.importance !== nextUnit.importance) return false;
+  if (nextStep.estimated_minutes.min !== nextUnit.estimated_minutes.min) return false;
+  if (nextStep.estimated_minutes.max !== nextUnit.estimated_minutes.max) return false;
+  if (nextStep.learning_types.length !== nextUnit.learning_types.length) return false;
+  if (nextStep.learning_types.some((type, index) => type !== nextUnit.learning_types[index])) return false;
   if (units.some((unit) => {
+    if (new Set(unit.ncert_subtopics.map((subtopic) => subtopic.id)).size !== unit.ncert_subtopics.length) return true;
     if (new Set(unit.prerequisite_unit_ids).size !== unit.prerequisite_unit_ids.length) return true;
     if (new Set(unit.dependent_unit_ids).size !== unit.dependent_unit_ids.length) return true;
     return unit.prerequisite_unit_ids.some((id) => {
@@ -370,27 +469,31 @@ export function isPlanningRoadmap(value: unknown): value is PlanningRoadmap {
   if (progress.learning_units !== units.filter((unit) => unit.status === "learning").length) return false;
   if (progress.practising_units !== units.filter((unit) => unit.status === "practising").length) return false;
   if (progress.needs_review_units !== units.filter((unit) => unit.status === "needs_review").length) return false;
+  if (progress.recommended_units !== units.filter((unit) => unit.status === "recommended").length) return false;
   if (progress.percentage !== Math.round((progress.mastered_units / progress.total_units) * 100)) return false;
   const expectedNextUnit = orderedUnits.find((unit) => unit.status !== "mastered") || orderedUnits.at(-1);
   if (!expectedNextUnit || nextStep.unit_id !== expectedNextUnit.id) return false;
   const dailyRoute = value.daily_route as PlanningDailyRoute;
-  if (dailyRoute.time_preference !== value.study_time_today) return false;
-  const expectedBudget: Record<PlanningStudyTime, number | null> = {
-    "15": 15,
-    "30": 30,
-    "60": 60,
-    "120_plus": 120,
-    no_limit: null,
-  };
-  if (dailyRoute.budget_minutes !== expectedBudget[dailyRoute.time_preference]) return false;
+  const sessionDuration = value.session_duration_minutes as number | null;
+  const expectedSource = sessionDuration === null ? "default_focus" : "session_state";
+  const expectedBudget = sessionDuration === null ? 25 : Math.round(sessionDuration / 5) * 5;
+  if (dailyRoute.source !== expectedSource || dailyRoute.budget_minutes !== expectedBudget) return false;
   if (dailyRoute.total_minutes !== dailyRoute.items.reduce((total, item) => total + item.minutes, 0)) return false;
-  if (dailyRoute.budget_minutes !== null && dailyRoute.total_minutes > dailyRoute.budget_minutes) return false;
+  if (dailyRoute.total_minutes > dailyRoute.budget_minutes) return false;
+  if (dailyRoute.total_minutes < dailyRoute.estimated_minutes.min) return false;
+  if (dailyRoute.total_minutes > dailyRoute.estimated_minutes.max) return false;
   if (dailyRoute.items[0]?.unit_id !== nextStep.unit_id) return false;
   const routeUnits = dailyRoute.items.map((item) => unitById.get(item.unit_id));
   if (routeUnits.some((unit) => !unit)) return false;
-  if (new Set(dailyRoute.items.map((item) => item.unit_id)).size !== dailyRoute.items.length) return false;
+  if (new Set(dailyRoute.items.map((item) => `${item.unit_id}:${item.role}`)).size !== dailyRoute.items.length) return false;
   if (dailyRoute.items.some((item, index) => item.title !== routeUnits[index]?.title)) return false;
-  if (routeUnits.some((unit, index) => index > 0 && Number(unit?.order) <= Number(routeUnits[index - 1]?.order))) return false;
+  if (routeUnits.some((unit, index) => index > 0 && Number(unit?.order) < Number(routeUnits[index - 1]?.order))) return false;
+  if (dailyRoute.items.some((item, index) => (
+    index > 0
+    && item.unit_id === dailyRoute.items[index - 1]?.unit_id
+    && item.role === "main_focus"
+    && dailyRoute.items[index - 1]?.role === "quick_check"
+  ))) return false;
   return true;
 }
 
@@ -405,16 +508,21 @@ export function normalizePlanningRoadmap(value: unknown): PlanningRoadmap | null
 export function normalizePlanningPlan(value: unknown): PlanningPlan | null {
   if (!isRecord(value) || !isRecord(value.scope)) return null;
   const roadmap = normalizePlanningRoadmap(value.roadmap);
-  const scope = value.scope;
-  if (!roadmap || typeof scope.chapter !== "string") return null;
+  if (!roadmap) return null;
+  // The validated server roadmap is the canonical source for a restored
+  // snapshot. Device scope is merely the request context and may be stale or
+  // partially migrated; rebuilding it here prevents refreshes from applying a
+  // different chapter, proficiency, or session duration than the rendered UI.
+  const sessionDurationMinutes = roadmap.session_duration_minutes ?? undefined;
   return {
     roadmap,
     scope: {
-      chapter: scope.chapter,
-      chapterLabel: typeof scope.chapterLabel === "string" ? scope.chapterLabel : roadmap.chapter,
-      subject: typeof scope.subject === "string" ? scope.subject : roadmap.subject,
-      classLevel: typeof scope.classLevel === "string" ? scope.classLevel : roadmap.class_level,
-      studyTimeToday: isPlanningStudyTime(scope.studyTimeToday) ? scope.studyTimeToday : "",
+      chapter: roadmap.chapter_slug,
+      chapterLabel: roadmap.chapter,
+      subject: roadmap.subject,
+      classLevel: roadmap.class_level,
+      chapterProficiency: roadmap.chapter_proficiency,
+      ...(sessionDurationMinutes ? { sessionDurationMinutes } : {}),
     },
   };
 }
@@ -425,10 +533,6 @@ export function getPlanningLearningUnits(roadmap?: PlanningRoadmap | null) {
 
 export function getPlanningUnit(roadmap: PlanningRoadmap, unitId: string) {
   return getPlanningLearningUnits(roadmap).find((unit) => unit.id === unitId);
-}
-
-export function planningTimeLabel(value?: PlanningStudyTime | "") {
-  return PLANNING_STUDY_TIME_OPTIONS.find((option) => option.value === value)?.label || "Flexible";
 }
 
 export function isRetiredPlanningSnapshot(value: unknown) {

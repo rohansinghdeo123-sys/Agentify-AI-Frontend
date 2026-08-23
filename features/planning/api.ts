@@ -64,13 +64,33 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
-const CURRENT_PLANNING_CHAPTER = {
-  value: "some_basic_concepts_of_chemistry",
-  label: "Some Basic Concepts of Chemistry",
-  classLevel: "Class 11",
-  subject: "Chemistry",
-  aliases: ["matter", "Basic Concepts of Chemistry", "basic-concepts-of-chemistry"],
-} as const;
+const LEGACY_PLANNING_CHAPTERS = [
+  {
+    value: "some_basic_concepts_of_chemistry",
+    label: "Some Basic Concepts of Chemistry",
+    classLevel: "Class 11",
+    subject: "Chemistry",
+    aliases: ["matter", "Basic Concepts of Chemistry", "basic-concepts-of-chemistry"],
+  },
+  {
+    value: "structure_of_atom",
+    label: "Structure of Atom",
+    classLevel: "Class 11",
+    subject: "Chemistry",
+    aliases: ["Atomic Structure", "structure-of-atom", "NCERT Class 11 Chemistry Chapter 2"],
+  },
+] as const;
+
+/** Stable allow-list used only to validate an already-saved roadmap offline. */
+export const BUILTIN_PLANNING_CHAPTERS: PlanningCatalogChapter[] = LEGACY_PLANNING_CHAPTERS.map(
+  (chapter, index) => ({
+    ...chapter,
+    aliases: [...chapter.aliases],
+    order: index + 1,
+    planningSupported: true,
+    roadmapVersion: "planning_roadmap_v2",
+  }),
+);
 
 function normalizeCatalogIdentity(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
@@ -81,20 +101,19 @@ function normalizePlanningClass(value: string) {
   return identity === "xi" ? "11" : identity;
 }
 
-function isCurrentPlanningChapter(
+function knownLegacyPlanningChapter(
   chapter: { value: string; label: string; aliases: string[] },
   classLevel: string,
   subject: string,
 ) {
-  const knownChapterIdentities = [
-    CURRENT_PLANNING_CHAPTER.value,
-    CURRENT_PLANNING_CHAPTER.label,
-    ...CURRENT_PLANNING_CHAPTER.aliases,
-  ].map(normalizeCatalogIdentity);
   const chapterIdentities = [chapter.value, chapter.label, ...chapter.aliases].map(normalizeCatalogIdentity);
-  return normalizePlanningClass(classLevel) === "11"
-    && normalizeCatalogIdentity(subject) === "chemistry"
-    && chapterIdentities.some((identity) => knownChapterIdentities.includes(identity));
+  return LEGACY_PLANNING_CHAPTERS.find((candidate) => {
+    const knownChapterIdentities = [candidate.value, candidate.label, ...candidate.aliases]
+      .map(normalizeCatalogIdentity);
+    return normalizePlanningClass(classLevel) === normalizePlanningClass(candidate.classLevel)
+      && normalizeCatalogIdentity(subject) === normalizeCatalogIdentity(candidate.subject)
+      && chapterIdentities.some((identity) => knownChapterIdentities.includes(identity));
+  });
 }
 
 export function planningCatalogChapterMatches(chapter: PlanningCatalogChapter, requested: string) {
@@ -209,7 +228,7 @@ export async function fetchPlanningCatalog(
         const rawAliases = Array.isArray(rawChapter.aliases)
           ? rawChapter.aliases.filter((alias): alias is string => typeof alias === "string" && Boolean(alias.trim()))
           : [];
-        const canonicalFallback = isCurrentPlanningChapter(
+        const canonicalFallback = knownLegacyPlanningChapter(
           { value: rawValue, label: rawLabel, aliases: rawAliases },
           classLevel,
           subject,
@@ -220,21 +239,21 @@ export async function fetchPlanningCatalog(
             && capability.roadmap_version === "planning_roadmap_v2"
             && typeof capability.canonical_slug === "string"
             && Boolean(capability.canonical_slug.trim())
-          : rawChapter.planning_supported === true && canonicalFallback;
+          : rawChapter.planning_supported === true && Boolean(canonicalFallback);
         const legacyFallback = !capability
           && rawChapter.planning_supported === undefined
-          && canonicalFallback;
+          && Boolean(canonicalFallback);
         if (!rawValue || (!attachedSupported && !legacyFallback)) return;
 
         const capabilitySlug = capability && typeof capability.canonical_slug === "string"
           ? capability.canonical_slug.trim()
           : "";
-        const value = capabilitySlug || (canonicalFallback ? CURRENT_PLANNING_CHAPTER.value : rawValue);
-        const label = canonicalFallback ? CURRENT_PLANNING_CHAPTER.label : rawLabel;
+        const value = capabilitySlug || canonicalFallback?.value || rawValue;
+        const label = canonicalFallback?.label || rawLabel;
         const aliases = Array.from(new Set([
           ...rawAliases,
           rawValue,
-          ...(canonicalFallback ? [rawLabel, ...CURRENT_PLANNING_CHAPTER.aliases] : []),
+          ...(canonicalFallback ? [rawLabel, ...canonicalFallback.aliases] : []),
         ])).filter((alias) => normalizeCatalogIdentity(alias) !== normalizeCatalogIdentity(value));
         addChapter({
           value,
@@ -249,7 +268,7 @@ export async function fetchPlanningCatalog(
   }
   if (!chapters.length) {
     throw new PlanningApiError(
-      "Planning is currently available for Class 11 Chemistry — Some Basic Concepts of Chemistry.",
+      "Planning is currently available for Class 11 Chemistry — Some Basic Concepts of Chemistry and Structure of Atom.",
       "invalid_response",
     );
   }
@@ -290,6 +309,10 @@ export async function generatePlanningRoadmap(
   signal?: AbortSignal,
 ): Promise<PlanningRoadmap> {
   try {
+    const sessionDurationMinutes = scope.sessionDurationMinutes;
+    const hasSessionDuration = Number.isInteger(sessionDurationMinutes)
+      && Number(sessionDurationMinutes) >= 20
+      && Number(sessionDurationMinutes) <= 120;
     const mission = await apiJson<unknown>(
       `${getBackendURL(context.backendURL)}/coach/autonomous-study/${encodeURIComponent(context.userId)}`,
       {
@@ -299,7 +322,10 @@ export async function generatePlanningRoadmap(
           current_chapter: scope.chapter,
           subject: scope.subject,
           class_level: scope.classLevel,
-          ...(scope.studyTimeToday ? { study_time_today: scope.studyTimeToday } : {}),
+          chapter_proficiency: scope.chapterProficiency,
+          ...(hasSessionDuration
+            ? { session_duration_minutes: sessionDurationMinutes }
+            : {}),
         }),
         retries: 0,
         timeoutMs: 45000,

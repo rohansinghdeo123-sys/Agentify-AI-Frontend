@@ -12,6 +12,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  BUILTIN_PLANNING_CHAPTERS,
   fetchPlanningCatalog,
   generatePlanningRoadmap,
   isPlanningPlanSupported,
@@ -21,10 +22,10 @@ import {
   type PlanningCatalogChapter,
 } from "./api";
 import {
+  type PlanningChapterProficiency,
   type PlanningDraft,
   type PlanningPlan,
   type PlanningScope,
-  type PlanningStudyTime,
 } from "./contracts";
 import {
   clearActivePlanningPlan,
@@ -45,7 +46,7 @@ type PlanningExperienceValue = {
   catalogSettled: boolean;
   catalogNotice: string;
   selectedChapter: PlanningCatalogChapter | undefined;
-  scope: PlanningScope;
+  scope: PlanningScope | null;
   activePlan: PlanningPlan | null;
   generating: boolean;
   refreshingPlan: boolean;
@@ -55,7 +56,7 @@ type PlanningExperienceValue = {
   setClassLevel: (classLevel: string) => void;
   setSubject: (subject: string) => void;
   setChapter: (chapter: string) => void;
-  setStudyTimeToday: (studyTimeToday: PlanningStudyTime | "") => void;
+  setChapterProficiency: (chapterProficiency: PlanningChapterProficiency) => void;
   retryCatalog: () => void;
   createPlan: (signal?: AbortSignal) => Promise<PlanningPlan | null>;
   refreshActivePlan: (options?: { force?: boolean }) => Promise<void>;
@@ -68,7 +69,7 @@ const DEFAULT_DRAFT: PlanningDraft = {
   classLevel: "",
   subject: "",
   chapter: "",
-  studyTimeToday: "",
+  chapterProficiency: "",
 };
 
 export function PlanningExperienceProvider({ children }: { children: ReactNode }) {
@@ -84,6 +85,7 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
   const [staleNotice, setStaleNotice] = useState("");
   const [catalogChapters, setCatalogChapters] = useState<PlanningCatalogChapter[]>([]);
   const [catalogSettled, setCatalogSettled] = useState(false);
+  const [catalogLoaded, setCatalogLoaded] = useState(false);
   const [catalogNotice, setCatalogNotice] = useState("");
   const [catalogReload, setCatalogReload] = useState(0);
   const loadedUserRef = useRef("");
@@ -110,27 +112,35 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     (left.order ?? Number.MAX_SAFE_INTEGER) - (right.order ?? Number.MAX_SAFE_INTEGER)
     || left.label.localeCompare(right.label)
   )), [catalogChapters, draft.classLevel, draft.subject]);
+  const supportCatalog = catalogChapters.length
+    ? catalogChapters
+    : BUILTIN_PLANNING_CHAPTERS;
   const selectedChapter = useMemo(
     () => chapters.find((chapter) => planningCatalogChapterMatches(chapter, draft.chapter)),
     [chapters, draft.chapter],
   );
-  const scope = useMemo<PlanningScope>(() => ({
-    chapter: selectedChapter?.value || "",
-    chapterLabel: selectedChapter?.label || "",
-    subject: selectedChapter?.subject || draft.subject,
-    classLevel: selectedChapter?.classLevel || draft.classLevel,
-    studyTimeToday: draft.studyTimeToday,
-  }), [draft.classLevel, draft.studyTimeToday, draft.subject, selectedChapter]);
+  const scope = useMemo<PlanningScope | null>(() => {
+    if (!selectedChapter || !draft.chapterProficiency) return null;
+    return {
+      chapter: selectedChapter.value,
+      chapterLabel: selectedChapter.label,
+      subject: selectedChapter.subject,
+      classLevel: selectedChapter.classLevel,
+      chapterProficiency: draft.chapterProficiency,
+    };
+  }, [draft.chapterProficiency, selectedChapter]);
   currentInputRef.current = JSON.stringify({ userId, scope });
 
   useEffect(() => {
     if (authBusy) return;
     const controller = new AbortController();
     setCatalogSettled(false);
+    setCatalogLoaded(false);
     setCatalogNotice("");
 
     if (!userId) {
       setCatalogChapters([]);
+      setCatalogLoaded(false);
       setCatalogNotice("Sign in again to load your syllabus chapters.");
       setCatalogSettled(true);
       return () => controller.abort();
@@ -140,10 +150,12 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
       .then((catalog) => {
         if (controller.signal.aborted) return;
         setCatalogChapters(catalog.chapters);
+        setCatalogLoaded(true);
       })
       .catch((catalogError: unknown) => {
         if (controller.signal.aborted) return;
         setCatalogChapters([]);
+        setCatalogLoaded(false);
         setCatalogNotice(
           catalogError instanceof PlanningApiError && catalogError.message
             ? catalogError.message
@@ -196,7 +208,7 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
   }, [authBusy, userId]);
 
   useEffect(() => {
-    if (!catalogSettled || !catalogChapters.length) return;
+    if (!catalogLoaded || !catalogChapters.length) return;
     setDraft((current) => {
       const exact = catalogChapters.find((chapter) => (
         chapter.classLevel === current.classLevel
@@ -252,9 +264,9 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
         && subject === current.subject
         && chapter === current.chapter
       ) return current;
-      return { ...current, classLevel, subject, chapter };
+      return { ...current, classLevel, subject, chapter, chapterProficiency: "" };
     });
-  }, [catalogChapters, catalogSettled, profile?.classLevel]);
+  }, [catalogChapters, catalogLoaded, profile?.classLevel]);
 
   useEffect(() => {
     if (!hydrated || !userId) return;
@@ -275,19 +287,19 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
   }, [activePlan, userId]);
 
   useEffect(() => {
-    if (!catalogSettled || !activePlan) return;
+    if (!catalogLoaded || !activePlan || !catalogChapters.length) return;
     const planStillMatches = isPlanningPlanSupported(activePlan, catalogChapters);
     if (!planStillMatches) {
       retireActivePlan("That saved roadmap is not available in Planning yet. Choose the supported chapter to continue.");
     }
-  }, [activePlan, catalogChapters, catalogSettled, retireActivePlan]);
+  }, [activePlan, catalogChapters, catalogLoaded, retireActivePlan]);
 
   const changeSetup = useCallback((next: PlanningDraft) => {
     if (
       next.classLevel === draft.classLevel
       && next.subject === draft.subject
       && next.chapter === draft.chapter
-      && next.studyTimeToday === draft.studyTimeToday
+      && next.chapterProficiency === draft.chapterProficiency
     ) return;
     generationRef.current += 1;
     generationInFlightRef.current = false;
@@ -295,28 +307,28 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     retireActivePlan();
     setDraft((current) => ({ ...current, ...next }));
     setError("");
-  }, [draft.chapter, draft.classLevel, draft.studyTimeToday, draft.subject, retireActivePlan]);
+  }, [draft.chapter, draft.chapterProficiency, draft.classLevel, draft.subject, retireActivePlan]);
 
   const setClassLevel = useCallback((classLevel: string) => {
-    changeSetup({ ...draft, classLevel, subject: "", chapter: "" });
+    changeSetup({ ...draft, classLevel, subject: "", chapter: "", chapterProficiency: "" });
   }, [changeSetup, draft]);
 
   const setSubject = useCallback((subject: string) => {
-    changeSetup({ ...draft, subject, chapter: "" });
+    changeSetup({ ...draft, subject, chapter: "", chapterProficiency: "" });
   }, [changeSetup, draft]);
 
   const setChapter = useCallback((chapter: string) => {
-    changeSetup({ ...draft, chapter });
+    changeSetup({ ...draft, chapter, chapterProficiency: "" });
   }, [changeSetup, draft]);
 
-  const setStudyTimeToday = useCallback((studyTimeToday: PlanningStudyTime | "") => {
-    changeSetup({ ...draft, studyTimeToday });
+  const setChapterProficiency = useCallback((chapterProficiency: PlanningChapterProficiency) => {
+    changeSetup({ ...draft, chapterProficiency });
   }, [changeSetup, draft]);
 
   const createPlan = useCallback(async (signal?: AbortSignal) => {
     if (!userId || authBusy || generating || generationInFlightRef.current) return null;
-    if (!selectedChapter || !scope.chapter || !scope.subject) {
-      setError("Choose your class, subject, and chapter before generating the learning roadmap.");
+    if (!selectedChapter || !scope) {
+      setError("Choose your class, subject, chapter, and chapter proficiency before generating the learning roadmap.");
       return null;
     }
     const generationId = generationRef.current + 1;
@@ -376,7 +388,7 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
       !activePlan
       || !userId
       || authBusy
-      || !catalogSettled
+      || !catalogLoaded
       || refreshInFlightRef.current
       || !isPlanningPlanSupported(activePlan, catalogChapters)
     ) return;
@@ -420,7 +432,7 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
         setRefreshingPlan(false);
       }
     }
-  }, [activePlan, authBusy, catalogChapters, catalogSettled, getAuthHeaders, userId]);
+  }, [activePlan, authBusy, catalogChapters, catalogLoaded, getAuthHeaders, userId]);
 
   useEffect(() => () => {
     refreshAbortRef.current?.abort();
@@ -438,7 +450,7 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     catalogNotice,
     selectedChapter,
     scope,
-    activePlan: activePlan && catalogSettled && isPlanningPlanSupported(activePlan, catalogChapters)
+    activePlan: activePlan && isPlanningPlanSupported(activePlan, supportCatalog)
       ? activePlan
       : null,
     generating,
@@ -449,7 +461,7 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     setClassLevel,
     setSubject,
     setChapter,
-    setStudyTimeToday,
+    setChapterProficiency,
     retryCatalog: () => setCatalogReload((value) => value + 1),
     createPlan,
     refreshActivePlan,
@@ -457,7 +469,6 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
   }), [
     activePlan,
     authBusy,
-    catalogChapters,
     catalogNotice,
     catalogSettled,
     chapters,
@@ -475,9 +486,10 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     setClassLevel,
     setChapter,
     setSubject,
-    setStudyTimeToday,
+    setChapterProficiency,
     staleNotice,
     subjectOptions,
+    supportCatalog,
     userId,
   ]);
 
