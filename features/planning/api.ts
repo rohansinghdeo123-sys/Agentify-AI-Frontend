@@ -311,7 +311,7 @@ export async function generatePlanningRoadmap(
   try {
     const sessionDurationMinutes = scope.sessionDurationMinutes;
     const hasSessionDuration = Number.isInteger(sessionDurationMinutes)
-      && Number(sessionDurationMinutes) >= 20
+      && Number(sessionDurationMinutes) >= 15
       && Number(sessionDurationMinutes) <= 120;
     const mission = await apiJson<unknown>(
       `${getBackendURL(context.backendURL)}/coach/autonomous-study/${encodeURIComponent(context.userId)}`,
@@ -323,6 +323,9 @@ export async function generatePlanningRoadmap(
           subject: scope.subject,
           class_level: scope.classLevel,
           chapter_proficiency: scope.chapterProficiency,
+          ...(scope.studyTimeToday
+            ? { study_time_today: scope.studyTimeToday }
+            : {}),
           ...(hasSessionDuration
             ? { session_duration_minutes: sessionDurationMinutes }
             : {}),

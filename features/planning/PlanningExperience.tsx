@@ -26,6 +26,7 @@ import {
   type PlanningDraft,
   type PlanningPlan,
   type PlanningScope,
+  type PlanningStudyTime,
 } from "./contracts";
 import {
   clearActivePlanningPlan,
@@ -57,6 +58,7 @@ type PlanningExperienceValue = {
   setSubject: (subject: string) => void;
   setChapter: (chapter: string) => void;
   setChapterProficiency: (chapterProficiency: PlanningChapterProficiency) => void;
+  setStudyTimeToday: (studyTimeToday: PlanningStudyTime | "") => void;
   retryCatalog: () => void;
   createPlan: (signal?: AbortSignal) => Promise<PlanningPlan | null>;
   refreshActivePlan: (options?: { force?: boolean }) => Promise<void>;
@@ -70,6 +72,7 @@ const DEFAULT_DRAFT: PlanningDraft = {
   subject: "",
   chapter: "",
   chapterProficiency: "",
+  studyTimeToday: "",
 };
 
 export function PlanningExperienceProvider({ children }: { children: ReactNode }) {
@@ -127,8 +130,9 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
       subject: selectedChapter.subject,
       classLevel: selectedChapter.classLevel,
       chapterProficiency: draft.chapterProficiency,
+      studyTimeToday: draft.studyTimeToday,
     };
-  }, [draft.chapterProficiency, selectedChapter]);
+  }, [draft.chapterProficiency, draft.studyTimeToday, selectedChapter]);
   currentInputRef.current = JSON.stringify({ userId, scope });
 
   useEffect(() => {
@@ -300,6 +304,7 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
       && next.subject === draft.subject
       && next.chapter === draft.chapter
       && next.chapterProficiency === draft.chapterProficiency
+      && next.studyTimeToday === draft.studyTimeToday
     ) return;
     generationRef.current += 1;
     generationInFlightRef.current = false;
@@ -307,7 +312,7 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     retireActivePlan();
     setDraft((current) => ({ ...current, ...next }));
     setError("");
-  }, [draft.chapter, draft.chapterProficiency, draft.classLevel, draft.subject, retireActivePlan]);
+  }, [draft.chapter, draft.chapterProficiency, draft.classLevel, draft.studyTimeToday, draft.subject, retireActivePlan]);
 
   const setClassLevel = useCallback((classLevel: string) => {
     changeSetup({ ...draft, classLevel, subject: "", chapter: "", chapterProficiency: "" });
@@ -323,6 +328,10 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
 
   const setChapterProficiency = useCallback((chapterProficiency: PlanningChapterProficiency) => {
     changeSetup({ ...draft, chapterProficiency });
+  }, [changeSetup, draft]);
+
+  const setStudyTimeToday = useCallback((studyTimeToday: PlanningStudyTime | "") => {
+    changeSetup({ ...draft, studyTimeToday });
   }, [changeSetup, draft]);
 
   const createPlan = useCallback(async (signal?: AbortSignal) => {
@@ -462,6 +471,7 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     setSubject,
     setChapter,
     setChapterProficiency,
+    setStudyTimeToday,
     retryCatalog: () => setCatalogReload((value) => value + 1),
     createPlan,
     refreshActivePlan,
@@ -487,6 +497,7 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     setChapter,
     setSubject,
     setChapterProficiency,
+    setStudyTimeToday,
     staleNotice,
     subjectOptions,
     supportCatalog,

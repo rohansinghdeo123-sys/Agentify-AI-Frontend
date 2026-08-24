@@ -6,8 +6,8 @@ import {
   type PlanningPlan,
 } from "./contracts";
 
-const VERSION = "v5";
-const LEGACY_VERSIONS = ["v4", "v3"] as const;
+const VERSION = "v6";
+const LEGACY_VERSIONS = ["v5", "v4", "v3"] as const;
 
 function key(userId: string, part: string, version = VERSION) {
   return `agentify:planning:${version}:${encodeURIComponent(userId)}:${part}`;

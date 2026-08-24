@@ -3,7 +3,7 @@
 import { AppIcon } from "@/components/ui/Polished";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { PLANNING_PROFICIENCY_OPTIONS } from "./contracts";
+import { PLANNING_PROFICIENCY_OPTIONS, PLANNING_STUDY_TIME_OPTIONS } from "./contracts";
 import { usePlanningExperience } from "./PlanningExperience";
 import { PlanningLoading, PlanningScreen, planningStyles as styles } from "./PlanningScreen";
 import { PLANNING_ROUTES } from "./routes";
@@ -75,6 +75,7 @@ export default function PlanningHome() {
     setSubject,
     setChapter,
     setChapterProficiency,
+    setStudyTimeToday,
     retryCatalog,
     createPlan,
     clearError,
@@ -122,7 +123,7 @@ export default function PlanningHome() {
           }}
         >
           <h2 id="planning-selection-heading" className={styles.srOnly}>
-            Choose class, subject, chapter, and chapter proficiency
+            Choose class, subject, chapter, chapter proficiency, and optionally today’s study time
           </h2>
 
           {!catalogSettled ? (
@@ -229,6 +230,41 @@ export default function PlanningHome() {
                         </small>
                       </span>
                     </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+          ) : null}
+
+          {selectedChapter ? (
+            <fieldset
+              className={styles.todayTimeField}
+              disabled={generating}
+              aria-describedby="planning-time-help"
+            >
+              <legend>
+                <span className={styles.timeLegendIcon} aria-hidden="true">05</span>
+                <span>
+                  <strong>How much time would you like to study today?</strong>
+                  <small id="planning-time-help">Optional. This shapes today’s route, not a deadline for the chapter.</small>
+                </span>
+              </legend>
+              <div className={styles.timeOptions} role="group" aria-label="Study time today">
+                {PLANNING_STUDY_TIME_OPTIONS.map((option) => {
+                  const selected = draft.studyTimeToday === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={styles.timeOption}
+                      aria-pressed={selected}
+                      onClick={() => {
+                        clearError();
+                        setStudyTimeToday(selected ? "" : option.value);
+                      }}
+                    >
+                      {option.label}
+                    </button>
                   );
                 })}
               </div>

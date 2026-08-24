@@ -555,6 +555,104 @@
   line-height: 1.4;
 }
 
+.todayTimeField {
+  min-width: 0;
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--plan-line);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--ds-bg-subtle) 72%, var(--ds-surface));
+}
+
+.todayTimeField:disabled {
+  opacity: 0.58;
+}
+
+.todayTimeField legend {
+  display: flex;
+  width: 100%;
+  padding: 0 0.15rem;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.todayTimeField legend span:last-child,
+.todayTimeField legend strong,
+.todayTimeField legend small {
+  display: block;
+}
+
+.todayTimeField legend strong {
+  color: var(--plan-ink);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.todayTimeField legend small {
+  margin-top: 0.16rem;
+  color: var(--plan-muted);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.timeLegendIcon {
+  display: inline-flex;
+  width: 2.15rem;
+  height: 2.15rem;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--plan-teal) 32%, var(--plan-line));
+  border-radius: 0.7rem;
+  background: var(--ds-accent-teal-soft);
+  color: var(--plan-teal);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.timeOptions {
+  display: flex;
+  min-width: 0;
+  margin-top: 0.8rem;
+  flex-wrap: wrap;
+  gap: 0.48rem;
+}
+
+.timeOption {
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0.58rem 0.78rem;
+  border: 1px solid var(--plan-line);
+  border-radius: 999px;
+  background: var(--plan-field-bg);
+  color: var(--plan-secondary);
+  font-size: 0.875rem;
+  font-weight: 790;
+  cursor: pointer;
+  transition:
+    transform var(--ds-duration-fast) var(--ds-ease-standard),
+    border-color var(--ds-duration-fast) var(--ds-ease-standard),
+    background var(--ds-duration-fast) var(--ds-ease-standard),
+    color var(--ds-duration-fast) var(--ds-ease-standard);
+}
+
+.timeOption:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--plan-teal);
+}
+
+.timeOption[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--plan-teal) 72%, var(--plan-line));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--ds-accent-teal-soft) 88%, var(--ds-surface)), var(--ds-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--plan-teal) 16%, transparent);
+  color: var(--plan-ink);
+}
+
+.timeOption:focus-visible {
+  outline: none;
+  box-shadow: var(--ds-shadow-focus);
+}
+
 .emptyCard {
   padding: clamp(1rem, 2.6vw, 1.6rem);
   border: 1px solid var(--plan-line);
@@ -1395,6 +1493,15 @@
     grid-template-columns: 1fr;
   }
 
+  .timeOptions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .timeOption:last-child {
+    grid-column: 1 / -1;
+  }
+
   .roadmapExperience,
   .nextStepCard,
   .routeProgressGrid,
@@ -1475,8 +1582,17 @@
     padding-inline: 0.72rem;
   }
 
-  .proficiencyField {
+  .proficiencyField,
+  .todayTimeField {
     padding-inline: 0.7rem;
+  }
+
+  .timeOptions {
+    grid-template-columns: 1fr;
+  }
+
+  .timeOption:last-child {
+    grid-column: auto;
   }
 
   .nextStepCard,
@@ -1553,6 +1669,7 @@
   .secondaryButton,
   .selectionControl,
   .proficiencyOption,
+  .timeOption,
   .roadmapUnit,
   .unitToggle svg,
   .progressTrack > span {

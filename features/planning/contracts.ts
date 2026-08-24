@@ -21,7 +21,16 @@ export const PLANNING_PROFICIENCY_OPTIONS = [
   },
 ] as const;
 
+export const PLANNING_STUDY_TIME_OPTIONS = [
+  { value: "15", label: "15 min" },
+  { value: "30", label: "30 min" },
+  { value: "60", label: "1 hour" },
+  { value: "120_plus", label: "2+ hours" },
+  { value: "no_limit", label: "No limit" },
+] as const;
+
 export type PlanningChapterProficiency = (typeof PLANNING_PROFICIENCY_OPTIONS)[number]["value"];
+export type PlanningStudyTime = (typeof PLANNING_STUDY_TIME_OPTIONS)[number]["value"];
 export type PlanningImportance = "very_high" | "high" | "moderate" | "low";
 export type PlanningDifficulty = "foundation" | "steady" | "challenging";
 export type PlanningDepth = "overview" | "working" | "mastery";
@@ -98,8 +107,8 @@ export interface PlanningDailyRouteItem {
 }
 
 export interface PlanningDailyRoute {
-  source: "default_focus" | "session_state";
-  budget_minutes: number;
+  source: "default_focus" | "student_choice" | "session_state";
+  budget_minutes: number | null;
   estimated_minutes: PlanningTimeRange;
   total_minutes: number;
   items: PlanningDailyRouteItem[];
@@ -137,6 +146,7 @@ export interface PlanningRoadmap {
   chapter: string;
   chapter_slug: string;
   chapter_proficiency: PlanningChapterProficiency;
+  study_time_today: PlanningStudyTime | null;
   session_duration_minutes: number | null;
   curriculum: PlanningCurriculum;
   learning_units: PlanningLearningUnit[];
@@ -152,6 +162,7 @@ export interface PlanningDraft {
   subject: string;
   chapter: string;
   chapterProficiency: PlanningChapterProficiency | "";
+  studyTimeToday: PlanningStudyTime | "";
 }
 
 export interface PlanningScope {
@@ -160,6 +171,7 @@ export interface PlanningScope {
   subject: string;
   classLevel: string;
   chapterProficiency: PlanningChapterProficiency;
+  studyTimeToday: PlanningStudyTime | "";
   /** Optional context supplied by an existing learning session, never setup UI. */
   sessionDurationMinutes?: number;
 }
@@ -191,6 +203,10 @@ function isIntegerInRange(value: unknown, minimum: number, maximum = Number.MAX_
 
 export function isPlanningChapterProficiency(value: unknown): value is PlanningChapterProficiency {
   return PLANNING_PROFICIENCY_OPTIONS.some((option) => option.value === value);
+}
+
+export function isPlanningStudyTime(value: unknown): value is PlanningStudyTime {
+  return PLANNING_STUDY_TIME_OPTIONS.some((option) => option.value === value);
 }
 
 function isPlanningImportance(value: unknown): value is PlanningImportance {
@@ -312,12 +328,10 @@ function isPlanningDailyRouteItem(value: unknown): value is PlanningDailyRouteIt
 function isPlanningDailyRoute(value: unknown): value is PlanningDailyRoute {
   return Boolean(
     isRecord(value)
-    && ["default_focus", "session_state"].includes(String(value.source))
-    && isIntegerInRange(value.budget_minutes, 20, 120)
+    && ["default_focus", "student_choice", "session_state"].includes(String(value.source))
+    && (value.budget_minutes === null || isIntegerInRange(value.budget_minutes, 15, 120))
     && isPlanningTimeRange(value.estimated_minutes)
-    && isIntegerInRange(value.estimated_minutes.min, 20, 120)
-    && isIntegerInRange(value.estimated_minutes.max, 20, 120)
-    && isIntegerInRange(value.total_minutes, 20, 120)
+    && isIntegerInRange(value.total_minutes, 5, 180)
     && Array.isArray(value.items)
     && value.items.length > 0
     && value.items.every(isPlanningDailyRouteItem),
@@ -372,6 +386,7 @@ export function normalizePlanningDraft(value: unknown): PlanningDraft | null {
     subject: typeof value.subject === "string" ? value.subject : "",
     chapter: value.chapter,
     chapterProficiency: planningProficiencyFromRecord(value),
+    studyTimeToday: planningStudyTimeFromRecord(value),
   };
 }
 
@@ -406,12 +421,24 @@ function planningProficiencyFromRecord(value: Record<string, unknown>): Planning
   return legacyPlanningProficiency(value.currentKnowledge ?? value.current_knowledge);
 }
 
+function planningStudyTimeFromRecord(value: Record<string, unknown>): PlanningStudyTime | "" {
+  const explicit = value.studyTimeToday ?? value.study_time_today;
+  if (isPlanningStudyTime(explicit)) return explicit;
+  const duration = value.sessionDurationMinutes ?? value.session_duration_minutes;
+  if (duration === 15 || duration === "15") return "15";
+  if (duration === 30 || duration === "30") return "30";
+  if (duration === 60 || duration === "60") return "60";
+  if (duration === 120 || duration === "120") return "120_plus";
+  return "";
+}
+
 export function isPlanningRoadmap(value: unknown): value is PlanningRoadmap {
   if (!isRecord(value) || value.roadmap_version !== "planning_roadmap_v2") return false;
   if (!nonEmptyString(value.class_level) || !nonEmptyString(value.subject)) return false;
   if (!nonEmptyString(value.chapter) || !nonEmptyString(value.chapter_slug)) return false;
   if (!isPlanningChapterProficiency(value.chapter_proficiency)) return false;
-  if (value.session_duration_minutes !== null && !isIntegerInRange(value.session_duration_minutes, 20, 120)) return false;
+  if (value.study_time_today !== null && !isPlanningStudyTime(value.study_time_today)) return false;
+  if (value.session_duration_minutes !== null && !isIntegerInRange(value.session_duration_minutes, 15, 120)) return false;
   if (!isPlanningCurriculum(value.curriculum)) return false;
   if (!Array.isArray(value.learning_units) || !value.learning_units.length) return false;
   if (!value.learning_units.every(isPlanningLearningUnit)) return false;
@@ -431,8 +458,8 @@ export function isPlanningRoadmap(value: unknown): value is PlanningRoadmap {
   const nextUnit = units.find((unit) => unit.id === nextStep.unit_id);
   if (!nextUnit || nextStep.title !== nextUnit.title) return false;
   if (nextStep.importance !== nextUnit.importance) return false;
-  if (nextStep.estimated_minutes.min !== nextUnit.estimated_minutes.min) return false;
-  if (nextStep.estimated_minutes.max !== nextUnit.estimated_minutes.max) return false;
+  // Next Step timing is route guidance. The Learning Unit card independently
+  // retains the complete-unit range and must not overwrite this value.
   if (nextStep.learning_types.length !== nextUnit.learning_types.length) return false;
   if (nextStep.learning_types.some((type, index) => type !== nextUnit.learning_types[index])) return false;
   if (units.some((unit) => {
@@ -474,15 +501,34 @@ export function isPlanningRoadmap(value: unknown): value is PlanningRoadmap {
   const expectedNextUnit = orderedUnits.find((unit) => unit.status !== "mastered") || orderedUnits.at(-1);
   if (!expectedNextUnit || nextStep.unit_id !== expectedNextUnit.id) return false;
   const dailyRoute = value.daily_route as PlanningDailyRoute;
+  if (nextStep.estimated_minutes.min !== dailyRoute.estimated_minutes.min) return false;
+  if (nextStep.estimated_minutes.max !== dailyRoute.estimated_minutes.max) return false;
   const sessionDuration = value.session_duration_minutes as number | null;
-  const expectedSource = sessionDuration === null ? "default_focus" : "session_state";
-  const expectedBudget = sessionDuration === null ? 25 : Math.round(sessionDuration / 5) * 5;
+  const studyTime = value.study_time_today as PlanningStudyTime | null;
+  const selectedBudget: Record<PlanningStudyTime, number | null> = {
+    "15": 15,
+    "30": 30,
+    "60": 60,
+    "120_plus": 120,
+    no_limit: null,
+  };
+  const expectedSource = studyTime !== null
+    ? "student_choice"
+    : sessionDuration !== null
+      ? "session_state"
+      : "default_focus";
+  const expectedBudget = studyTime !== null
+    ? selectedBudget[studyTime]
+    : sessionDuration !== null
+      ? Math.floor(sessionDuration / 5) * 5
+      : 30;
   if (dailyRoute.source !== expectedSource || dailyRoute.budget_minutes !== expectedBudget) return false;
   if (dailyRoute.total_minutes !== dailyRoute.items.reduce((total, item) => total + item.minutes, 0)) return false;
-  if (dailyRoute.total_minutes > dailyRoute.budget_minutes) return false;
+  if (dailyRoute.budget_minutes !== null && dailyRoute.total_minutes > dailyRoute.budget_minutes) return false;
   if (dailyRoute.total_minutes < dailyRoute.estimated_minutes.min) return false;
   if (dailyRoute.total_minutes > dailyRoute.estimated_minutes.max) return false;
   if (dailyRoute.items[0]?.unit_id !== nextStep.unit_id) return false;
+  if (dailyRoute.items.some((item) => item.unit_id !== nextStep.unit_id)) return false;
   const routeUnits = dailyRoute.items.map((item) => unitById.get(item.unit_id));
   if (routeUnits.some((unit) => !unit)) return false;
   if (new Set(dailyRoute.items.map((item) => `${item.unit_id}:${item.role}`)).size !== dailyRoute.items.length) return false;
@@ -498,10 +544,32 @@ export function isPlanningRoadmap(value: unknown): value is PlanningRoadmap {
 }
 
 export function normalizePlanningRoadmap(value: unknown): PlanningRoadmap | null {
-  if (!isPlanningRoadmap(value)) return null;
+  // V2 roadmaps saved before the optional time selector did not carry the
+  // nullable preference and used a 25-minute default. Upgrade them in memory
+  // so students keep their roadmap when the v6 device schema is introduced.
+  let candidate: unknown = value;
+  if (isRecord(value) && value.study_time_today === undefined) {
+    const migratedRoute = isRecord(value.daily_route)
+      && value.daily_route.source === "default_focus"
+      && value.daily_route.budget_minutes === 25
+      ? { ...value.daily_route, budget_minutes: 30 }
+      : value.daily_route;
+    const migratedNextStep = isRecord(value.next_step)
+      && isRecord(migratedRoute)
+      && isRecord(migratedRoute.estimated_minutes)
+      ? { ...value.next_step, estimated_minutes: migratedRoute.estimated_minutes }
+      : value.next_step;
+    candidate = {
+      ...value,
+      study_time_today: null,
+      daily_route: migratedRoute,
+      next_step: migratedNextStep,
+    };
+  }
+  if (!isPlanningRoadmap(candidate)) return null;
   return {
-    ...value,
-    learning_units: [...value.learning_units].sort((left, right) => left.order - right.order),
+    ...candidate,
+    learning_units: [...candidate.learning_units].sort((left, right) => left.order - right.order),
   };
 }
 
@@ -522,6 +590,7 @@ export function normalizePlanningPlan(value: unknown): PlanningPlan | null {
       subject: roadmap.subject,
       classLevel: roadmap.class_level,
       chapterProficiency: roadmap.chapter_proficiency,
+      studyTimeToday: roadmap.study_time_today ?? "",
       ...(sessionDurationMinutes ? { sessionDurationMinutes } : {}),
     },
   };
