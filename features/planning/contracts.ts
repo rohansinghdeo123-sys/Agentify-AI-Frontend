@@ -157,11 +157,15 @@ export interface PlanningRoadmap {
   coverage: PlanningCoverage;
 }
 
+export interface PlanningChapterChoice {
+  chapter: string;
+  chapterProficiency: PlanningChapterProficiency | "";
+}
+
 export interface PlanningDraft {
   classLevel: string;
   subject: string;
-  chapter: string;
-  chapterProficiency: PlanningChapterProficiency | "";
+  chapterChoices: PlanningChapterChoice[];
   studyTimeToday: PlanningStudyTime | "";
 }
 
@@ -179,6 +183,80 @@ export interface PlanningScope {
 export interface PlanningPlan {
   roadmap: PlanningRoadmap;
   scope: PlanningScope;
+}
+
+export interface PlanningSelectionFactor {
+  id: string;
+  label: string;
+  value: string;
+  score: number;
+  explanation: string;
+}
+
+export interface PlanningPortfolioChapter {
+  curriculum_key: string;
+  chapter_slug: string;
+  chapter: string;
+  chapter_proficiency: PlanningChapterProficiency;
+  roadmap_version: "planning_roadmap_v2";
+  curriculum: PlanningCurriculum;
+  learning_units: PlanningLearningUnit[];
+  next_step: PlanningNextStep;
+  progress: PlanningProgress;
+  coverage: PlanningCoverage;
+  completion_criteria: string[];
+  candidate_score: number;
+  selection_factors: PlanningSelectionFactor[];
+  selected_for_today: boolean;
+}
+
+export interface PlanningPortfolioNextStep extends PlanningNextStep {
+  curriculum_key: string;
+  chapter_slug: string;
+  chapter: string;
+  chapter_proficiency: PlanningChapterProficiency;
+  selection_reason: string;
+  candidate_score: number;
+}
+
+export interface PlanningPortfolioRouteItem extends PlanningDailyRouteItem {
+  curriculum_key: string;
+  chapter_slug: string;
+  chapter: string;
+}
+
+export interface PlanningPortfolioTodayRoute extends Omit<PlanningDailyRoute, "items"> {
+  items: PlanningPortfolioRouteItem[];
+}
+
+export interface PlanningPortfolioProgress {
+  mastered_units: number;
+  active_units: number;
+  needs_review_units: number;
+  total_units: number;
+  percentage: number;
+}
+
+export interface PlanningPortfolio {
+  portfolio_version: "planning_portfolio_v1";
+  user_id: string;
+  class_level: string;
+  subject: string;
+  requested_chapter_count: number;
+  chapter_count: number;
+  deduplicated_chapter_count: number;
+  study_time_today: PlanningStudyTime | null;
+  session_duration_minutes: number | null;
+  chapters: PlanningPortfolioChapter[];
+  global_next_step: PlanningPortfolioNextStep;
+  today_route: PlanningPortfolioTodayRoute;
+  selection_factors: PlanningSelectionFactor[];
+  aggregate_progress: PlanningPortfolioProgress;
+}
+
+export interface PlanningPortfolioState {
+  portfolio: PlanningPortfolio;
+  activeChapterSlug: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -380,12 +458,46 @@ function isPlanningCoverage(value: unknown): value is PlanningCoverage {
 }
 
 export function normalizePlanningDraft(value: unknown): PlanningDraft | null {
-  if (!isRecord(value) || typeof value.chapter !== "string") return null;
+  if (!isRecord(value)) return null;
+  const legacyChapter = [
+    value.chapter,
+    value.currentChapter,
+    value.current_chapter,
+    value.targetChapter,
+    value.target_chapter,
+  ].find((candidate) => typeof candidate === "string" && candidate.trim());
+  const rawChoices = Array.isArray(value.chapterChoices)
+    ? value.chapterChoices
+    : Array.isArray(value.chapter_choices)
+      ? value.chapter_choices
+      : typeof legacyChapter === "string"
+      ? [{
+          chapter: legacyChapter,
+          chapterProficiency: planningProficiencyFromRecord(value),
+        }]
+      : [];
+  const seen = new Set<string>();
+  const chapterChoices = rawChoices.flatMap((rawChoice) => {
+    if (!isRecord(rawChoice) || !nonEmptyString(rawChoice.chapter)) return [];
+    const chapter = rawChoice.chapter.trim();
+    const identity = normalizePlanningChoice(chapter);
+    if (!identity || seen.has(identity) || seen.size >= 6) return [];
+    seen.add(identity);
+    return [{
+      chapter,
+      chapterProficiency: legacyPlanningProficiency(
+        rawChoice.chapterProficiency ?? rawChoice.chapter_proficiency,
+      ),
+    } satisfies PlanningChapterChoice];
+  });
   return {
-    classLevel: typeof value.classLevel === "string" ? value.classLevel : "",
+    classLevel: typeof value.classLevel === "string"
+      ? value.classLevel
+      : typeof value.class_level === "string"
+        ? value.class_level
+        : "",
     subject: typeof value.subject === "string" ? value.subject : "",
-    chapter: value.chapter,
-    chapterProficiency: planningProficiencyFromRecord(value),
+    chapterChoices,
     studyTimeToday: planningStudyTimeFromRecord(value),
   };
 }
@@ -596,11 +708,282 @@ export function normalizePlanningPlan(value: unknown): PlanningPlan | null {
   };
 }
 
-export function getPlanningLearningUnits(roadmap?: PlanningRoadmap | null) {
+function isPlanningSelectionFactor(value: unknown): value is PlanningSelectionFactor {
+  return Boolean(
+    isRecord(value)
+    && nonEmptyString(value.id)
+    && nonEmptyString(value.label)
+    && nonEmptyString(value.value)
+    && typeof value.score === "number"
+    && Number.isFinite(value.score)
+    && nonEmptyString(value.explanation),
+  );
+}
+
+function isPlanningPortfolioChapter(value: unknown): value is PlanningPortfolioChapter {
+  return Boolean(
+    isRecord(value)
+    && nonEmptyString(value.curriculum_key)
+    && nonEmptyString(value.chapter_slug)
+    && nonEmptyString(value.chapter)
+    && isPlanningChapterProficiency(value.chapter_proficiency)
+    && value.roadmap_version === "planning_roadmap_v2"
+    && isPlanningCurriculum(value.curriculum)
+    && Array.isArray(value.learning_units)
+    && value.learning_units.length > 0
+    && value.learning_units.every(isPlanningLearningUnit)
+    && isPlanningNextStep(value.next_step)
+    && isPlanningProgress(value.progress)
+    && isPlanningCoverage(value.coverage)
+    && isStringArray(value.completion_criteria, { nonEmpty: true })
+    && typeof value.candidate_score === "number"
+    && Number.isFinite(value.candidate_score)
+    && Array.isArray(value.selection_factors)
+    && value.selection_factors.every(isPlanningSelectionFactor)
+    && typeof value.selected_for_today === "boolean",
+  );
+}
+
+function isPlanningPortfolioNextStep(value: unknown): value is PlanningPortfolioNextStep {
+  return Boolean(
+    isRecord(value)
+    && isPlanningNextStep(value)
+    && nonEmptyString(value.curriculum_key)
+    && nonEmptyString(value.chapter_slug)
+    && nonEmptyString(value.chapter)
+    && isPlanningChapterProficiency(value.chapter_proficiency)
+    && nonEmptyString(value.selection_reason)
+    && typeof value.candidate_score === "number"
+    && Number.isFinite(value.candidate_score),
+  );
+}
+
+function isPlanningPortfolioRouteItem(value: unknown): value is PlanningPortfolioRouteItem {
+  return Boolean(
+    isRecord(value)
+    && isPlanningDailyRouteItem(value)
+    && nonEmptyString(value.curriculum_key)
+    && nonEmptyString(value.chapter_slug)
+    && nonEmptyString(value.chapter),
+  );
+}
+
+function isPlanningPortfolioTodayRoute(value: unknown): value is PlanningPortfolioTodayRoute {
+  if (!isRecord(value)) return false;
+  const budget = value.budget_minutes;
+  const totalMinutes = value.total_minutes;
+  return Boolean(
+    ["default_focus", "student_choice", "session_state"].includes(String(value.source))
+    && (budget === null || isIntegerInRange(budget, 15, 120))
+    && isPlanningTimeRange(value.estimated_minutes)
+    && isIntegerInRange(totalMinutes, 5, 180)
+    && Array.isArray(value.items)
+    && value.items.length > 0
+    && value.items.every(isPlanningPortfolioRouteItem)
+    && totalMinutes === value.items.reduce((total, item) => total + Number((item as PlanningPortfolioRouteItem).minutes), 0)
+    && (budget === null || Number(totalMinutes) <= Number(budget)),
+  );
+}
+
+function isPlanningPortfolioProgress(value: unknown): value is PlanningPortfolioProgress {
+  return Boolean(
+    isRecord(value)
+    && isIntegerInRange(value.mastered_units, 0)
+    && isIntegerInRange(value.active_units, 0)
+    && isIntegerInRange(value.needs_review_units, 0)
+    && isIntegerInRange(value.total_units, 1)
+    && isIntegerInRange(value.percentage, 0, 100)
+    && Number(value.mastered_units) <= Number(value.total_units),
+  );
+}
+
+export function isPlanningPortfolio(value: unknown): value is PlanningPortfolio {
+  if (!isRecord(value) || value.portfolio_version !== "planning_portfolio_v1") return false;
+  if (!nonEmptyString(value.user_id) || !nonEmptyString(value.class_level) || !nonEmptyString(value.subject)) return false;
+  if (!isIntegerInRange(value.requested_chapter_count, 1, 6)) return false;
+  if (!isIntegerInRange(value.chapter_count, 1, 6)) return false;
+  if (!isIntegerInRange(value.deduplicated_chapter_count, 0, 5)) return false;
+  if (Number(value.requested_chapter_count) !== Number(value.chapter_count) + Number(value.deduplicated_chapter_count)) return false;
+  if (value.study_time_today !== null && !isPlanningStudyTime(value.study_time_today)) return false;
+  if (value.session_duration_minutes !== null && !isIntegerInRange(value.session_duration_minutes, 15, 120)) return false;
+  if (!Array.isArray(value.chapters) || value.chapters.length !== value.chapter_count) return false;
+  if (!value.chapters.every(isPlanningPortfolioChapter)) return false;
+  if (!isPlanningPortfolioNextStep(value.global_next_step)) return false;
+  if (!isPlanningPortfolioTodayRoute(value.today_route)) return false;
+  if (!Array.isArray(value.selection_factors) || !value.selection_factors.every(isPlanningSelectionFactor)) return false;
+  if (!isPlanningPortfolioProgress(value.aggregate_progress)) return false;
+
+  const chapters = value.chapters as PlanningPortfolioChapter[];
+  const chapterSlugs = chapters.map((chapter) => chapter.chapter_slug);
+  const curriculumKeys = chapters.map((chapter) => chapter.curriculum_key);
+  if (new Set(chapterSlugs).size !== chapters.length || new Set(curriculumKeys).size !== chapters.length) return false;
+  const selectedChapter = chapters.find((chapter) => chapter.selected_for_today);
+  if (!selectedChapter || chapters.filter((chapter) => chapter.selected_for_today).length !== 1) return false;
+  const globalNextStep = value.global_next_step as PlanningPortfolioNextStep;
+  if (selectedChapter.chapter_slug !== globalNextStep.chapter_slug) return false;
+  if (selectedChapter.curriculum_key !== globalNextStep.curriculum_key) return false;
+  if (selectedChapter.next_step.unit_id !== globalNextStep.unit_id) return false;
+  if ((value.today_route as PlanningPortfolioTodayRoute).items.some((item) => (
+    item.chapter_slug !== selectedChapter.chapter_slug
+    || item.curriculum_key !== selectedChapter.curriculum_key
+  ))) return false;
+  const totalUnits = chapters.reduce((total, chapter) => total + chapter.progress.total_units, 0);
+  if ((value.aggregate_progress as PlanningPortfolioProgress).total_units !== totalUnits) return false;
+  return true;
+}
+
+export function normalizePlanningPortfolio(value: unknown): PlanningPortfolio | null {
+  if (!isPlanningPortfolio(value)) return null;
+  return {
+    ...value,
+    chapters: [...value.chapters].map((chapter) => ({
+      ...chapter,
+      learning_units: [...chapter.learning_units].sort((left, right) => left.order - right.order),
+    })),
+  };
+}
+
+export function planningPortfolioFromPlan(plan: PlanningPlan, userId: string): PlanningPortfolio {
+  const { roadmap } = plan;
+  const factor: PlanningSelectionFactor = {
+    id: "legacy_priority",
+    label: "Saved roadmap",
+    value: "restored",
+    score: 0,
+    explanation: "This chapter was restored from your previous single-chapter roadmap.",
+  };
+  return {
+    portfolio_version: "planning_portfolio_v1",
+    user_id: userId,
+    class_level: roadmap.class_level,
+    subject: roadmap.subject,
+    requested_chapter_count: 1,
+    chapter_count: 1,
+    deduplicated_chapter_count: 0,
+    study_time_today: roadmap.study_time_today,
+    session_duration_minutes: roadmap.session_duration_minutes,
+    chapters: [{
+      curriculum_key: roadmap.curriculum.key,
+      chapter_slug: roadmap.chapter_slug,
+      chapter: roadmap.chapter,
+      chapter_proficiency: roadmap.chapter_proficiency,
+      roadmap_version: roadmap.roadmap_version,
+      curriculum: roadmap.curriculum,
+      learning_units: roadmap.learning_units,
+      next_step: roadmap.next_step,
+      progress: roadmap.progress,
+      coverage: roadmap.coverage,
+      completion_criteria: roadmap.completion_criteria,
+      candidate_score: 0,
+      selection_factors: [factor],
+      selected_for_today: true,
+    }],
+    global_next_step: {
+      ...roadmap.next_step,
+      curriculum_key: roadmap.curriculum.key,
+      chapter_slug: roadmap.chapter_slug,
+      chapter: roadmap.chapter,
+      chapter_proficiency: roadmap.chapter_proficiency,
+      selection_reason: factor.explanation,
+      candidate_score: 0,
+    },
+    today_route: {
+      ...roadmap.daily_route,
+      items: roadmap.daily_route.items.map((item) => ({
+        ...item,
+        curriculum_key: roadmap.curriculum.key,
+        chapter_slug: roadmap.chapter_slug,
+        chapter: roadmap.chapter,
+      })),
+    },
+    selection_factors: [factor],
+    aggregate_progress: {
+      mastered_units: roadmap.progress.mastered_units,
+      active_units: roadmap.progress.learning_units + roadmap.progress.practising_units + roadmap.progress.recommended_units,
+      needs_review_units: roadmap.progress.needs_review_units,
+      total_units: roadmap.progress.total_units,
+      percentage: roadmap.progress.percentage,
+    },
+  };
+}
+
+export function planningRoadmapFromPortfolioChapter(
+  portfolio: PlanningPortfolio,
+  chapter: PlanningPortfolioChapter,
+): PlanningRoadmap {
+  const selectedRouteItems = portfolio.today_route.items
+    .filter((item) => item.chapter_slug === chapter.chapter_slug)
+    .map((item): PlanningDailyRouteItem => ({
+      unit_id: item.unit_id,
+      title: item.title,
+      activity: item.activity,
+      reason: item.reason,
+      role: item.role,
+      minutes: item.minutes,
+      scope: item.scope,
+    }));
+  const dailyRoute: PlanningDailyRoute = selectedRouteItems.length
+    ? { ...portfolio.today_route, items: selectedRouteItems }
+    : {
+        source: "default_focus",
+        budget_minutes: null,
+        estimated_minutes: chapter.next_step.estimated_minutes,
+        total_minutes: chapter.next_step.estimated_minutes.min,
+        items: [{
+          unit_id: chapter.next_step.unit_id,
+          title: chapter.next_step.title,
+          activity: chapter.next_step.approach[0] || `Begin ${chapter.next_step.title}.`,
+          reason: chapter.next_step.reason,
+          role: "main_focus",
+          minutes: chapter.next_step.estimated_minutes.min,
+          scope: "partial",
+        }],
+      };
+  return {
+    roadmap_version: chapter.roadmap_version,
+    class_level: portfolio.class_level,
+    subject: portfolio.subject,
+    chapter: chapter.chapter,
+    chapter_slug: chapter.chapter_slug,
+    chapter_proficiency: chapter.chapter_proficiency,
+    study_time_today: portfolio.study_time_today,
+    session_duration_minutes: portfolio.session_duration_minutes,
+    curriculum: chapter.curriculum,
+    learning_units: chapter.learning_units,
+    next_step: chapter.next_step,
+    daily_route: dailyRoute,
+    progress: chapter.progress,
+    completion_criteria: chapter.completion_criteria,
+    coverage: chapter.coverage,
+  };
+}
+
+export function planningPlanFromPortfolioState(state: PlanningPortfolioState): PlanningPlan | null {
+  const chapter = state.portfolio.chapters.find((item) => item.chapter_slug === state.activeChapterSlug)
+    || state.portfolio.chapters.find((item) => item.selected_for_today)
+    || state.portfolio.chapters[0];
+  if (!chapter) return null;
+  return {
+    roadmap: planningRoadmapFromPortfolioChapter(state.portfolio, chapter),
+    scope: {
+      chapter: chapter.chapter_slug,
+      chapterLabel: chapter.chapter,
+      subject: state.portfolio.subject,
+      classLevel: state.portfolio.class_level,
+      chapterProficiency: chapter.chapter_proficiency,
+      studyTimeToday: state.portfolio.study_time_today ?? "",
+      ...(state.portfolio.session_duration_minutes
+        ? { sessionDurationMinutes: state.portfolio.session_duration_minutes }
+        : {}),
+    },
+  };
+}
+
+export function getPlanningLearningUnits(roadmap?: Pick<PlanningRoadmap, "learning_units"> | null) {
   return roadmap?.learning_units?.filter(isPlanningLearningUnit).sort((left, right) => left.order - right.order) || [];
 }
 
-export function getPlanningUnit(roadmap: PlanningRoadmap, unitId: string) {
+export function getPlanningUnit(roadmap: Pick<PlanningRoadmap, "learning_units">, unitId: string) {
   return getPlanningLearningUnits(roadmap).find((unit) => unit.id === unitId);
 }
 

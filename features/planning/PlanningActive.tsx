@@ -297,11 +297,13 @@ export default function PlanningActive() {
     hydrated,
     catalogSettled,
     catalogNotice,
+    portfolio,
     activePlan,
     staleNotice,
     refreshingPlan,
     refreshNotice,
     refreshActivePlan,
+    selectActiveChapter,
   } = usePlanningExperience();
 
   useEffect(() => {
@@ -322,16 +324,16 @@ export default function PlanningActive() {
     return (
       <PlanningScreen
         eyebrow="Planning Lab"
-        title={catalogNotice ? "Planning is not available for this chapter yet." : "Choose a chapter first."}
-        intro={catalogNotice || "Your NCERT-ordered roadmap appears after three quick syllabus choices."}
+        title={catalogNotice ? "Planning is not available for these chapters yet." : "Choose your chapters first."}
+        intro={catalogNotice || "Your NCERT-ordered portfolio appears after class, subject, chapter and proficiency choices."}
       >
         <div className={styles.selectionStage}>
           {unavailableNotice ? <div className={styles.compactNotice} role="status">{unavailableNotice}</div> : null}
           <section className={styles.emptyCard}>
             <h2>No current roadmap</h2>
-            <p>Select a class, subject, and chapter to create one.</p>
+            <p>Select a class, subject, and one or more chapters to create one.</p>
             <div className={styles.emptyActions}>
-              <Link href={PLANNING_ROUTES.home} className={styles.secondaryButton}>Choose a chapter</Link>
+              <Link href={PLANNING_ROUTES.home} className={styles.secondaryButton}>Choose chapters</Link>
             </div>
           </section>
         </div>
@@ -341,7 +343,8 @@ export default function PlanningActive() {
 
   const { roadmap, scope } = activePlan;
   const nextUnit = getPlanningUnit(roadmap, roadmap.next_step.unit_id);
-  const showTodayRoute = Boolean(roadmap.daily_route?.items.length);
+  const isGlobalChapter = portfolio?.global_next_step.chapter_slug === roadmap.chapter_slug;
+  const showTodayRoute = Boolean(isGlobalChapter && roadmap.daily_route?.items.length);
   const firstRouteUnit = roadmap.daily_route?.items[0]
     ? getPlanningUnit(roadmap, roadmap.daily_route.items[0].unit_id)
     : undefined;
@@ -378,11 +381,45 @@ export default function PlanningActive() {
     <PlanningScreen
       eyebrow={`${scope.classLevel} / ${scope.subject}`}
       title={scope.chapterLabel}
-      intro={`${roadmap.curriculum.source} · ${roadmap.curriculum.edition}. Your route follows the chapter’s conceptual order.`}
+      intro={`${roadmap.curriculum.source} · ${roadmap.curriculum.edition}. ${portfolio?.chapter_count || 1} ${portfolio?.chapter_count === 1 ? "chapter" : "chapters"} planned; every route keeps its own conceptual order.`}
       backHref={PLANNING_ROUTES.home}
       backLabel="Change plan"
     >
       <div className={styles.roadmapExperience}>
+        {portfolio ? (
+          <section className={styles.portfolioBar} aria-labelledby="portfolio-heading">
+            <div className={styles.portfolioHeading}>
+              <div>
+                <p className={styles.eyebrow}>Your chapter portfolio</p>
+                <h2 id="portfolio-heading">One best next step, separate progress for every chapter</h2>
+              </div>
+              <span>{portfolio.aggregate_progress.percentage}% across {portfolio.aggregate_progress.total_units} learning units</span>
+            </div>
+            <nav className={styles.portfolioChapters} aria-label="Planned chapters">
+              {portfolio.chapters.map((chapter, index) => (
+                <button
+                  key={chapter.chapter_slug}
+                  type="button"
+                  className={styles.portfolioChapter}
+                  data-active={chapter.chapter_slug === roadmap.chapter_slug || undefined}
+                  data-recommended={chapter.selected_for_today || undefined}
+                  onClick={() => selectActiveChapter(chapter.chapter_slug)}
+                >
+                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  <span>
+                    <strong>{chapter.chapter}</strong>
+                    <small>{chapter.chapter_proficiency.replaceAll("_", " ")} · {chapter.progress.percentage}% ready</small>
+                  </span>
+                  {chapter.selected_for_today ? <em>Best next</em> : <AppIcon name="arrowRight" />}
+                </button>
+              ))}
+            </nav>
+            <p className={styles.portfolioReason}>
+              <AppIcon name="spark" />
+              <span><strong>Why this chapter now:</strong> {portfolio.global_next_step.selection_reason}</span>
+            </p>
+          </section>
+        ) : null}
         {refreshingPlan || refreshNotice ? (
           <div className={`${styles.compactNotice} ${styles.refreshNotice}`} role="status" aria-live="polite">
             <span>{refreshingPlan ? "Refreshing your latest learning progress…" : refreshNotice}</span>
@@ -396,7 +433,7 @@ export default function PlanningActive() {
         {nextUnit ? (
           <section className={styles.nextStepCard} aria-labelledby="next-step-heading">
             <div className={styles.nextStepCopy}>
-              <p className={styles.eyebrow}>Your next step</p>
+              <p className={styles.eyebrow}>{isGlobalChapter ? "Your global next step" : "Next step in this chapter"}</p>
               <h2 id="next-step-heading">{nextUnit.title}</h2>
               <p>{roadmap.next_step.reason}</p>
               <div className={styles.nextStepMetadata}>

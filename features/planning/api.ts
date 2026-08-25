@@ -1,7 +1,9 @@
 import { ApiRequestError, apiJson } from "@/lib/apiClient";
 import {
+  normalizePlanningPortfolio,
   normalizePlanningRoadmap,
   type PlanningPlan,
+  type PlanningPortfolio,
   type PlanningRoadmap,
   type PlanningScope,
 } from "./contracts";
@@ -344,6 +346,71 @@ export async function generatePlanningRoadmap(
     return roadmap;
   } catch (error) {
     throw normalizePlanningError(error, "Your plan could not be created.");
+  }
+}
+
+export async function generatePlanningPortfolio(
+  context: PlanningRequestContext,
+  scopes: PlanningScope[],
+  signal?: AbortSignal,
+): Promise<PlanningPortfolio> {
+  if (!scopes.length || scopes.length > 6) {
+    throw new PlanningApiError("Choose between one and six chapters for this roadmap.", "invalid_response");
+  }
+  const [firstScope] = scopes;
+  if (scopes.some((scope) => (
+    scope.classLevel !== firstScope.classLevel
+    || scope.subject !== firstScope.subject
+    || scope.studyTimeToday !== firstScope.studyTimeToday
+    || scope.sessionDurationMinutes !== firstScope.sessionDurationMinutes
+  ))) {
+    throw new PlanningApiError("Every selected chapter must belong to the same class, subject, and study session.", "invalid_response");
+  }
+
+  try {
+    const sessionDurationMinutes = firstScope.sessionDurationMinutes;
+    const hasSessionDuration = Number.isInteger(sessionDurationMinutes)
+      && Number(sessionDurationMinutes) >= 15
+      && Number(sessionDurationMinutes) <= 120;
+    const portfolio = await apiJson<unknown>(
+      `${getBackendURL(context.backendURL)}/planning/portfolio/${encodeURIComponent(context.userId)}`,
+      {
+        method: "POST",
+        headers: await jsonHeaders(context.getAuthHeaders),
+        body: JSON.stringify({
+          class_level: firstScope.classLevel,
+          subject: firstScope.subject,
+          chapters: scopes.map((scope) => ({
+            chapter_ref: scope.chapter,
+            chapter_proficiency: scope.chapterProficiency,
+          })),
+          ...(firstScope.studyTimeToday
+            ? { study_time_today: firstScope.studyTimeToday }
+            : {}),
+          ...(hasSessionDuration
+            ? { session_duration_minutes: sessionDurationMinutes }
+            : {}),
+        }),
+        retries: 0,
+        timeoutMs: 45000,
+        forceFresh: true,
+        signal,
+      },
+    );
+    const normalized = normalizePlanningPortfolio(portfolio);
+    if (!normalized) {
+      throw new PlanningApiError("The planner returned an incomplete chapter portfolio. Please try again.", "invalid_response");
+    }
+    if (
+      normalized.user_id !== context.userId
+      || normalized.class_level !== firstScope.classLevel
+      || normalized.subject !== firstScope.subject
+    ) {
+      throw new PlanningApiError("The planner returned a roadmap for a different student or syllabus. Please try again.", "invalid_response");
+    }
+    return normalized;
+  } catch (error) {
+    throw normalizePlanningError(error, "Your multi-chapter roadmap could not be created.");
   }
 }
 

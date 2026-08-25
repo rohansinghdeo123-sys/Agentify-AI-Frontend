@@ -1,13 +1,18 @@
 import {
+  isRetiredPlanningSnapshot,
   normalizePlanningDraft,
   normalizePlanningPlan,
-  isRetiredPlanningSnapshot,
+  normalizePlanningPortfolio,
+  planningPlanFromPortfolioState,
+  planningPortfolioFromPlan,
   type PlanningDraft,
   type PlanningPlan,
+  type PlanningPortfolio,
+  type PlanningPortfolioState,
 } from "./contracts";
 
-const VERSION = "v6";
-const LEGACY_VERSIONS = ["v5", "v4", "v3"] as const;
+const VERSION = "v7";
+const LEGACY_VERSIONS = ["v6", "v5", "v4", "v3"] as const;
 
 function key(userId: string, part: string, version = VERSION) {
   return `agentify:planning:${version}:${encodeURIComponent(userId)}:${part}`;
@@ -49,31 +54,82 @@ export function writePlanningDraft(userId: string, draft: PlanningDraft) {
   writeJSON(key(userId, "draft"), draft);
 }
 
-export function readActivePlanningPlanState(userId: string) {
-  const currentRaw = readJSON<unknown>(key(userId, "active"));
-  const legacyRaw = currentRaw
-    ? null
-    : LEGACY_VERSIONS
-        .map((legacyVersion) => readJSON<unknown>(key(userId, "active", legacyVersion)))
-        .find((value) => value !== null) ?? null;
-  const raw = currentRaw ?? legacyRaw;
-  const plan = normalizePlanningPlan(raw);
-  if (!currentRaw && plan) writeJSON(key(userId, "active"), plan);
-  const retired = !plan && isRetiredPlanningSnapshot(raw);
+function normalizePortfolioState(value: unknown): PlanningPortfolioState | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const portfolio = normalizePlanningPortfolio(record.portfolio);
+  if (!portfolio) return null;
+  const requestedActive = typeof record.activeChapterSlug === "string"
+    ? record.activeChapterSlug
+    : "";
+  const activeChapterSlug = portfolio.chapters.some((chapter) => chapter.chapter_slug === requestedActive)
+    ? requestedActive
+    : portfolio.global_next_step.chapter_slug;
+  return { portfolio, activeChapterSlug };
+}
+
+export function readPlanningPortfolioState(userId: string) {
+  const currentRaw = readJSON<unknown>(key(userId, "portfolio"));
+  const current = normalizePortfolioState(currentRaw);
+  if (current) return { state: current, retired: false, invalid: false };
+
+  const legacyRaw = LEGACY_VERSIONS
+    .map((legacyVersion) => readJSON<unknown>(key(userId, "active", legacyVersion)))
+    .find((value) => value !== null) ?? null;
+  const legacyPlan = normalizePlanningPlan(legacyRaw);
+  if (legacyPlan) {
+    const portfolio = planningPortfolioFromPlan(legacyPlan, userId);
+    const state = {
+      portfolio,
+      activeChapterSlug: portfolio.global_next_step.chapter_slug,
+    } satisfies PlanningPortfolioState;
+    writeJSON(key(userId, "portfolio"), state);
+    return { state, retired: false, invalid: false };
+  }
+
+  const retired = Boolean(legacyRaw && isRetiredPlanningSnapshot(legacyRaw));
   return {
-    plan,
+    state: null,
     retired,
-    invalid: Boolean(raw && !plan && !retired),
+    invalid: Boolean((currentRaw || legacyRaw) && !retired),
   };
 }
 
-export function writeActivePlanningPlan(userId: string, plan: PlanningPlan) {
-  writeJSON(key(userId, "active"), plan);
+export function writePlanningPortfolioState(userId: string, state: PlanningPortfolioState) {
+  writeJSON(key(userId, "portfolio"), state);
 }
 
-export function clearActivePlanningPlan(userId: string) {
+export function writePlanningPortfolio(userId: string, portfolio: PlanningPortfolio, activeChapterSlug?: string) {
+  const state = {
+    portfolio,
+    activeChapterSlug: portfolio.chapters.some((chapter) => chapter.chapter_slug === activeChapterSlug)
+      ? String(activeChapterSlug)
+      : portfolio.global_next_step.chapter_slug,
+  } satisfies PlanningPortfolioState;
+  writePlanningPortfolioState(userId, state);
+  return state;
+}
+
+/** Compatibility reader for older callers while v6 snapshots migrate to v7 portfolios. */
+export function readActivePlanningPlanState(userId: string) {
+  const result = readPlanningPortfolioState(userId);
+  return {
+    plan: result.state ? planningPlanFromPortfolioState(result.state) : null,
+    retired: result.retired,
+    invalid: result.invalid,
+  };
+}
+
+/** Compatibility writer used by tests and older routes during the portfolio rollout. */
+export function writeActivePlanningPlan(userId: string, plan: PlanningPlan) {
+  const portfolio = planningPortfolioFromPlan(plan, userId);
+  writePlanningPortfolio(userId, portfolio, plan.roadmap.chapter_slug);
+}
+
+export function clearPlanningPortfolio(userId: string) {
   if (typeof window === "undefined") return;
   try {
+    window.localStorage.removeItem(key(userId, "portfolio"));
     window.localStorage.removeItem(key(userId, "active"));
     LEGACY_VERSIONS.forEach((legacyVersion) => {
       window.localStorage.removeItem(key(userId, "active", legacyVersion));
@@ -82,3 +138,5 @@ export function clearActivePlanningPlan(userId: string) {
     // In-memory state remains authoritative for this visit.
   }
 }
+
+export const clearActivePlanningPlan = clearPlanningPortfolio;

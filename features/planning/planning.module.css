@@ -429,6 +429,159 @@
   text-align: center;
 }
 
+.chapterPicker {
+  min-width: 0;
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--plan-line);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--ds-bg-subtle) 72%, var(--ds-surface));
+}
+
+.chapterPicker:disabled {
+  opacity: 0.58;
+}
+
+.chapterPicker legend {
+  display: flex;
+  width: 100%;
+  padding: 0 0.15rem;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.chapterPicker legend > span:nth-child(2),
+.chapterPicker legend strong,
+.chapterPicker legend small {
+  display: block;
+}
+
+.chapterPicker legend strong {
+  color: var(--plan-ink);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.chapterPicker legend small {
+  margin-top: 0.16rem;
+  color: var(--plan-muted);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.chapterPicker legend em {
+  margin-left: auto;
+  border: 1px solid color-mix(in srgb, var(--plan-teal) 28%, var(--plan-line));
+  border-radius: 999px;
+  background: var(--ds-accent-teal-soft);
+  padding: 0.34rem 0.6rem;
+  color: var(--plan-teal);
+  font-size: 0.75rem;
+  font-style: normal;
+  font-weight: 780;
+  white-space: nowrap;
+}
+
+.chapterOptions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-top: 0.8rem;
+}
+
+.chapterOption {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 4.9rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.68rem;
+  border: 1px solid var(--plan-line);
+  border-radius: 0.9rem;
+  background: var(--plan-field-bg);
+  padding: 0.75rem;
+  color: var(--plan-secondary);
+  cursor: pointer;
+  transition:
+    transform var(--ds-duration-fast) var(--ds-ease-standard),
+    border-color var(--ds-duration-fast) var(--ds-ease-standard),
+    background var(--ds-duration-fast) var(--ds-ease-standard);
+}
+
+.chapterOption:hover {
+  border-color: var(--plan-teal);
+  transform: translateY(-1px);
+}
+
+.chapterOption:focus-within {
+  outline: none;
+  box-shadow: var(--ds-shadow-focus);
+}
+
+.chapterOption[data-selected] {
+  border-color: color-mix(in srgb, var(--plan-teal) 68%, var(--plan-line));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--ds-accent-teal-soft) 82%, var(--ds-surface)), var(--ds-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--plan-teal) 14%, transparent);
+}
+
+.chapterOption input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.chapterOrder,
+.chapterCheck {
+  display: inline-flex;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--plan-line);
+  border-radius: 0.72rem;
+  background: var(--ds-bg-subtle);
+  color: var(--plan-muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.chapterCheck {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  color: var(--plan-teal);
+}
+
+.chapterCheck svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.chapterOption > span:nth-child(3) {
+  display: grid;
+  min-width: 0;
+  gap: 0.18rem;
+}
+
+.chapterOption strong {
+  overflow: hidden;
+  color: var(--plan-ink);
+  font-size: 0.875rem;
+  font-weight: 790;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chapterOption small {
+  color: var(--plan-muted);
+  font-size: 0.78rem;
+}
+
 .proficiencyField {
   min-width: 0;
   margin-top: 1rem;
@@ -452,9 +605,7 @@
 
 .proficiencyField legend span:last-child,
 .proficiencyField legend strong,
-.proficiencyField legend small,
-.proficiencyCopy strong,
-.proficiencyCopy small {
+.proficiencyField legend small {
   display: block;
 }
 
@@ -486,74 +637,73 @@
   font-weight: 900;
 }
 
-.proficiencyOptions {
+.chapterProficiencyList {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-top: 0.8rem;
   gap: 0.55rem;
+  margin-top: 0.8rem;
 }
 
-.proficiencyOption {
+.chapterProficiencyRow {
   display: grid;
   min-width: 0;
-  min-height: 4.8rem;
-  grid-template-columns: 1.15rem minmax(0, 1fr);
-  padding: 0.72rem 0.78rem;
-  align-items: flex-start;
-  gap: 0.65rem;
+  min-height: 4.7rem;
+  grid-template-columns: minmax(0, 1fr) minmax(12.5rem, 0.48fr);
+  align-items: center;
+  gap: 0.8rem;
   border: 1px solid var(--plan-line);
   border-radius: 0.88rem;
   background: var(--plan-field-bg);
-  color: var(--plan-secondary);
-  cursor: pointer;
-  transition:
-    transform var(--ds-duration-fast) var(--ds-ease-standard),
-    border-color var(--ds-duration-fast) var(--ds-ease-standard),
-    background var(--ds-duration-fast) var(--ds-ease-standard),
-    color var(--ds-duration-fast) var(--ds-ease-standard);
+  padding: 0.72rem 0.78rem;
 }
 
-.proficiencyOption:hover {
-  transform: translateY(-1px);
-  border-color: var(--plan-teal);
+.chapterProficiencyRow > span {
+  display: grid;
+  min-width: 0;
+  gap: 0.18rem;
 }
 
-.proficiencyOption[data-selected] {
-  border-color: color-mix(in srgb, var(--plan-teal) 72%, var(--plan-line));
-  background: linear-gradient(135deg, color-mix(in srgb, var(--ds-accent-teal-soft) 88%, var(--ds-surface)), var(--ds-surface));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--plan-teal) 16%, transparent);
+.chapterProficiencyRow strong {
+  overflow: hidden;
   color: var(--plan-ink);
+  font-size: 0.875rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.proficiencyOption:focus-within {
+.chapterProficiencyRow small {
+  color: var(--plan-muted);
+  font-size: 0.8rem;
+  line-height: 1.42;
+}
+
+.chapterProficiencyRow select {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.9rem;
+  border: 1px solid var(--plan-field-border);
+  border-radius: 0.78rem;
   outline: none;
+  background: var(--plan-field-bg);
+  padding: 0.65rem 2.2rem 0.65rem 0.75rem;
+  color: var(--plan-field-text);
+  font-size: 0.875rem;
+  font-weight: 720;
+}
+
+.chapterProficiencyRow select:required:invalid {
+  color: var(--plan-muted);
+}
+
+.chapterProficiencyRow select:focus-visible {
+  border-color: var(--plan-teal);
   box-shadow: var(--ds-shadow-focus);
 }
 
-.proficiencyOption input {
-  width: 1.1rem;
-  height: 1.1rem;
-  margin-top: 0.12rem;
-  accent-color: var(--plan-teal);
-}
-
-.proficiencyCopy {
-  min-width: 0;
-}
-
-.proficiencyCopy strong {
-  color: var(--plan-ink);
-  font-size: 0.875rem;
-  font-weight: 820;
-  line-height: 1.3;
-}
-
-.proficiencyCopy small {
-  margin-top: 0.2rem;
-  color: var(--plan-muted);
-  font-size: 0.8rem;
-  line-height: 1.4;
-}
+:global([data-theme="light"]) .chapterProficiencyRow select { color-scheme: light; }
+:global([data-theme="dark"]) .chapterProficiencyRow select { color-scheme: dark; }
+:global([data-theme="light"]) .chapterProficiencyRow option { background: #fff; color: #172033; }
+:global([data-theme="dark"]) .chapterProficiencyRow option { background: #111d2e; color: #dce7f5; }
 
 .todayTimeField {
   min-width: 0;
@@ -682,6 +832,159 @@
   display: flex;
   margin-top: 1rem;
   justify-content: center;
+}
+
+.portfolioBar {
+  border: 1px solid var(--plan-line);
+  border-radius: 1.2rem;
+  background:
+    radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--ds-accent-teal-soft) 76%, transparent), transparent 18rem),
+    color-mix(in srgb, var(--ds-surface) 97%, transparent);
+  padding: clamp(0.9rem, 2vw, 1.2rem);
+  box-shadow: var(--ds-shadow-sm);
+}
+
+.portfolioHeading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.portfolioHeading h2 {
+  margin-top: 0.24rem;
+  color: var(--plan-ink);
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  font-weight: 790;
+  letter-spacing: -0.028em;
+  line-height: 1.25;
+}
+
+.portfolioHeading > span {
+  color: var(--plan-muted);
+  font-size: 0.78rem;
+  font-weight: 680;
+  text-align: right;
+}
+
+.portfolioChapters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+}
+
+.portfolioChapter {
+  display: grid;
+  min-width: 0;
+  min-height: 4.5rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.68rem;
+  border: 1px solid var(--plan-line);
+  border-radius: 0.9rem;
+  background: var(--plan-field-bg);
+  padding: 0.68rem 0.75rem;
+  color: var(--plan-secondary);
+  text-align: left;
+  transition:
+    border-color var(--ds-duration-fast) var(--ds-ease-standard),
+    background var(--ds-duration-fast) var(--ds-ease-standard),
+    transform var(--ds-duration-fast) var(--ds-ease-standard);
+}
+
+.portfolioChapter:hover {
+  border-color: var(--plan-teal);
+  transform: translateY(-1px);
+}
+
+.portfolioChapter:focus-visible {
+  outline: none;
+  box-shadow: var(--ds-shadow-focus);
+}
+
+.portfolioChapter[data-active] {
+  border-color: color-mix(in srgb, var(--plan-teal) 64%, var(--plan-line));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--ds-accent-teal-soft) 82%, var(--ds-surface)), var(--ds-surface));
+}
+
+.portfolioChapter > span:first-child {
+  display: inline-flex;
+  width: 2.15rem;
+  height: 2.15rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.68rem;
+  background: var(--ds-bg-subtle);
+  color: var(--plan-teal);
+  font-size: 0.7rem;
+  font-weight: 850;
+}
+
+.portfolioChapter > span:nth-child(2) {
+  display: grid;
+  min-width: 0;
+  gap: 0.16rem;
+}
+
+.portfolioChapter strong {
+  overflow: hidden;
+  color: var(--plan-ink);
+  font-size: 0.84rem;
+  font-weight: 780;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portfolioChapter small {
+  overflow: hidden;
+  color: var(--plan-muted);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.portfolioChapter em {
+  border: 1px solid color-mix(in srgb, var(--plan-teal) 28%, var(--plan-line));
+  border-radius: 999px;
+  background: var(--ds-accent-teal-soft);
+  padding: 0.32rem 0.52rem;
+  color: var(--plan-teal);
+  font-size: 0.7rem;
+  font-style: normal;
+  font-weight: 780;
+  white-space: nowrap;
+}
+
+.portfolioChapter > svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  color: var(--plan-muted);
+}
+
+.portfolioReason {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--ds-border-subtle);
+  padding: 0.75rem 0.15rem 0.05rem;
+  color: var(--plan-secondary);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.portfolioReason svg {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+  margin-top: 0.12rem;
+  color: var(--plan-teal);
+}
+
+.portfolioReason strong {
+  color: var(--plan-ink);
 }
 
 .roadmapExperience {
@@ -1465,6 +1768,19 @@
     border-radius: 1rem;
   }
 
+  .portfolioHeading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .portfolioHeading > span {
+    text-align: left;
+  }
+
+  .portfolioChapters {
+    grid-template-columns: 1fr;
+  }
+
   .selectionField {
     grid-template-columns: 2.25rem minmax(0, 1fr);
     padding: 0.85rem 0;
@@ -1489,7 +1805,20 @@
     border-radius: 1rem;
   }
 
-  .proficiencyOptions {
+  .chapterOptions {
+    grid-template-columns: 1fr;
+  }
+
+  .chapterPicker legend {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .chapterPicker legend em {
+    margin-left: 2.8rem;
+  }
+
+  .chapterProficiencyRow {
     grid-template-columns: 1fr;
   }
 
@@ -1668,7 +1997,9 @@
   .primaryButton,
   .secondaryButton,
   .selectionControl,
-  .proficiencyOption,
+  .chapterOption,
+  .chapterProficiencyRow select,
+  .portfolioChapter,
   .timeOption,
   .roadmapUnit,
   .unitToggle svg,

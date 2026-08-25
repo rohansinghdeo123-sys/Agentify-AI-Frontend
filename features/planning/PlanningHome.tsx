@@ -2,7 +2,7 @@
 
 import { AppIcon } from "@/components/ui/Polished";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { PLANNING_PROFICIENCY_OPTIONS, PLANNING_STUDY_TIME_OPTIONS } from "./contracts";
 import { usePlanningExperience } from "./PlanningExperience";
 import { PlanningLoading, PlanningScreen, planningStyles as styles } from "./PlanningScreen";
@@ -68,49 +68,58 @@ export default function PlanningHome() {
     chapters,
     catalogSettled,
     catalogNotice,
-    selectedChapter,
+    selectedChapters,
     generating,
     error,
     setClassLevel,
     setSubject,
-    setChapter,
+    setChapterSelected,
     setChapterProficiency,
     setStudyTimeToday,
     retryCatalog,
-    createPlan,
+    createPortfolio,
     clearError,
   } = usePlanningExperience();
 
   useEffect(() => () => requestRef.current?.abort(), []);
 
-  if (authBusy || !hydrated) return <PlanningLoading label="Opening Planning..." />;
-
   const classSelected = classOptions.some((option) => option.value === draft.classLevel);
   const subjectSelected = subjectOptions.some((option) => option.value === draft.subject);
+  const allProficienciesReady = selectedChapters.length > 0 && selectedChapters.every((chapter) => (
+    draft.chapterChoices.some((choice) => choice.chapter === chapter.value && Boolean(choice.chapterProficiency))
+  ));
   const canGenerate = Boolean(
     userId
     && catalogSettled
     && classSelected
     && subjectSelected
-    && selectedChapter
-    && draft.chapterProficiency
+    && allProficienciesReady
     && !generating,
   );
+  const selectedLabel = useMemo(() => {
+    if (!selectedChapters.length) return "";
+    if (selectedChapters.length === 1) return selectedChapters[0].label;
+    return `${selectedChapters.length} chapters`;
+  }, [selectedChapters]);
+
+  if (authBusy || !hydrated) {
+    return <PlanningLoading label="Preparing your Planning Lab…" />;
+  }
 
   const buildPlan = async () => {
     if (!canGenerate) return;
     requestRef.current?.abort();
     const controller = new AbortController();
     requestRef.current = controller;
-    const plan = await createPlan(controller.signal);
-    if (plan && !controller.signal.aborted) router.push(PLANNING_ROUTES.active);
+    const portfolio = await createPortfolio(controller.signal);
+    if (portfolio && !controller.signal.aborted) router.push(PLANNING_ROUTES.active);
   };
 
   return (
     <PlanningScreen
-      eyebrow="Planning Lab"
-      title="Know exactly what to learn next."
-      intro="Choose one chapter. AgentifyAI will keep the NCERT order, make the next step clear, and fit today’s route around you."
+      eyebrow="Planning Lab · Multi-chapter"
+      title="Build one clear route across your chapters."
+      intro="Choose the chapters you need. AgentifyAI preserves each NCERT roadmap, uses a separate proficiency for every chapter, and recommends one achievable next step."
     >
       <div className={styles.selectionStage}>
         <form
@@ -123,7 +132,7 @@ export default function PlanningHome() {
           }}
         >
           <h2 id="planning-selection-heading" className={styles.srOnly}>
-            Choose class, subject, chapter, chapter proficiency, and optionally today’s study time
+            Choose class, subject, chapters, proficiency for each chapter, and optionally today’s study time
           </h2>
 
           {!catalogSettled ? (
@@ -143,7 +152,7 @@ export default function PlanningHome() {
             disabled={!catalogSettled || generating || Boolean(catalogNotice && !classOptions.length)}
             aria-busy={!catalogSettled || generating}
           >
-            <legend className={styles.srOnly}>Choose class, subject, and chapter</legend>
+            <legend className={styles.srOnly}>Choose class and subject</legend>
             <Selector
               id="planning-class"
               number="01"
@@ -172,23 +181,45 @@ export default function PlanningHome() {
                 setSubject(value);
               }}
             />
-            <Selector
-              id="planning-chapter"
-              number="03"
-              label="Chapter"
-              helper="Pick one chapter to get its learning roadmap."
-              value={selectedChapter?.value || ""}
-              placeholder="Choose chapter"
-              options={chapters.map((chapter) => ({ label: chapter.label, value: chapter.value }))}
-              disabled={!catalogSettled || !subjectSelected || generating}
-              onChange={(value) => {
-                clearError();
-                setChapter(value);
-              }}
-            />
           </fieldset>
 
-          {selectedChapter ? (
+          {subjectSelected ? (
+            <fieldset className={styles.chapterPicker} disabled={generating || !catalogSettled}>
+              <legend>
+                <span className={styles.proficiencyNumber} aria-hidden="true">03</span>
+                <span>
+                  <strong>Which chapters do you want to plan?</strong>
+                  <small>Choose one or more. Their NCERT roadmaps remain separate.</small>
+                </span>
+                {selectedChapters.length ? <em>{selectedChapters.length} selected</em> : null}
+              </legend>
+              <div className={styles.chapterOptions} role="group" aria-label="Select chapters">
+                {chapters.map((chapter, index) => {
+                  const selected = selectedChapters.some((item) => item.value === chapter.value);
+                  return (
+                    <label key={chapter.value} className={styles.chapterOption} data-selected={selected || undefined}>
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={(event) => {
+                          clearError();
+                          setChapterSelected(chapter.value, event.target.checked);
+                        }}
+                      />
+                      <span className={styles.chapterOrder}>{String(chapter.order ?? index + 1).padStart(2, "0")}</span>
+                      <span>
+                        <strong>{chapter.label}</strong>
+                        <small>{selected ? "Included in this roadmap" : "Add this chapter"}</small>
+                      </span>
+                      <span className={styles.chapterCheck} aria-hidden="true"><AppIcon name={selected ? "check" : "plus"} /></span>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+          ) : null}
+
+          {selectedChapters.length ? (
             <fieldset
               className={styles.proficiencyField}
               disabled={generating}
@@ -197,38 +228,38 @@ export default function PlanningHome() {
               <legend>
                 <span className={styles.proficiencyNumber} aria-hidden="true">04</span>
                 <span>
-                  <strong>How well do you know this chapter?</strong>
-                  <small id="planning-proficiency-help">This helps Agentify personalize your route.</small>
+                  <strong>
+                    {selectedChapters.length === 1
+                      ? "How well do you know this chapter?"
+                      : "How well do you know each chapter?"}
+                  </strong>
+                  <small id="planning-proficiency-help">This helps Agentify personalize every route independently.</small>
                 </span>
               </legend>
-              <div className={styles.proficiencyOptions} role="radiogroup" aria-label="Chapter proficiency">
-                {PLANNING_PROFICIENCY_OPTIONS.map((option) => {
-                  const selected = draft.chapterProficiency === option.value;
-                  const descriptionId = `planning-proficiency-${option.value}-description`;
+              <div className={styles.chapterProficiencyList}>
+                {selectedChapters.map((chapter) => {
+                  const choice = draft.chapterChoices.find((item) => item.chapter === chapter.value);
+                  const selectedOption = PLANNING_PROFICIENCY_OPTIONS.find((option) => option.value === choice?.chapterProficiency);
                   return (
-                    <label
-                      key={option.value}
-                      className={styles.proficiencyOption}
-                      data-selected={selected || undefined}
-                    >
-                      <input
-                        type="radio"
-                        name="chapter-proficiency"
-                        value={option.value}
-                        checked={selected}
-                        required
-                        aria-describedby={descriptionId}
-                        onChange={() => {
-                          clearError();
-                          setChapterProficiency(option.value);
-                        }}
-                      />
-                      <span className={styles.proficiencyCopy}>
-                        <strong>{option.label}</strong>
-                        <small id={descriptionId}>
-                          {option.description}
-                        </small>
+                    <label key={chapter.value} className={styles.chapterProficiencyRow}>
+                      <span>
+                        <strong>{chapter.label}</strong>
+                        <small>{selectedOption?.description || "Choose the closest starting point."}</small>
                       </span>
+                      <select
+                        value={choice?.chapterProficiency || ""}
+                        required
+                        aria-label={`How well do you know ${chapter.label}?`}
+                        onChange={(event) => {
+                          clearError();
+                          setChapterProficiency(chapter.value, event.target.value as (typeof PLANNING_PROFICIENCY_OPTIONS)[number]["value"]);
+                        }}
+                      >
+                        <option value="" disabled>Choose proficiency</option>
+                        {PLANNING_PROFICIENCY_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
                     </label>
                   );
                 })}
@@ -236,7 +267,7 @@ export default function PlanningHome() {
             </fieldset>
           ) : null}
 
-          {selectedChapter ? (
+          {selectedChapters.length ? (
             <fieldset
               className={styles.todayTimeField}
               disabled={generating}
@@ -246,7 +277,7 @@ export default function PlanningHome() {
                 <span className={styles.timeLegendIcon} aria-hidden="true">05</span>
                 <span>
                   <strong>How much time would you like to study today?</strong>
-                  <small id="planning-time-help">Optional. This shapes today’s route, not a deadline for the chapter.</small>
+                  <small id="planning-time-help">Optional. One total ceiling across all selected chapters—not time repeated for each chapter.</small>
                 </span>
               </legend>
               <div className={styles.timeOptions} role="group" aria-label="Study time today">
@@ -280,12 +311,12 @@ export default function PlanningHome() {
           </button>
           <p className={styles.generateHint} aria-live="polite">
             {generating
-              ? "Reading the selected chapter and preserving its NCERT learning order."
-              : selectedChapter && draft.chapterProficiency
-                ? `Ready to personalize ${selectedChapter.label}.`
-                : selectedChapter
-                  ? "Choose how well you know this chapter to continue."
-                : "Choose all three fields to continue."}
+              ? "Comparing eligible NCERT steps and choosing one achievable next action."
+              : allProficienciesReady
+                ? `Ready to personalize ${selectedLabel}.`
+                : selectedChapters.length
+                  ? "Choose a proficiency for every selected chapter to continue."
+                  : "Choose at least one chapter to continue."}
           </p>
         </form>
       </div>

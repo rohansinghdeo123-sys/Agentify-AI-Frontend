@@ -14,26 +14,29 @@ import {
 import {
   BUILTIN_PLANNING_CHAPTERS,
   fetchPlanningCatalog,
-  generatePlanningRoadmap,
-  isPlanningPlanSupported,
+  generatePlanningPortfolio,
   planningCatalogChapterMatches,
   planningErrorMessage,
   PlanningApiError,
   type PlanningCatalogChapter,
 } from "./api";
 import {
+  planningPlanFromPortfolioState,
   type PlanningChapterProficiency,
   type PlanningDraft,
   type PlanningPlan,
+  type PlanningPortfolio,
+  type PlanningPortfolioState,
   type PlanningScope,
   type PlanningStudyTime,
 } from "./contracts";
 import {
-  clearActivePlanningPlan,
-  readActivePlanningPlanState,
+  clearPlanningPortfolio,
   readPlanningDraft,
-  writeActivePlanningPlan,
+  readPlanningPortfolioState,
   writePlanningDraft,
+  writePlanningPortfolio,
+  writePlanningPortfolioState,
 } from "./storage";
 
 type PlanningExperienceValue = {
@@ -46,8 +49,9 @@ type PlanningExperienceValue = {
   chapters: PlanningCatalogChapter[];
   catalogSettled: boolean;
   catalogNotice: string;
-  selectedChapter: PlanningCatalogChapter | undefined;
-  scope: PlanningScope | null;
+  selectedChapters: PlanningCatalogChapter[];
+  scopes: PlanningScope[];
+  portfolio: PlanningPortfolio | null;
   activePlan: PlanningPlan | null;
   generating: boolean;
   refreshingPlan: boolean;
@@ -56,11 +60,12 @@ type PlanningExperienceValue = {
   staleNotice: string;
   setClassLevel: (classLevel: string) => void;
   setSubject: (subject: string) => void;
-  setChapter: (chapter: string) => void;
-  setChapterProficiency: (chapterProficiency: PlanningChapterProficiency) => void;
+  setChapterSelected: (chapter: string, selected: boolean) => void;
+  setChapterProficiency: (chapter: string, chapterProficiency: PlanningChapterProficiency) => void;
   setStudyTimeToday: (studyTimeToday: PlanningStudyTime | "") => void;
+  selectActiveChapter: (chapterSlug: string) => void;
   retryCatalog: () => void;
-  createPlan: (signal?: AbortSignal) => Promise<PlanningPlan | null>;
+  createPortfolio: (signal?: AbortSignal) => Promise<PlanningPortfolio | null>;
   refreshActivePlan: (options?: { force?: boolean }) => Promise<void>;
   clearError: () => void;
 };
@@ -70,16 +75,26 @@ const PlanningExperienceContext = createContext<PlanningExperienceValue | null>(
 const DEFAULT_DRAFT: PlanningDraft = {
   classLevel: "",
   subject: "",
-  chapter: "",
-  chapterProficiency: "",
+  chapterChoices: [],
   studyTimeToday: "",
 };
+
+function portfolioMatchesCatalog(
+  portfolio: PlanningPortfolio,
+  catalog: PlanningCatalogChapter[],
+) {
+  return portfolio.chapters.every((chapter) => catalog.some((candidate) => (
+    candidate.classLevel === portfolio.class_level
+    && candidate.subject === portfolio.subject
+    && planningCatalogChapterMatches(candidate, chapter.chapter_slug)
+  )));
+}
 
 export function PlanningExperienceProvider({ children }: { children: ReactNode }) {
   const { userId, loading, claimsLoading, getAuthHeaders, profile } = useAuth();
   const authBusy = loading || claimsLoading;
   const [draft, setDraft] = useState<PlanningDraft>(DEFAULT_DRAFT);
-  const [activePlan, setActivePlan] = useState<PlanningPlan | null>(null);
+  const [portfolioState, setPortfolioState] = useState<PlanningPortfolioState | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [refreshingPlan, setRefreshingPlan] = useState(false);
@@ -115,25 +130,34 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     (left.order ?? Number.MAX_SAFE_INTEGER) - (right.order ?? Number.MAX_SAFE_INTEGER)
     || left.label.localeCompare(right.label)
   )), [catalogChapters, draft.classLevel, draft.subject]);
-  const supportCatalog = catalogChapters.length
-    ? catalogChapters
-    : BUILTIN_PLANNING_CHAPTERS;
-  const selectedChapter = useMemo(
-    () => chapters.find((chapter) => planningCatalogChapterMatches(chapter, draft.chapter)),
-    [chapters, draft.chapter],
-  );
-  const scope = useMemo<PlanningScope | null>(() => {
-    if (!selectedChapter || !draft.chapterProficiency) return null;
-    return {
-      chapter: selectedChapter.value,
-      chapterLabel: selectedChapter.label,
-      subject: selectedChapter.subject,
-      classLevel: selectedChapter.classLevel,
-      chapterProficiency: draft.chapterProficiency,
+  const selectedChapters = useMemo(() => draft.chapterChoices.flatMap((choice) => {
+    const chapter = chapters.find((candidate) => planningCatalogChapterMatches(candidate, choice.chapter));
+    return chapter ? [chapter] : [];
+  }), [chapters, draft.chapterChoices]);
+  const scopes = useMemo<PlanningScope[]>(() => draft.chapterChoices.flatMap((choice) => {
+    const selected = chapters.find((candidate) => planningCatalogChapterMatches(candidate, choice.chapter));
+    if (!selected || !choice.chapterProficiency) return [];
+    return [{
+      chapter: selected.value,
+      chapterLabel: selected.label,
+      subject: selected.subject,
+      classLevel: selected.classLevel,
+      chapterProficiency: choice.chapterProficiency,
       studyTimeToday: draft.studyTimeToday,
-    };
-  }, [draft.chapterProficiency, draft.studyTimeToday, selectedChapter]);
-  currentInputRef.current = JSON.stringify({ userId, scope });
+    }];
+  }), [chapters, draft.chapterChoices, draft.studyTimeToday]);
+  const supportCatalog = catalogChapters.length ? catalogChapters : BUILTIN_PLANNING_CHAPTERS;
+  const portfolio = useMemo(() => (
+    portfolioState && portfolioMatchesCatalog(portfolioState.portfolio, supportCatalog)
+      ? portfolioState.portfolio
+      : null
+  ), [portfolioState, supportCatalog]);
+  const activePlan = useMemo(() => (
+    portfolioState && portfolio
+      ? planningPlanFromPortfolioState(portfolioState)
+      : null
+  ), [portfolio, portfolioState]);
+  currentInputRef.current = JSON.stringify({ userId, scopes });
 
   useEffect(() => {
     if (authBusy) return;
@@ -144,7 +168,6 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
 
     if (!userId) {
       setCatalogChapters([]);
-      setCatalogLoaded(false);
       setCatalogNotice("Sign in again to load your syllabus chapters.");
       setCatalogSettled(true);
       return () => controller.abort();
@@ -159,7 +182,6 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
       .catch((catalogError: unknown) => {
         if (controller.signal.aborted) return;
         setCatalogChapters([]);
-        setCatalogLoaded(false);
         setCatalogNotice(
           catalogError instanceof PlanningApiError && catalogError.message
             ? catalogError.message
@@ -191,21 +213,21 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     setHydrated(false);
     if (userId) {
       const savedDraft = readPlanningDraft(userId);
-      const savedPlanState = readActivePlanningPlanState(userId);
+      const savedPortfolio = readPlanningPortfolioState(userId);
       setDraft(savedDraft ?? DEFAULT_DRAFT);
-      setActivePlan(savedPlanState.plan);
-      if (savedPlanState.retired) {
-        setStaleNotice("Your chapter choice is safe. An older focus brief was retired so you can build the new NCERT-ordered roadmap.");
-        clearActivePlanningPlan(userId);
-      } else if (savedPlanState.invalid) {
-        setStaleNotice("An older saved plan could not be restored safely. Choose a chapter to create a fresh learning roadmap.");
-        clearActivePlanningPlan(userId);
+      setPortfolioState(savedPortfolio.state);
+      if (savedPortfolio.retired) {
+        setStaleNotice("Your chapter choices are safe. An older plan format was retired so you can build the new roadmap.");
+        clearPlanningPortfolio(userId);
+      } else if (savedPortfolio.invalid) {
+        setStaleNotice("An older saved roadmap could not be restored safely. Choose your chapters to create a fresh roadmap.");
+        clearPlanningPortfolio(userId);
       } else {
         setStaleNotice("");
       }
     } else {
       setDraft(DEFAULT_DRAFT);
-      setActivePlan(null);
+      setPortfolioState(null);
       setStaleNotice("");
     }
     setHydrated(true);
@@ -214,32 +236,9 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
   useEffect(() => {
     if (!catalogLoaded || !catalogChapters.length) return;
     setDraft((current) => {
-      const exact = catalogChapters.find((chapter) => (
-        chapter.classLevel === current.classLevel
-        && chapter.subject === current.subject
-        && planningCatalogChapterMatches(chapter, current.chapter)
-      ));
-      if (exact) {
-        return exact.value === current.chapter ? current : { ...current, chapter: exact.value };
-      }
-      const legacyMatch = current.chapter && !current.classLevel && !current.subject
-        ? catalogChapters.find((chapter) => (
-            planningCatalogChapterMatches(chapter, current.chapter)
-            && (!profile?.classLevel || chapter.classLevel === profile.classLevel)
-          )) || catalogChapters.find((chapter) => planningCatalogChapterMatches(chapter, current.chapter))
-        : undefined;
-      if (legacyMatch) {
-        return {
-          ...current,
-          classLevel: legacyMatch.classLevel,
-          subject: legacyMatch.subject,
-          chapter: legacyMatch.value,
-        };
-      }
       const availableClasses = Array.from(new Set(catalogChapters.map((chapter) => chapter.classLevel)));
       const normalizedProfileClass = profile?.classLevel?.trim() || "";
-      const validCurrentClass = availableClasses.includes(current.classLevel);
-      const classLevel = validCurrentClass
+      const classLevel = availableClasses.includes(current.classLevel)
         ? current.classLevel
         : availableClasses.includes(normalizedProfileClass)
           ? normalizedProfileClass
@@ -257,18 +256,20 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
       const availableChapters = catalogChapters.filter((chapter) => (
         chapter.classLevel === classLevel && chapter.subject === subject
       ));
-      const matchedChapter = availableChapters.find((item) => planningCatalogChapterMatches(item, current.chapter));
-      const chapter = matchedChapter
-        ? matchedChapter.value
-        : availableChapters.length === 1
-          ? availableChapters[0].value
-          : "";
+      const chapterChoices = current.chapterChoices.flatMap((choice) => {
+        const matched = availableChapters.find((chapter) => planningCatalogChapterMatches(chapter, choice.chapter))
+          || (!current.classLevel && !current.subject
+            ? catalogChapters.find((chapter) => planningCatalogChapterMatches(chapter, choice.chapter))
+            : undefined);
+        if (!matched || matched.classLevel !== classLevel || matched.subject !== subject) return [];
+        return [{ ...choice, chapter: matched.value }];
+      }).filter((choice, index, all) => all.findIndex((item) => item.chapter === choice.chapter) === index);
       if (
         classLevel === current.classLevel
         && subject === current.subject
-        && chapter === current.chapter
+        && JSON.stringify(chapterChoices) === JSON.stringify(current.chapterChoices)
       ) return current;
-      return { ...current, classLevel, subject, chapter, chapterProficiency: "" };
+      return { ...current, classLevel, subject, chapterChoices };
     });
   }, [catalogChapters, catalogLoaded, profile?.classLevel]);
 
@@ -277,67 +278,87 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     writePlanningDraft(userId, draft);
   }, [draft, hydrated, userId]);
 
-  const retireActivePlan = useCallback((notice = "The previous roadmap was cleared because your planning choices changed.") => {
-    if (!activePlan) return;
+  const retirePortfolio = useCallback((notice: string) => {
     refreshIdRef.current += 1;
     refreshInFlightRef.current = false;
     refreshAbortRef.current?.abort();
     refreshAbortRef.current = null;
     setRefreshingPlan(false);
     setRefreshNotice("");
-    setActivePlan(null);
+    setPortfolioState(null);
     setStaleNotice(notice);
-    if (userId) clearActivePlanningPlan(userId);
-  }, [activePlan, userId]);
+    if (userId) clearPlanningPortfolio(userId);
+  }, [userId]);
 
   useEffect(() => {
-    if (!catalogLoaded || !activePlan || !catalogChapters.length) return;
-    const planStillMatches = isPlanningPlanSupported(activePlan, catalogChapters);
-    if (!planStillMatches) {
-      retireActivePlan("That saved roadmap is not available in Planning yet. Choose the supported chapter to continue.");
+    if (!catalogLoaded || !portfolioState || !catalogChapters.length) return;
+    if (!portfolioMatchesCatalog(portfolioState.portfolio, catalogChapters)) {
+      retirePortfolio("A saved chapter is no longer available in Planning. Choose the chapters you want to keep.");
     }
-  }, [activePlan, catalogChapters, catalogLoaded, retireActivePlan]);
+  }, [catalogChapters, catalogLoaded, portfolioState, retirePortfolio]);
 
   const changeSetup = useCallback((next: PlanningDraft) => {
-    if (
-      next.classLevel === draft.classLevel
-      && next.subject === draft.subject
-      && next.chapter === draft.chapter
-      && next.chapterProficiency === draft.chapterProficiency
-      && next.studyTimeToday === draft.studyTimeToday
-    ) return;
     generationRef.current += 1;
     generationInFlightRef.current = false;
     setGenerating(false);
-    retireActivePlan();
-    setDraft((current) => ({ ...current, ...next }));
+    setDraft(next);
     setError("");
-  }, [draft.chapter, draft.chapterProficiency, draft.classLevel, draft.studyTimeToday, draft.subject, retireActivePlan]);
+  }, []);
 
   const setClassLevel = useCallback((classLevel: string) => {
-    changeSetup({ ...draft, classLevel, subject: "", chapter: "", chapterProficiency: "" });
+    changeSetup({ ...draft, classLevel, subject: "", chapterChoices: [] });
   }, [changeSetup, draft]);
 
   const setSubject = useCallback((subject: string) => {
-    changeSetup({ ...draft, subject, chapter: "", chapterProficiency: "" });
+    changeSetup({ ...draft, subject, chapterChoices: [] });
   }, [changeSetup, draft]);
 
-  const setChapter = useCallback((chapter: string) => {
-    changeSetup({ ...draft, chapter, chapterProficiency: "" });
+  const setChapterSelected = useCallback((chapter: string, selected: boolean) => {
+    const exists = draft.chapterChoices.some((choice) => choice.chapter === chapter);
+    if (selected && !exists) {
+      if (draft.chapterChoices.length >= 6) {
+        setError("Choose up to six chapters at a time so the roadmap stays clear.");
+        return;
+      }
+      changeSetup({ ...draft, chapterChoices: [...draft.chapterChoices, { chapter, chapterProficiency: "" }] });
+      return;
+    }
+    if (!selected && exists) {
+      changeSetup({
+        ...draft,
+        chapterChoices: draft.chapterChoices.filter((choice) => choice.chapter !== chapter),
+      });
+    }
   }, [changeSetup, draft]);
 
-  const setChapterProficiency = useCallback((chapterProficiency: PlanningChapterProficiency) => {
-    changeSetup({ ...draft, chapterProficiency });
+  const setChapterProficiency = useCallback((chapter: string, chapterProficiency: PlanningChapterProficiency) => {
+    changeSetup({
+      ...draft,
+      chapterChoices: draft.chapterChoices.map((choice) => (
+        choice.chapter === chapter
+          ? { ...choice, chapterProficiency }
+          : choice
+      )),
+    });
   }, [changeSetup, draft]);
 
   const setStudyTimeToday = useCallback((studyTimeToday: PlanningStudyTime | "") => {
     changeSetup({ ...draft, studyTimeToday });
   }, [changeSetup, draft]);
 
-  const createPlan = useCallback(async (signal?: AbortSignal) => {
+  const selectActiveChapter = useCallback((chapterSlug: string) => {
+    setPortfolioState((current) => {
+      if (!current || !current.portfolio.chapters.some((chapter) => chapter.chapter_slug === chapterSlug)) return current;
+      const next = { ...current, activeChapterSlug: chapterSlug };
+      if (userId) writePlanningPortfolioState(userId, next);
+      return next;
+    });
+  }, [userId]);
+
+  const createPortfolio = useCallback(async (signal?: AbortSignal) => {
     if (!userId || authBusy || generating || generationInFlightRef.current) return null;
-    if (!selectedChapter || !scope) {
-      setError("Choose your class, subject, chapter, and chapter proficiency before generating the learning roadmap.");
+    if (!selectedChapters.length || scopes.length !== selectedChapters.length) {
+      setError("Choose at least one chapter and tell AgentifyAI how well you know each one.");
       return null;
     }
     const generationId = generationRef.current + 1;
@@ -353,35 +374,23 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     setGenerating(true);
     setError("");
     try {
-      const roadmap = await generatePlanningRoadmap(
+      const nextPortfolio = await generatePlanningPortfolio(
         { userId, getAuthHeaders },
-        scope,
+        scopes,
         signal,
       );
-      if (
-        signal?.aborted
-        || generationId !== generationRef.current
-        || requestInput !== currentInputRef.current
-      ) return null;
-      const plan: PlanningPlan = {
-        roadmap,
-        scope,
-      };
-      if (!isPlanningPlanSupported(plan, catalogChapters)) {
+      if (signal?.aborted || generationId !== generationRef.current || requestInput !== currentInputRef.current) return null;
+      if (!portfolioMatchesCatalog(nextPortfolio, catalogChapters)) {
         setError("The planner returned a chapter that is not available in Planning yet. Please try again.");
         return null;
       }
-      setActivePlan(plan);
+      const state = writePlanningPortfolio(userId, nextPortfolio);
+      setPortfolioState(state);
       lastRefreshAtRef.current = Date.now();
       setStaleNotice("");
-      writeActivePlanningPlan(userId, plan);
-      return plan;
+      return nextPortfolio;
     } catch (requestError) {
-      if (
-        signal?.aborted
-        || generationId !== generationRef.current
-        || requestInput !== currentInputRef.current
-      ) return null;
+      if (signal?.aborted || generationId !== generationRef.current || requestInput !== currentInputRef.current) return null;
       setError(planningErrorMessage(requestError));
       return null;
     } finally {
@@ -390,19 +399,24 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
         setGenerating(false);
       }
     }
-  }, [authBusy, catalogChapters, generating, getAuthHeaders, scope, selectedChapter, userId]);
+  }, [authBusy, catalogChapters, generating, getAuthHeaders, scopes, selectedChapters.length, userId]);
 
   const refreshActivePlan = useCallback(async (options?: { force?: boolean }) => {
-    if (
-      !activePlan
-      || !userId
-      || authBusy
-      || !catalogLoaded
-      || refreshInFlightRef.current
-      || !isPlanningPlanSupported(activePlan, catalogChapters)
-    ) return;
+    if (!portfolioState || !userId || authBusy || !catalogLoaded || refreshInFlightRef.current) return;
+    if (!portfolioMatchesCatalog(portfolioState.portfolio, catalogChapters)) return;
     if (!options?.force && Date.now() - lastRefreshAtRef.current < 30_000) return;
 
+    const refreshScopes: PlanningScope[] = portfolioState.portfolio.chapters.map((chapter) => ({
+      chapter: chapter.chapter_slug,
+      chapterLabel: chapter.chapter,
+      subject: portfolioState.portfolio.subject,
+      classLevel: portfolioState.portfolio.class_level,
+      chapterProficiency: chapter.chapter_proficiency,
+      studyTimeToday: portfolioState.portfolio.study_time_today ?? "",
+      ...(portfolioState.portfolio.session_duration_minutes
+        ? { sessionDurationMinutes: portfolioState.portfolio.session_duration_minutes }
+        : {}),
+    }));
     const refreshId = refreshIdRef.current + 1;
     refreshIdRef.current = refreshId;
     refreshInFlightRef.current = true;
@@ -410,26 +424,21 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     refreshAbortRef.current?.abort();
     const controller = new AbortController();
     refreshAbortRef.current = controller;
-    const savedScope = activePlan.scope;
     setRefreshingPlan(true);
     setRefreshNotice("");
     try {
-      const roadmap = await generatePlanningRoadmap(
+      const refreshed = await generatePlanningPortfolio(
         { userId, getAuthHeaders },
-        savedScope,
+        refreshScopes,
         controller.signal,
       );
-      const refreshedPlan: PlanningPlan = { roadmap, scope: savedScope };
-      if (
-        controller.signal.aborted
-        || refreshId !== refreshIdRef.current
-      ) return;
-      if (!isPlanningPlanSupported(refreshedPlan, catalogChapters)) {
+      if (controller.signal.aborted || refreshId !== refreshIdRef.current) return;
+      if (!portfolioMatchesCatalog(refreshed, catalogChapters)) {
         setRefreshNotice("Your saved roadmap is still available, but its latest progress could not be verified. Try again.");
         return;
       }
-      setActivePlan(refreshedPlan);
-      writeActivePlanningPlan(userId, refreshedPlan);
+      const state = writePlanningPortfolio(userId, refreshed, portfolioState.activeChapterSlug);
+      setPortfolioState(state);
       setRefreshNotice("");
     } catch (refreshError) {
       if (controller.signal.aborted || refreshId !== refreshIdRef.current) return;
@@ -441,7 +450,7 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
         setRefreshingPlan(false);
       }
     }
-  }, [activePlan, authBusy, catalogChapters, catalogLoaded, getAuthHeaders, userId]);
+  }, [authBusy, catalogChapters, catalogLoaded, getAuthHeaders, portfolioState, userId]);
 
   useEffect(() => () => {
     refreshAbortRef.current?.abort();
@@ -457,11 +466,10 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     chapters,
     catalogSettled,
     catalogNotice,
-    selectedChapter,
-    scope,
-    activePlan: activePlan && isPlanningPlanSupported(activePlan, supportCatalog)
-      ? activePlan
-      : null,
+    selectedChapters,
+    scopes,
+    portfolio,
+    activePlan,
     generating,
     refreshingPlan,
     refreshNotice,
@@ -469,11 +477,12 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     staleNotice,
     setClassLevel,
     setSubject,
-    setChapter,
+    setChapterSelected,
     setChapterProficiency,
     setStudyTimeToday,
+    selectActiveChapter,
     retryCatalog: () => setCatalogReload((value) => value + 1),
-    createPlan,
+    createPortfolio,
     refreshActivePlan,
     clearError: () => setError(""),
   }), [
@@ -483,24 +492,25 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     catalogSettled,
     chapters,
     classOptions,
-    createPlan,
+    createPortfolio,
     draft,
     error,
     generating,
     hydrated,
+    portfolio,
     refreshingPlan,
     refreshNotice,
     refreshActivePlan,
-    scope,
-    selectedChapter,
-    setClassLevel,
-    setChapter,
-    setSubject,
+    scopes,
+    selectedChapters,
+    selectActiveChapter,
     setChapterProficiency,
+    setChapterSelected,
+    setClassLevel,
     setStudyTimeToday,
+    setSubject,
     staleNotice,
     subjectOptions,
-    supportCatalog,
     userId,
   ]);
 
