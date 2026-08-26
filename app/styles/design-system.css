@@ -25,14 +25,14 @@
     --ds-accent-teal-strong: #14b8a6;
     --ds-accent-teal-soft: rgba(20, 184, 166, 0.12);
     --ds-accent-gold: #f2b84b;
-    --ds-accent-gold-strong: #b7791f;
+    --ds-accent-gold-strong: #8a530e;
     --ds-accent-gold-soft: rgba(242, 184, 75, 0.16);
 
-    --ds-success: #0f8f82;
+    --ds-success: #0b746a;
     --ds-success-soft: rgba(15, 143, 130, 0.12);
-    --ds-warning: #b7791f;
+    --ds-warning: #8a530e;
     --ds-warning-soft: rgba(242, 184, 75, 0.16);
-    --ds-danger: #d94a57;
+    --ds-danger: #b42332;
     --ds-danger-soft: rgba(217, 74, 87, 0.12);
     --ds-info: #0e7490;
     --ds-info-soft: rgba(14, 116, 144, 0.12);

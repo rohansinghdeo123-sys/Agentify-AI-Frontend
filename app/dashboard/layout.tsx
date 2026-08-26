@@ -18,7 +18,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     refreshProfile,
     loading,
     sessionExpired,
-    isAdmin,
+    isFounderAdmin,
     logout,
   } = useAuth();
   const router = useRouter();
@@ -41,7 +41,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }, [accountProfile, authError, authReady, profileError, router, sessionExpired, user]);
 
   useEffect(() => {
-    if (!authReady || !user || !isAdmin) return;
+    if (!authReady || !user || !isFounderAdmin) return;
 
     const handler = (event: KeyboardEvent) => {
       if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "a") {
@@ -52,7 +52,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [authReady, isAdmin, router, user]);
+  }, [authReady, isFounderAdmin, router, user]);
 
   if (!authReady) {
     return (
@@ -146,14 +146,18 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   if (!accountProfile.onboarding_completed) return null;
 
   if (isAdminRoute) {
-    return <div className="min-h-[100dvh] bg-[#050812]">{children}</div>;
+    return (
+      <div className="min-h-[100dvh] bg-[var(--agentify-page-bg)] text-[var(--agentify-primary-text)]">
+        {children}
+      </div>
+    );
   }
 
   return (
     <AppShell
       displayName={displayName}
       classLevel={classLevel}
-      isAdmin={isAdmin}
+      canOpenAdminConsole={isFounderAdmin}
       onLogout={logout}
     >
       {children}

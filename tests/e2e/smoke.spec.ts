@@ -74,7 +74,11 @@ test.describe("public routes", () => {
     test(`${route.path} renders on desktop and mobile without layout overflow`, async ({ page }) => {
       await gotoAppRoute(page, route.path);
 
-      await expect(page.getByRole("heading", { name: route.heading })).toBeVisible();
+      if (route.path === "/login") {
+        await expectLoginReady(page);
+      } else {
+        await expect(page.getByRole("heading", { name: route.heading })).toBeVisible();
+      }
       await expectNoHorizontalOverflow(page);
     });
   }

@@ -13,10 +13,12 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Founder Admin Console
 
-The founder-only Admin Console lives at `/dashboard/internal/admin`. Set
-`NEXT_PUBLIC_FOUNDER_ADMIN_EMAILS` to the approved Rohan/Amit emails in
-production. If that value is omitted, the frontend falls back to
-`NEXT_PUBLIC_ADMIN_EMAILS`.
+The founder-only Admin Console lives at `/dashboard/internal/admin`. The
+authenticated backend `/admin/me` response is the production source of truth;
+configure the backend founder/admin allow-list or verified Firebase custom
+claims there. `NEXT_PUBLIC_FOUNDER_ADMIN_EMAILS` and
+`NEXT_PUBLIC_ADMIN_EMAILS` are optional client fallbacks only and must never be
+treated as the security boundary.
 
 ## Firebase Auth Branding
 

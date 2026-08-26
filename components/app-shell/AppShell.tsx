@@ -12,13 +12,13 @@ export default function AppShell({
   children,
   displayName,
   classLevel,
-  isAdmin,
+  canOpenAdminConsole,
   onLogout,
 }: {
   children: ReactNode;
   displayName: string;
   classLevel: string;
-  isAdmin: boolean;
+  canOpenAdminConsole: boolean;
   onLogout: () => Promise<void>;
 }) {
   const pathname = usePathname();
@@ -65,7 +65,7 @@ export default function AppShell({
             <UserMenu
               displayName={displayName}
               classLevel={classLevel}
-              isAdmin={isAdmin}
+              canOpenAdminConsole={canOpenAdminConsole}
               onLogout={onLogout}
             />
           </div>
@@ -87,7 +87,7 @@ export default function AppShell({
               compact
               displayName={displayName}
               classLevel={classLevel}
-              isAdmin={isAdmin}
+              canOpenAdminConsole={canOpenAdminConsole}
               onLogout={onLogout}
             />
           </div>

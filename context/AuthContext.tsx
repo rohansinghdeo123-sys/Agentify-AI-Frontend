@@ -44,6 +44,12 @@ import {
 
 type AuthRole = "admin" | "user";
 
+type BackendAdminAccess = {
+  role: "admin";
+  founder: boolean;
+  verified: boolean;
+};
+
 type AuthProfile = {
   uid: string;
   role: AuthRole;
@@ -63,6 +69,7 @@ interface AuthContextType {
   userId: string;
   role: AuthRole;
   isAdmin: boolean;
+  isFounderAdmin: boolean;
   authError: string;
   authLoading: boolean;
   loading: boolean;
@@ -88,6 +95,7 @@ const AuthContext = createContext<AuthContextType>({
   userId: "",
   role: "user",
   isAdmin: false,
+  isFounderAdmin: false,
   authError: "",
   authLoading: true,
   loading: true,
@@ -139,11 +147,24 @@ function hasAdminClaim(claims: Record<string, unknown>) {
   return Array.isArray(roles) && roles.includes("admin");
 }
 
-function isAdminUser(user: User | null, claims: Record<string, unknown>) {
+function hasFounderClaim(claims: Record<string, unknown>) {
+  if (claims.founder === true || claims.founderAdmin === true) return true;
+  const roles = claims.roles;
+  return Array.isArray(roles) && roles.includes("founder");
+}
+
+export function isAdminUser(user: User | null, claims: Record<string, unknown>) {
   if (!user) return false;
   if (hasAdminClaim(claims)) return true;
 
-  const adminEmails = parseEnvList(process.env.NEXT_PUBLIC_ADMIN_EMAILS);
+  // Founder accounts are admins by definition. Keep the general and founder
+  // allow-lists additive so deployments that follow the documented
+  // NEXT_PUBLIC_FOUNDER_ADMIN_EMAILS-only setup can still reveal and open the
+  // founder console.
+  const adminEmails = [
+    ...parseEnvList(process.env.NEXT_PUBLIC_ADMIN_EMAILS),
+    ...parseEnvList(process.env.NEXT_PUBLIC_FOUNDER_ADMIN_EMAILS),
+  ];
   const adminUids = parseEnvList(process.env.NEXT_PUBLIC_ADMIN_UIDS);
   const adminPhones = parseEnvList(process.env.NEXT_PUBLIC_ADMIN_PHONES);
 
@@ -156,6 +177,29 @@ function isAdminUser(user: User | null, claims: Record<string, unknown>) {
     adminUids.includes(uid) ||
     adminPhones.includes(phone)
   );
+}
+
+export function isFounderUser(user: User | null, claims: Record<string, unknown>) {
+  if (!user) return false;
+  if (hasFounderClaim(claims)) return true;
+
+  const founderEmails = parseEnvList(process.env.NEXT_PUBLIC_FOUNDER_ADMIN_EMAILS);
+  return founderEmails.includes(user.email?.trim().toLowerCase() ?? "");
+}
+
+export function resolveAdminAuthorization(
+  user: User | null,
+  claims: Record<string, unknown>,
+  backendAccess: BackendAdminAccess | null,
+) {
+  const backendVerified = backendAccess?.verified === true;
+  const isFounderAdmin =
+    (backendVerified && backendAccess?.founder === true) || isFounderUser(user, claims);
+  const isAdmin =
+    (backendVerified && backendAccess?.role === "admin") ||
+    isFounderAdmin ||
+    isAdminUser(user, claims);
+  return { isAdmin, isFounderAdmin };
 }
 
 function createGoogleProvider() {
@@ -226,6 +270,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profileError, setProfileError] = useState("");
   const [claimsLoading, setClaimsLoading] = useState(true);
   const [claims, setClaims] = useState<Record<string, unknown>>({});
+  const [adminAccessLoading, setAdminAccessLoading] = useState(true);
+  const [backendAdminAccess, setBackendAdminAccess] = useState<BackendAdminAccess | null>(null);
 
   const authRef = useRef<Auth | null>(null);
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
@@ -314,6 +360,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const loadAdminAccess = useCallback(
+    async (currentUser: User) => {
+      setAdminAccessLoading(true);
+      setBackendAdminAccess(null);
+      try {
+        const token = await currentUser.getIdToken();
+        const access = await apiJson<BackendAdminAccess>(`${backendURL}/admin/me`, {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          forceFresh: true,
+          retries: 1,
+          timeoutMs: 15000,
+        });
+
+        if (authRef.current?.currentUser?.uid === currentUser.uid) {
+          setBackendAdminAccess(access);
+        }
+      } catch {
+        // A 404 means a normal learner; a temporary backend failure falls back
+        // to verified Firebase claims and the public emergency allow-list.
+        if (authRef.current?.currentUser?.uid === currentUser.uid) {
+          setBackendAdminAccess(null);
+        }
+      } finally {
+        if (authRef.current?.currentUser?.uid === currentUser.uid) {
+          setAdminAccessLoading(false);
+        }
+      }
+    },
+    [backendURL],
+  );
+
   const loginWithGoogle = useCallback(async () => {
     const authClient = requireAuthClient();
     try {
@@ -381,6 +461,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     manualSignOutRef.current = true;
     resetRecaptcha();
     setAccountProfile(null);
+    setBackendAdminAccess(null);
+    setAdminAccessLoading(false);
     setProfileError("");
     setSessionExpired(false);
     await signOut(requireAuthClient());
@@ -457,6 +539,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthLoading(false);
       setProfileLoading(false);
       setClaimsLoading(false);
+      setAdminAccessLoading(false);
       return;
     }
 
@@ -474,24 +557,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfileLoading(false);
         setClaims({});
         setClaimsLoading(false);
+        setBackendAdminAccess(null);
+        setAdminAccessLoading(false);
         return;
       }
 
       hasAuthenticatedRef.current = true;
       manualSignOutRef.current = false;
       setSessionExpired(false);
+      setClaims({});
+      setBackendAdminAccess(null);
+      setClaimsLoading(true);
+      setAdminAccessLoading(true);
       primeBackend(getPublicBackendUrl());
       await Promise.all([refreshClaims(), loadProfile(currentUser)]);
+      await loadAdminAccess(currentUser);
     });
 
     return () => {
       unsubscribe();
     };
-  }, [loadProfile, refreshClaims]);
+  }, [loadAdminAccess, loadProfile, refreshClaims]);
 
-  const isAdmin = useMemo(() => isAdminUser(user, claims), [user, claims]);
+  const { isAdmin, isFounderAdmin } = useMemo(
+    () => resolveAdminAuthorization(user, claims, backendAdminAccess),
+    [backendAdminAccess, claims, user],
+  );
   const role: AuthRole = isAdmin ? "admin" : "user";
   const loading = !authError && (authLoading || profileLoading);
+  const authorizationLoading = claimsLoading || adminAccessLoading;
 
   const profile = useMemo<AuthProfile | null>(() => {
     if (!user) return null;
@@ -517,11 +611,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       userId: user?.uid ?? "",
       role,
       isAdmin,
+      isFounderAdmin,
       authError,
       authLoading,
       loading,
       sessionExpired,
-      claimsLoading,
+      claimsLoading: authorizationLoading,
       claims,
       profileError,
       loginWithGoogle,
@@ -540,11 +635,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       accountProfile,
       role,
       isAdmin,
+      isFounderAdmin,
       authError,
       authLoading,
       loading,
       sessionExpired,
-      claimsLoading,
+      authorizationLoading,
       claims,
       profileError,
       loginWithGoogle,

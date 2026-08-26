@@ -19,13 +19,13 @@ export default function UserMenu({
   compact = false,
   displayName,
   classLevel,
-  isAdmin,
+  canOpenAdminConsole,
   onLogout,
 }: {
   compact?: boolean;
   displayName: string;
   classLevel: string;
-  isAdmin: boolean;
+  canOpenAdminConsole: boolean;
   onLogout: () => Promise<void>;
 }) {
   const detailsRef = useRef<HTMLDetailsElement>(null);
@@ -79,7 +79,7 @@ export default function UserMenu({
           <BackendStatus />
         </div>
 
-        {isAdmin ? (
+        {canOpenAdminConsole ? (
           <Link
             href="/dashboard/internal/admin"
             className="market-user-action"

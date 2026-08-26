@@ -33,7 +33,7 @@ function stageReached(chapter: ReportChapter): number {
 function Field({ label, value, tone }: { label: string; value: React.ReactNode; tone?: string }) {
   return (
     <div className="rounded-lg border border-[color:var(--agentify-border)] bg-[color:var(--agentify-hover-bg)] px-2.5 py-1.5">
-      <p className={cn("text-[9px] font-bold uppercase tracking-[0.12em]", MUTED)}>{label}</p>
+      <p className={cn("text-xs font-bold uppercase tracking-[0.1em]", MUTED)}>{label}</p>
       <p className={cn("mt-0.5 text-xs font-semibold", NUM, tone || TEXT)}>{value}</p>
     </div>
   );
@@ -51,21 +51,21 @@ function ChapterDetail({ chapter }: { chapter: ReportChapter }) {
           return (
             <span key={stage} className="flex items-center">
               <span
-                className="rounded-md border px-2 py-0.5 text-[10px] font-semibold"
+                className="rounded-md border px-2 py-1 text-xs font-semibold"
                 style={done
-                  ? { borderColor: "#14B8A655", background: "#14B8A614", color: "#0F8F82" }
+                  ? { borderColor: "var(--ds-success)", background: "var(--ds-success-soft)", color: "var(--ds-success)" }
                   : held
-                    ? { borderColor: "#F2B84B55", background: "#F2B84B14", color: "#B7791F" }
+                    ? { borderColor: "var(--ds-warning)", background: "var(--ds-warning-soft)", color: "var(--ds-warning)" }
                     : { borderColor: "var(--agentify-border)", color: "var(--agentify-muted-text)" }}
               >
                 {stage}
               </span>
-              {i < STAGES.length - 1 ? <span className="mx-0.5 text-[10px]" style={{ color: done ? "#14B8A6" : "var(--agentify-muted-text)" }}>›</span> : null}
+              {i < STAGES.length - 1 ? <span className="mx-0.5 text-xs" style={{ color: done ? "var(--ds-success)" : "var(--agentify-muted-text)" }}>›</span> : null}
             </span>
           );
         })}
         {chapter.status === "needs_review" ? (
-          <span className="ml-1 rounded-full border border-[#F2B84B]/35 bg-[#F2B84B]/12 px-2 py-0.5 text-[10px] font-bold text-[#B7791F]">held for review</span>
+          <span className="ml-1 rounded-full border border-[var(--ds-warning)] bg-[var(--ds-warning-soft)] px-2 py-1 text-xs font-bold text-[var(--ds-warning)]">held for review</span>
         ) : null}
       </div>
 
@@ -79,7 +79,7 @@ function ChapterDetail({ chapter }: { chapter: ReportChapter }) {
         <Field label="Memory" value={formatBytes(chapter.memory_bytes)} />
         <Field label="Tokens" value={formatCompact(chapter.chunk_tokens)} />
         <Field label="Vectors" value={chapter.embedding_dims ? `${chapter.embedding_dims}d` : "—"} />
-        <Field label="Ready" value={chapter.ready_for_approval ? "yes" : "no"} tone={chapter.ready_for_approval ? "text-[#0F8F82]" : "text-[#B7791F]"} />
+        <Field label="Ready" value={chapter.ready_for_approval ? "yes" : "no"} tone={chapter.ready_for_approval ? "text-[var(--ds-success)]" : "text-[var(--ds-warning)]"} />
         <Field label="Version" value={chapter.version || "—"} />
         <Field label="Published" value={chapter.published_at ? formatTime(chapter.published_at) : "—"} />
         <Field label="Updated" value={chapter.updated_at ? formatTime(chapter.updated_at) : "—"} />
@@ -88,12 +88,12 @@ function ChapterDetail({ chapter }: { chapter: ReportChapter }) {
       {/* Why it needs review */}
       {chapter.missing_source_pages.length || (chapter.issues && chapter.issues.length) ? (
         <div className={cn(SOFT_PANEL, "p-2.5")}>
-          <p className={cn("text-[10px] font-bold uppercase tracking-[0.12em]", "text-[#B7791F]")}>Review notes</p>
+          <p className={cn("text-xs font-bold uppercase tracking-[0.1em]", "text-[var(--ds-warning)]")}>Review notes</p>
           {chapter.missing_source_pages.length ? (
-            <p className={cn("mt-1 text-[11px]", MUTED)}>Uncovered pages: <span className={NUM}>{chapter.missing_source_pages.join(", ")}</span></p>
+            <p className={cn("mt-1 text-xs", MUTED)}>Uncovered pages: <span className={NUM}>{chapter.missing_source_pages.join(", ")}</span></p>
           ) : null}
           {(chapter.issues || []).slice(0, 6).map((issue, i) => (
-            <p key={i} className={cn("mt-1 text-[11px]", issue.severity === "error" ? "text-[#D94A57]" : MUTED)}>
+            <p key={i} className={cn("mt-1 text-xs", issue.severity === "error" ? "text-[var(--ds-danger)]" : MUTED)}>
               • {issue.message}{issue.concept_id ? <span className="opacity-70"> ({issue.concept_id})</span> : null}
             </p>
           ))}
@@ -104,22 +104,22 @@ function ChapterDetail({ chapter }: { chapter: ReportChapter }) {
 }
 
 function errTone(rate: number): string {
-  if (rate <= 0) return "text-[#0F8F82]";
-  if (rate < 0.15) return "text-[#B7791F]";
-  return "text-[#D94A57]";
+  if (rate <= 0) return "text-[var(--ds-success)]";
+  if (rate < 0.15) return "text-[var(--ds-warning)]";
+  return "text-[var(--ds-danger)]";
 }
 function covTone(score: number): string {
-  if (score >= 0.7) return "text-[#0F8F82]";
-  if (score >= 0.4) return "text-[#B7791F]";
-  return "text-[#D94A57]";
+  if (score >= 0.7) return "text-[var(--ds-success)]";
+  if (score >= 0.4) return "text-[var(--ds-warning)]";
+  return "text-[var(--ds-danger)]";
 }
 
 function Kpi({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
   return (
     <div className="rounded-xl border border-[color:var(--agentify-border)] bg-[color:var(--agentify-hover-bg)] px-3 py-2.5">
-      <p className={cn("text-[9px] font-bold uppercase tracking-[0.16em]", MUTED)}>{label}</p>
+      <p className={cn("text-xs font-bold uppercase tracking-[0.12em]", MUTED)}>{label}</p>
       <p className={cn("mt-1 text-lg font-semibold tracking-tight", NUM, tone || TEXT)}>{value}</p>
-      {sub ? <p className={cn("mt-0.5 text-[10px]", MUTED)}>{sub}</p> : null}
+      {sub ? <p className={cn("mt-0.5 text-xs", MUTED)}>{sub}</p> : null}
     </div>
   );
 }
@@ -131,9 +131,9 @@ function SubtopicTable({ chapter }: { chapter: ReportChapter }) {
   const sorted = [...chapter.concepts].sort((a, b) => b.chars - a.chars);
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[640px] border-collapse text-left text-[11px]">
+      <table className="w-full min-w-[640px] border-collapse text-left text-xs">
         <thead>
-          <tr className={cn("text-[9px] font-bold uppercase tracking-[0.12em]", MUTED)}>
+          <tr className={cn("text-xs font-bold uppercase tracking-[0.1em]", MUTED)}>
             <th className="px-2 py-1.5">Subtopic</th>
             <th className="px-2 py-1.5">Difficulty</th>
             <th className="px-2 py-1.5">Importance</th>
@@ -154,13 +154,13 @@ function SubtopicTable({ chapter }: { chapter: ReportChapter }) {
               <td className={cn("px-2 py-1.5 text-right", NUM, TEXT)}>{formatBytes(c.chars)}</td>
               <td className={cn("px-2 py-1.5 text-right", NUM, MUTED)}>{formatCompact(c.tokens)}</td>
               <td className={cn("px-2 py-1.5", NUM, MUTED)}>{c.source_pages.length ? c.source_pages.join(",") : "—"}</td>
-              <td className={cn("px-2 py-1.5 text-right", NUM, c.validation_issues ? "text-[#D94A57]" : MUTED)}>{c.validation_issues}</td>
+              <td className={cn("px-2 py-1.5 text-right", NUM, c.validation_issues ? "text-[var(--ds-danger)]" : MUTED)}>{c.validation_issues}</td>
             </tr>
           ))}
         </tbody>
       </table>
       {chapter.concepts_truncated ? (
-        <p className={cn("mt-2 px-2 text-[10px]", MUTED)}>Showing {chapter.concepts.length} of {chapter.concept_count} subtopics.</p>
+        <p className={cn("mt-2 px-2 text-xs", MUTED)}>Showing {chapter.concepts.length} of {chapter.concept_count} subtopics.</p>
       ) : null}
     </div>
   );
@@ -177,12 +177,12 @@ function ChapterRow({ chapter, maxMemory }: { chapter: ReportChapter; maxMemory:
         onClick={() => setOpen((v) => !v)}
       >
         <td className="px-2 py-2">
-          <span className={cn("inline-block w-3 text-[10px]", MUTED)}>{open ? "▾" : "▸"}</span>
-          <span className={cn("text-[11px]", MUTED)}>{chapter.subject || "—"}</span>
+          <span className={cn("inline-block w-3 text-xs", MUTED)}>{open ? "▾" : "▸"}</span>
+          <span className={cn("text-xs", MUTED)}>{chapter.subject || "—"}</span>
         </td>
         <td className={cn("px-2 py-2 font-medium", TEXT)}>
           <span className="line-clamp-1">{chapter.chapter_name || `Chapter ${chapter.chapter_number ?? ""}`}</span>
-          <span className={cn("text-[10px]", MUTED)}>Class {chapter.class_level || "—"}</span>
+          <span className={cn("text-xs", MUTED)}>Class {chapter.class_level || "—"}</span>
         </td>
         <td className="px-2 py-2"><HealthBadge state={classifyHealth(chapter.status)} label={chapter.status} /></td>
         <td className={cn("px-2 py-2 text-right", NUM, MUTED)}>{chapter.page_count}</td>
@@ -191,10 +191,10 @@ function ChapterRow({ chapter, maxMemory }: { chapter: ReportChapter; maxMemory:
         <td className="px-2 py-2 text-right">
           <span className={cn(NUM, TEXT)}>{formatBytes(chapter.memory_bytes)}</span>
           <span className="mt-1 block h-1 overflow-hidden rounded-full bg-[color:var(--agentify-border)]">
-            <span className="block h-full rounded-full bg-[#14B8A6]" style={{ width: `${Math.max(3, memShare)}%` }} />
+            <span className="block h-full rounded-full bg-[var(--ds-accent-teal)]" style={{ width: `${Math.max(3, memShare)}%` }} />
           </span>
         </td>
-        <td className={cn("px-2 py-2 text-right", NUM, embPct >= 99 ? "text-[#0F8F82]" : MUTED)}>{Math.round(embPct)}%</td>
+        <td className={cn("px-2 py-2 text-right", NUM, embPct >= 99 ? "text-[var(--ds-success)]" : MUTED)}>{Math.round(embPct)}%</td>
         <td className={cn("px-2 py-2 text-right", NUM, covTone(chapter.coverage_score))}>{formatPercent(chapter.coverage_score)}</td>
         <td className={cn("px-2 py-2 text-right", NUM, errTone(chapter.error_rate))}>{formatPercent(chapter.error_rate)}</td>
       </tr>
@@ -262,11 +262,11 @@ export function DataIngestionReport({ report }: { report: ContentReport | null }
         </div>
         <div className="flex items-center gap-2">
           {needsReview > 0 ? (
-            <span className="rounded-full border border-[#F2B84B]/35 bg-[#F2B84B]/12 px-2.5 py-1 text-[11px] font-bold text-[#B7791F]">
+            <span className="rounded-full border border-[var(--ds-warning)] bg-[var(--ds-warning-soft)] px-2.5 py-1 text-xs font-bold text-[var(--ds-warning)]">
               {needsReview} need review
             </span>
           ) : (
-            <span className="rounded-full border border-[#14B8A6]/30 bg-[#14B8A6]/10 px-2.5 py-1 text-[11px] font-bold text-[#0F8F82]">all published</span>
+            <span className="rounded-full border border-[var(--ds-success)] bg-[var(--ds-success-soft)] px-2.5 py-1 text-xs font-bold text-[var(--ds-success)]">all published</span>
           )}
           <HealthBadge state={report.embeddings_enabled ? "healthy" : "warning"} label={report.embeddings_enabled ? "Semantic" : "Lexical"} />
         </div>
@@ -274,10 +274,10 @@ export function DataIngestionReport({ report }: { report: ContentReport | null }
 
       {/* KPI strip */}
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-        <Kpi label="Total memory" value={formatBytes(t.memory_bytes)} sub={`${formatBytes(t.embedding_bytes)} vectors`} tone="text-[#0F8F82]" />
+        <Kpi label="Total memory" value={formatBytes(t.memory_bytes)} sub={`${formatBytes(t.embedding_bytes)} vectors`} tone="text-[var(--ds-success)]" />
         <Kpi label="Indexed text" value={formatBytes(t.chunk_chars)} sub={`${formatCompact(t.chunks)} chunks`} />
         <Kpi label="Tokens" value={formatCompact(t.tokens)} sub="estimated" />
-        <Kpi label="Embedded" value={`${Math.round(embPct)}%`} sub={`${formatCompact(t.embedded_chunks)}/${formatCompact(t.chunks)}`} tone={embPct >= 99 ? "text-[#0F8F82]" : undefined} />
+        <Kpi label="Embedded" value={`${Math.round(embPct)}%`} sub={`${formatCompact(t.embedded_chunks)}/${formatCompact(t.chunks)}`} tone={embPct >= 99 ? "text-[var(--ds-success)]" : undefined} />
         <Kpi label="Subtopics" value={formatCompact(t.concepts)} sub={`${t.chapters} chapters`} />
         <Kpi label="Error rate" value={formatPercent(t.error_rate)} sub={`${t.concepts_with_issues} flagged`} tone={errTone(t.error_rate)} />
       </div>
@@ -285,7 +285,7 @@ export function DataIngestionReport({ report }: { report: ContentReport | null }
       {/* Memory by subject */}
       {subjectMemory.length ? (
         <div className="mt-4">
-          <p className={cn("mb-2 text-[10px] font-bold uppercase tracking-[0.16em]", MUTED)}>Memory by subject</p>
+          <p className={cn("mb-2 text-xs font-bold uppercase tracking-[0.12em]", MUTED)}>Memory by subject</p>
           <div className="space-y-1.5">
             {subjectMemory.map(([subject, bytes]) => (
               <div key={subject} className="flex items-center gap-3">
@@ -304,7 +304,7 @@ export function DataIngestionReport({ report }: { report: ContentReport | null }
       <div className="mt-5 overflow-x-auto">
         <table className="w-full min-w-[820px] border-collapse text-left text-xs">
           <thead>
-            <tr className={cn("text-[9px] font-bold uppercase tracking-[0.12em]", MUTED)}>
+            <tr className={cn("text-xs font-bold uppercase tracking-[0.1em]", MUTED)}>
               <th className="px-2 py-2">Subject</th>
               <th className="px-2 py-2">Chapter</th>
               <th className="px-2 py-2">Status</th>
@@ -324,7 +324,7 @@ export function DataIngestionReport({ report }: { report: ContentReport | null }
           </tbody>
         </table>
       </div>
-      <p className={cn("mt-3 text-[10px]", MUTED)}>Click a chapter to expand its subtopics (sorted by memory). Memory = indexed chunk text + embedding vectors.</p>
+      <p className={cn("mt-3 text-xs", MUTED)}>Click a chapter to expand its subtopics (sorted by memory). Memory = indexed chunk text + embedding vectors.</p>
     </div>
   );
 }

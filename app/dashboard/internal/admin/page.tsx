@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { apiFetch, apiJson, ensureBackendReady } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import { AppIcon, ErrorState } from "@/components/ui/Polished";
+import ThemeToggle from "@/components/ThemeToggle";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -36,7 +37,7 @@ const NUM = "font-mono tabular-nums";
 // Flat terminal surfaces: thin border, no blur, no shadow, tight radius.
 const P = "rounded-lg border border-[color:var(--agentify-border)] bg-[color:var(--agentify-card-bg)]";
 const CELL = "border-[color:var(--agentify-border)]";
-const LABEL = "text-[9px] font-bold uppercase tracking-[0.16em] text-[color:var(--agentify-muted-text)]";
+const LABEL = "text-xs font-bold uppercase tracking-[0.12em] text-[color:var(--agentify-muted-text)]";
 
 const USAGE_METRICS: Array<{ key: string; label: string }> = [
   { key: "total_users", label: "Users" },
@@ -58,12 +59,6 @@ const QUALITY_ALERTS: Array<{ key: "hallucination_risk" | "missing_sources" | "f
   { key: "fallback_used", label: "fallbacks", state: "warning" },
 ];
 
-function parseEnvList(value?: string) {
-  return (value || "").split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
-}
-function founderEmails() {
-  return parseEnvList(process.env.NEXT_PUBLIC_FOUNDER_ADMIN_EMAILS || process.env.NEXT_PUBLIC_ADMIN_EMAILS);
-}
 function worstState(states: HealthState[]): HealthState {
   if (states.includes("error")) return "error";
   if (states.includes("warning")) return "warning";
@@ -102,9 +97,9 @@ function TermButton({ children, onClick, tone = "ghost" }: { children: React.Rea
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-semibold transition-colors",
+        "inline-flex min-h-11 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold transition-colors",
         tone === "gold"
-          ? "border-[#F2B84B]/40 bg-[#F2B84B]/10 text-[#F2B84B] hover:bg-[#F2B84B]/20"
+          ? "border-[var(--ds-warning)] bg-[var(--ds-warning-soft)] text-[var(--ds-warning)] hover:brightness-95"
           : cn(CELL, "border bg-transparent text-[color:var(--agentify-primary-text)] hover:bg-[color:var(--agentify-hover-bg)]"),
       )}
     >
@@ -119,7 +114,7 @@ function Zone({ label, meta, children, className }: { label: string; meta?: Reac
     <section className={cn(P, "min-w-0 overflow-hidden", className)}>
       <div className={cn("flex items-center justify-between gap-2 border-b px-3 py-1.5", CELL)}>
         <span className={LABEL}>{label}</span>
-        {meta ? <span className={cn("flex items-center gap-2 text-[10px]", MUTED, NUM)}>{meta}</span> : null}
+        {meta ? <span className={cn("flex items-center gap-2 text-xs", MUTED, NUM)}>{meta}</span> : null}
       </div>
       {children}
     </section>
@@ -131,7 +126,7 @@ function Th({ children, right }: { children: React.ReactNode; right?: boolean })
 }
 function Td({ children, right, mono, tone, className }: { children: React.ReactNode; right?: boolean; mono?: boolean; tone?: string; className?: string }) {
   return (
-    <td className={cn("px-2.5 py-1.5 whitespace-nowrap text-[11px]", right && "text-right", mono && NUM, tone || MUTED, className)}>
+    <td className={cn("px-2.5 py-2 whitespace-nowrap text-xs", right && "text-right", mono && NUM, tone || MUTED, className)}>
       {children}
     </td>
   );
@@ -160,7 +155,7 @@ function UnauthorizedState({ email }: { email: string }) {
       <div className={cn(P, "max-w-xl p-8 text-center")}>
         <HealthBadge state="error" label="Founder access only" />
         <h1 className={cn("mt-5 text-2xl font-semibold", TEXT)}>Admin Console is restricted</h1>
-        <p className={cn("mt-3 text-sm leading-6", MUTED)}>Signed in as {email || "an unknown account"}. This console only opens for approved founder emails.</p>
+        <p className={cn("mt-3 text-sm leading-6", MUTED)}>Signed in as {email || "an unknown account"}. This console only opens for an approved founder account.</p>
         <Link href="/dashboard" className={cn(P, "mt-6 inline-flex px-5 py-2.5 text-sm font-semibold", TEXT, "hover:bg-[color:var(--agentify-hover-bg)]")}>Return to dashboard</Link>
       </div>
     </main>
@@ -181,7 +176,7 @@ function VerifyingState() {
 }
 
 export default function FounderAdminConsolePage() {
-  const { user, profile, isAdmin, loading, claimsLoading, getAuthHeaders } = useAuth();
+  const { user, profile, isAdmin, isFounderAdmin, loading, claimsLoading, getAuthHeaders } = useAuth();
   const [data, setData] = useState<AdminConsolePayload | null>(null);
   const [report, setReport] = useState<ContentReport | null>(null);
   const [error, setError] = useState("");
@@ -191,9 +186,8 @@ export default function FounderAdminConsolePage() {
   const openedRef = useRef(false);
   const loadingRef = useRef(false);
 
-  const allowedEmails = useMemo(() => founderEmails(), []);
   const email = (profile?.email || user?.email || "").toLowerCase();
-  const founderAllowed = Boolean(isAdmin && email && allowedEmails.includes(email));
+  const founderAllowed = Boolean(isAdmin && isFounderAdmin);
 
   const adminGet = useCallback(async <T,>(path: string, timeoutMs: number): Promise<T> => {
     const headers = await getAuthHeaders();
@@ -309,22 +303,23 @@ export default function FounderAdminConsolePage() {
   const pendingChapters = Number(statusCounts.pending || 0) + Number(statusCounts.review || 0) + Number(statusCounts.extracted || 0);
 
   return (
-    <main id="main-content" className="relative min-h-[100svh]" data-theme="dark">
-      <div className="pointer-events-none fixed inset-0 -z-20 bg-[#060D18]" />
+    <main id="main-content" className="relative min-h-[100svh] bg-[var(--agentify-page-bg)] text-[var(--agentify-primary-text)]">
+      <div className="pointer-events-none fixed inset-0 -z-20 bg-[radial-gradient(circle_at_8%_0%,var(--ds-accent-teal-soft),transparent_32%),radial-gradient(circle_at_92%_4%,var(--ds-accent-gold-soft),transparent_30%),var(--agentify-page-bg)]" />
 
       <div className="flex w-full flex-col gap-2 px-2.5 pb-10 pt-2.5 sm:px-4 lg:px-5">
         {/* Command bar */}
         <header className={cn(P, "sticky top-2 z-20 flex flex-wrap items-center justify-between gap-2 px-3 py-2")}>
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-            <h1 className={cn("text-sm font-bold tracking-[0.18em]", TEXT)}>AGENTIFY<span className="text-[#14B8A6]">OPS</span></h1>
-            <span className={cn("rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em]", CELL, "text-[#F2B84B]")}>Founder</span>
-            <span className={cn("rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em]", CELL, MUTED, NUM)}>env {data?.environment || "dev"}</span>
-            <span className={cn("hidden text-[10px] sm:inline", MUTED, NUM)}>
+            <h1 className={cn("text-sm font-bold tracking-[0.18em]", TEXT)}>AGENTIFY<span className="text-[var(--ds-accent-teal)]">OPS</span></h1>
+            <span className={cn("rounded border px-2 py-1 text-xs font-bold uppercase tracking-[0.1em]", CELL, "text-[var(--ds-accent-gold-strong)]")}>Founder</span>
+            <span className={cn("rounded border px-2 py-1 text-xs uppercase tracking-[0.1em]", CELL, MUTED, NUM)}>env {data?.environment || "dev"}</span>
+            <span className={cn("hidden text-xs sm:inline", MUTED, NUM)}>
               synced {formatTime(header?.last_sync_time || data?.generated_at)}{refreshing ? " · syncing…" : ""}
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className={cn("inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-bold", HEALTH_STYLES[overallState].chip)}>
+            <ThemeToggle compact />
+            <span className={cn("inline-flex min-h-11 items-center gap-1.5 rounded-md border px-3 text-xs font-bold", HEALTH_STYLES[overallState].chip)}>
               <HealthDot state={overallState} pulse={overallState === "healthy"} />
               {data ? humanize(header?.system_status || overallState) : "Syncing"}
             </span>
@@ -342,7 +337,7 @@ export default function FounderAdminConsolePage() {
                 <span className="mt-0.5"><HealthDot state="warning" pulse /></span>
                 <div className="min-w-0">
                   <p className={cn("text-sm font-semibold", TEXT)}>Connecting to the backend…</p>
-                  <p className={cn("mt-1 truncate text-[11px]", MUTED)}>Calling <span className="font-mono">{API_BASE}/admin/console</span>{detail ? <> · <span className="text-[#D94A57]">{detail}</span></> : null}</p>
+                  <p className={cn("mt-1 truncate text-xs", MUTED)}>Calling <span className="font-mono">{API_BASE}/admin/console</span>{detail ? <> · <span className="text-[var(--ds-danger)]">{detail}</span></> : null}</p>
                 </div>
               </div>
             ) : null}
@@ -359,15 +354,15 @@ export default function FounderAdminConsolePage() {
                   <span key={c.label} className="inline-flex items-center gap-1.5">
                     <HealthDot state={c.state} pulse={c.state === "healthy"} />
                     <span className={LABEL}>{c.label}</span>
-                    <span className={cn("text-[10px] font-semibold", NUM, HEALTH_STYLES[c.state].text)}>{humanize(c.value || c.state)}</span>
+                    <span className={cn("text-xs font-semibold", NUM, HEALTH_STYLES[c.state].text)}>{humanize(c.value || c.state)}</span>
                   </span>
                 ))}
                 <span className="ml-auto flex flex-wrap items-center gap-1.5">
                   {alerts.length ? alerts.map((a) => (
-                    <span key={a.label} className={cn("inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-semibold", HEALTH_STYLES[a.state].chip, NUM)}>
+                    <span key={a.label} className={cn("inline-flex items-center gap-1 rounded border px-2 py-1 text-xs font-semibold", HEALTH_STYLES[a.state].chip, NUM)}>
                       <HealthDot state={a.state} /> {a.label}
                     </span>
-                  )) : <span className={cn("inline-flex items-center gap-1 text-[10px] text-[#0F8F82]", NUM)}><HealthDot state="healthy" /> no alerts</span>}
+                  )) : <span className={cn("inline-flex items-center gap-1 text-xs text-[var(--ds-success)]", NUM)}><HealthDot state="healthy" /> no alerts</span>}
                 </span>
               </div>
             </section>
@@ -402,7 +397,7 @@ export default function FounderAdminConsolePage() {
                             <Td>{s.class_level || "—"}</Td>
                             <Td right mono>{s.streak || 0}</Td>
                             <Td right mono>{formatCompact(s.xp)} · L{s.level}</Td>
-                            <Td right mono tone={s.accuracy >= 75 ? "text-[#0F8F82]" : s.accuracy >= 50 ? "text-[#B7791F]" : "text-[#D94A57]"}>{s.accuracy}%</Td>
+                            <Td right mono tone={s.accuracy >= 75 ? "text-[var(--ds-success)]" : s.accuracy >= 50 ? "text-[var(--ds-warning)]" : "text-[var(--ds-danger)]"}>{s.accuracy}%</Td>
                             <Td right mono>{formatCompact(s.total_questions)}</Td>
                             <Td right mono>{s.focus_score}</Td>
                             <Td>{s.last_active_date || "—"}</Td>
@@ -419,10 +414,10 @@ export default function FounderAdminConsolePage() {
                 <Zone label="Runtime" meta={model?.latency_ms ? <>{Math.round(model.latency_ms)}ms avg</> : undefined}>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2">
                     <span className={cn("text-xs font-semibold", NUM, TEXT)}>{model?.llm_provider || "provider"} / {model?.llm_model || "model"}</span>
-                    <span className={cn("text-[10px]", MUTED, NUM)}>RAG {model?.rag_index_version || "—"}</span>
-                    <span className={cn("text-[10px]", MUTED, NUM)}>emb {model?.embedding_model || "off"}</span>
-                    {model?.quality_score !== null && model?.quality_score !== undefined ? <span className={cn("text-[10px] text-[#0F8F82]", NUM)}>quality {formatPercent(model.quality_score)}</span> : null}
-                    {model?.grounded_answer_rate !== null && model?.grounded_answer_rate !== undefined ? <span className={cn("text-[10px] text-[#0F8F82]", NUM)}>grounded {formatPercent(model.grounded_answer_rate)}</span> : null}
+                    <span className={cn("text-xs", MUTED, NUM)}>RAG {model?.rag_index_version || "—"}</span>
+                    <span className={cn("text-xs", MUTED, NUM)}>emb {model?.embedding_model || "off"}</span>
+                    {model?.quality_score !== null && model?.quality_score !== undefined ? <span className={cn("text-xs text-[var(--ds-success)]", NUM)}>quality {formatPercent(model.quality_score)}</span> : null}
+                    {model?.grounded_answer_rate !== null && model?.grounded_answer_rate !== undefined ? <span className={cn("text-xs text-[var(--ds-success)]", NUM)}>grounded {formatPercent(model.grounded_answer_rate)}</span> : null}
                   </div>
                 </Zone>
 
@@ -443,7 +438,7 @@ export default function FounderAdminConsolePage() {
                               <tr key={a.agent_id} className={cn("border-b last:border-b-0 hover:bg-[color:var(--agentify-hover-bg)]", CELL)}>
                                 <Td tone={TEXT} className="font-medium"><span className="inline-flex items-center gap-1.5"><HealthDot state={state} />{a.display_name || a.agent_id}</span></Td>
                                 <Td right mono>{formatCompact(a.total_requests)}</Td>
-                                <Td right mono tone={a.total_errors ? "text-[#D94A57]" : undefined}>{a.total_errors || 0}</Td>
+                                <Td right mono tone={a.total_errors ? "text-[var(--ds-danger)]" : undefined}>{a.total_errors || 0}</Td>
                                 <Td right mono>{formatPercent(a.success_rate)}</Td>
                                 <Td right mono>{a.avg_latency_ms ? `${Math.round(a.avg_latency_ms)}ms` : "—"}</Td>
                                 <Td>{relativeTime(a.last_activity)}</Td>
@@ -462,10 +457,10 @@ export default function FounderAdminConsolePage() {
                     <ul className="divide-y divide-[color:var(--agentify-border)]">
                       {data.content.recent_jobs.slice(0, 6).map((j) => (
                         <li key={j.job_id} className="flex items-center justify-between gap-2 px-3 py-1.5">
-                          <span className={cn("min-w-0 truncate text-[11px] font-medium", TEXT)}>{humanize(j.job_type)}<span className={cn("ml-2", MUTED)}>{j.source_path.split(/[\\/]/).pop()}</span></span>
+                          <span className={cn("min-w-0 truncate text-xs font-medium", TEXT)}>{humanize(j.job_type)}<span className={cn("ml-2", MUTED)}>{j.source_path.split(/[\\/]/).pop()}</span></span>
                           <span className="flex shrink-0 items-center gap-2">
                             <HealthBadge state={classifyHealth(j.status)} label={j.status} />
-                            <span className={cn("text-[10px]", MUTED, NUM)}>{relativeTime(j.created_at)}</span>
+                            <span className={cn("text-xs", MUTED, NUM)}>{relativeTime(j.created_at)}</span>
                           </span>
                         </li>
                       ))}
@@ -491,12 +486,12 @@ export default function FounderAdminConsolePage() {
                 ].map((c) => (
                   <div key={c.label} className="px-3 py-2">
                     <p className={LABEL}>{c.label}</p>
-                    <p className={cn("mt-0.5 text-base font-semibold", NUM, c.label === "Failed" && c.value !== "0" ? "text-[#D94A57]" : TEXT)}>{c.value}</p>
+                    <p className={cn("mt-0.5 text-base font-semibold", NUM, c.label === "Failed" && c.value !== "0" ? "text-[var(--ds-danger)]" : TEXT)}>{c.value}</p>
                   </div>
                 ))}
               </div>
               <details className="group">
-                <summary className={cn("flex cursor-pointer items-center gap-2 px-3 py-2 text-[11px] font-semibold", MUTED, "hover:text-[color:var(--agentify-primary-text)]")}>
+                <summary className={cn("flex min-h-11 cursor-pointer items-center gap-2 px-3 py-2 text-xs font-semibold", MUTED, "hover:text-[color:var(--agentify-primary-text)]")}>
                   <span className="transition-transform group-open:rotate-90">▸</span> Full ingestion report — subjects, chapters, concepts, memory
                 </summary>
                 <div className="border-t border-[color:var(--agentify-border)] p-3">
@@ -513,12 +508,12 @@ export default function FounderAdminConsolePage() {
                     {data.traces.slice(0, 14).map((t) => (
                       <li key={t.id} className="flex items-center justify-between gap-3 px-3 py-1.5">
                         <div className="min-w-0">
-                          <p className={cn("truncate text-[11px] font-semibold", TEXT)}>{t.name}</p>
-                          <p className={cn("truncate text-[10px]", MUTED, NUM)}>{t.model || t.provider || t.trace_type} · {relativeTime(t.created_at)}{t.estimated_cost_usd ? ` · ${formatCost(t.estimated_cost_usd)}` : ""}</p>
+                          <p className={cn("truncate text-xs font-semibold", TEXT)}>{t.name}</p>
+                          <p className={cn("truncate text-xs", MUTED, NUM)}>{t.model || t.provider || t.trace_type} · {relativeTime(t.created_at)}{t.estimated_cost_usd ? ` · ${formatCost(t.estimated_cost_usd)}` : ""}</p>
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
                           <HealthDot state={classifyHealth(t.status)} />
-                          <span className={cn("text-[10px]", NUM, t.latency_ms >= 7000 ? "text-[#D94A57]" : MUTED)}>{t.latency_ms}ms</span>
+                          <span className={cn("text-xs", NUM, t.latency_ms >= 7000 ? "text-[var(--ds-danger)]" : MUTED)}>{t.latency_ms}ms</span>
                         </div>
                       </li>
                     ))}

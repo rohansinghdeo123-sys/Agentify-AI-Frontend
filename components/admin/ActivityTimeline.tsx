@@ -31,7 +31,7 @@ export function ActivityTimeline({ rows, limit = 25 }: { rows: AuditRow[]; limit
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                 <p className={cn("truncate text-sm font-semibold", TEXT)}>{humanize(row.action)}</p>
-                <time className={cn("shrink-0 text-[11px]", MUTED)}>{relativeTime(row.created_at)}</time>
+                <time className={cn("shrink-0 text-xs", MUTED)}>{relativeTime(row.created_at)}</time>
               </div>
               <p className={cn("mt-0.5 truncate text-xs", MUTED)}>
                 {actor}

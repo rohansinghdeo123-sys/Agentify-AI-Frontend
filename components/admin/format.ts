@@ -24,28 +24,28 @@ export interface HealthStyle {
 
 export const HEALTH_STYLES: Record<HealthState, HealthStyle> = {
   healthy: {
-    dot: "bg-[#14B8A6]",
-    text: "text-[#0F8F82]",
-    ring: "ring-[#14B8A6]/30",
-    chip: "border-[#14B8A6]/25 bg-[#14B8A6]/10 text-[#0F8F82]",
+    dot: "bg-[var(--ds-success)]",
+    text: "text-[var(--ds-success)]",
+    ring: "ring-[var(--ds-success)]",
+    chip: "border-[color:var(--ds-success)] bg-[var(--ds-success-soft)] text-[var(--ds-success)]",
   },
   warning: {
-    dot: "bg-[#F2B84B]",
-    text: "text-[#B7791F]",
-    ring: "ring-[#F2B84B]/30",
-    chip: "border-[#F2B84B]/30 bg-[#F2B84B]/12 text-[#B7791F]",
+    dot: "bg-[var(--ds-warning)]",
+    text: "text-[var(--ds-warning)]",
+    ring: "ring-[var(--ds-warning)]",
+    chip: "border-[color:var(--ds-warning)] bg-[var(--ds-warning-soft)] text-[var(--ds-warning)]",
   },
   error: {
-    dot: "bg-[#F43F5E]",
-    text: "text-[#D94A57]",
-    ring: "ring-[#F43F5E]/30",
-    chip: "border-[#F43F5E]/25 bg-[#F43F5E]/10 text-[#D94A57]",
+    dot: "bg-[var(--ds-danger)]",
+    text: "text-[var(--ds-danger)]",
+    ring: "ring-[var(--ds-danger)]",
+    chip: "border-[color:var(--ds-danger)] bg-[var(--ds-danger-soft)] text-[var(--ds-danger)]",
   },
   unknown: {
-    dot: "bg-slate-400",
-    text: "text-slate-500",
-    ring: "ring-slate-400/20",
-    chip: "border-slate-400/25 bg-slate-400/10 text-slate-500",
+    dot: "bg-[var(--ds-text-muted)]",
+    text: "text-[var(--ds-text-muted)]",
+    ring: "ring-[var(--ds-text-muted)]",
+    chip: "border-[color:var(--ds-text-muted)] bg-[var(--ds-surface-muted)] text-[var(--ds-text-muted)]",
   },
 };
 
