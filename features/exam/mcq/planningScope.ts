@@ -2,7 +2,7 @@ type SearchParamsReader = {
   get(name: string): string | null;
 };
 
-export type PlanningMcqScope = {
+export type PlanningExamScope = {
   source: "planning";
   catalogSource: "planning_manifest";
   classLevel: string;
@@ -12,6 +12,9 @@ export type PlanningMcqScope = {
   topic: string;
   topicLabel: string;
 };
+
+export type PlanningMcqScope = PlanningExamScope;
+type PlanningScopeFields = Omit<PlanningExamScope, "source" | "catalogSource">;
 
 function cleanLabel(value: string | null, maximum: number) {
   return String(value || "").trim().slice(0, maximum);
@@ -24,7 +27,7 @@ function cleanId(value: string | null) {
     .replace(/^_+|_+$/g, "");
 }
 
-export function readPlanningMcqScope(searchParams: SearchParamsReader): PlanningMcqScope | null {
+export function readPlanningExamScope(searchParams: SearchParamsReader): PlanningExamScope | null {
   if (searchParams.get("source") !== "planning") return null;
   const classLevel = cleanLabel(searchParams.get("classLevel"), 64);
   const subject = cleanLabel(searchParams.get("subject"), 120);
@@ -45,8 +48,10 @@ export function readPlanningMcqScope(searchParams: SearchParamsReader): Planning
   };
 }
 
-export function planningMcqHref(scope: Omit<PlanningMcqScope, "source" | "catalogSource">) {
-  const params = new URLSearchParams({
+export const readPlanningMcqScope = readPlanningExamScope;
+
+function planningScopeParams(scope: PlanningScopeFields) {
+  return new URLSearchParams({
     source: "planning",
     catalogSource: "planning_manifest",
     classLevel: scope.classLevel,
@@ -56,5 +61,31 @@ export function planningMcqHref(scope: Omit<PlanningMcqScope, "source" | "catalo
     topic: scope.topic,
     topicLabel: scope.topicLabel,
   });
-  return `/dashboard/exam/mcq?${params.toString()}`;
+}
+
+export function planningMcqHref(scope: PlanningScopeFields) {
+  return planningExamDestinationHref("/dashboard/exam/mcq", scope);
+}
+
+export function planningExamHubHref(scope: PlanningScopeFields) {
+  return planningExamDestinationHref("/dashboard/exam", scope);
+}
+
+export function planningExamQuery(scope: PlanningScopeFields) {
+  return planningScopeParams(scope).toString();
+}
+
+export function planningExamDestinationHref(route: string, scope: PlanningScopeFields) {
+  const safeRoute = route.startsWith("/dashboard/exam") ? route : "/dashboard/exam";
+  return `${safeRoute}?${planningExamQuery(scope)}`;
+}
+
+export function planningExamCatalogChapter(scope: PlanningScopeFields) {
+  return {
+    label: scope.chapterLabel,
+    value: scope.chapter,
+    subject: scope.subject,
+    classLevel: scope.classLevel,
+    topics: [{ label: scope.topicLabel, value: scope.topic }],
+  };
 }

@@ -4,6 +4,11 @@ import { ExamScreen, ExamStatusMessage } from "@/components/exam/ExamScreen";
 import { AppIcon } from "@/components/ui/Polished";
 import { useAuth } from "@/context/AuthContext";
 import { examApiRequest } from "@/features/exam/api";
+import {
+  planningExamCatalogChapter,
+  planningExamQuery,
+  readPlanningExamScope,
+} from "@/features/exam/mcq/planningScope";
 import type {
   LegacyProbableQuestion,
   PaperOut,
@@ -58,12 +63,19 @@ export default function ProbableQuestionsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const requestedTopic = normalizeTopic(searchParams.get("topic") || "alkanes") || "alkanes";
+  const planningScope = useMemo(() => readPlanningExamScope(searchParams), [searchParams]);
+  const planningChapter = useMemo(
+    () => planningScope ? planningExamCatalogChapter(planningScope) : null,
+    [planningScope],
+  );
+  const scopeChapters = planningChapter ? [planningChapter] : chapters;
+  const requestedTopic = planningScope?.topic || normalizeTopic(searchParams.get("topic") || "alkanes") || "alkanes";
   const requestedChapter =
-    searchParams.get("chapter") || findChapterForTopic(BUILTIN_CHAPTERS, requestedTopic) || "hydrocarbon";
-  const selectedChapter = chapters.find((item) => item.value === requestedChapter) || chapters[0];
+    planningScope?.chapter || searchParams.get("chapter") || findChapterForTopic(BUILTIN_CHAPTERS, requestedTopic) || "hydrocarbon";
+  const selectedChapter = scopeChapters.find((item) => item.value === requestedChapter) || scopeChapters[0];
   const selectedTopic = selectedChapter?.topics.find((item) => item.value === requestedTopic) || selectedChapter?.topics[0];
-  const classLevel = profile?.classLevel || DEFAULT_CLASS_LEVEL;
+  const classLevel = planningScope?.classLevel || profile?.classLevel || DEFAULT_CLASS_LEVEL;
+  const activeSubject = planningScope?.subject || SUBJECT;
   const mode: ProbableMode = searchParams.get("mode") === "syllabus" ? "syllabus" : "paper_pattern";
   const scopeKey = `${selectedChapter?.value || ""}:${selectedTopic?.value || ""}`;
 
@@ -84,11 +96,12 @@ export default function ProbableQuestionsPage() {
   const [notice, setNotice] = useState("");
 
   const scopeQuery = useMemo(() => {
+    if (planningScope) return planningExamQuery(planningScope);
     const params = new URLSearchParams();
     if (selectedChapter?.value) params.set("chapter", selectedChapter.value);
     if (selectedTopic?.value) params.set("topic", selectedTopic.value);
     return params.toString();
-  }, [selectedChapter?.value, selectedTopic?.value]);
+  }, [planningScope, selectedChapter?.value, selectedTopic?.value]);
 
   const updateQuery = (updates: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -100,7 +113,8 @@ export default function ProbableQuestionsPage() {
   };
 
   const updateScope = (chapterValue: string, topicValue?: string) => {
-    const chapter = chapters.find((item) => item.value === chapterValue) || chapters[0];
+    if (planningScope) return;
+    const chapter = scopeChapters.find((item) => item.value === chapterValue) || scopeChapters[0];
     const topic = chapter?.topics.find((item) => item.value === topicValue) || chapter?.topics[0];
     setPatternSet(null);
     setSelectedQuestionId("");
@@ -111,12 +125,12 @@ export default function ProbableQuestionsPage() {
     if (!userId) return;
     setLoadingSources(true);
     setError("");
-    const paperParams = new URLSearchParams({ subject: SUBJECT, limit: "100", offset: "0" });
+    const paperParams = new URLSearchParams({ subject: activeSubject, limit: "100", offset: "0" });
     const results = await Promise.allSettled([
       examApiRequest<{ total: number; papers: PaperOut[] }>(`/exam/papers?${paperParams.toString()}`, {
         getAuthHeaders,
         timeoutMs: 18000,
-        cacheKey: `exam-papers:${userId}:${SUBJECT}`,
+        cacheKey: `exam-papers:${userId}:${activeSubject}`,
         cacheTtlMs: 30000,
       }),
       examApiRequest<PatternSummary>("/exam/pattern/summary", {
@@ -141,7 +155,7 @@ export default function ProbableQuestionsPage() {
       setError(reason instanceof Error ? reason.message : "Could not load paper-pattern sources.");
     }
     setLoadingSources(false);
-  }, [getAuthHeaders, userId]);
+  }, [activeSubject, getAuthHeaders, userId]);
 
   useEffect(() => {
     if (loading || !userId) return;
@@ -149,16 +163,16 @@ export default function ProbableQuestionsPage() {
   }, [loadSources, loading, userId]);
 
   const scopedAnalyses = useMemo(
-    () => (patternSummary?.analyses || []).filter((analysis) => analysis.subject === SUBJECT && sameChapter(analysis.chapter_name, selectedChapter?.label)),
-    [patternSummary?.analyses, selectedChapter?.label],
+    () => (patternSummary?.analyses || []).filter((analysis) => analysis.subject === activeSubject && sameChapter(analysis.chapter_name, selectedChapter?.label)),
+    [activeSubject, patternSummary?.analyses, selectedChapter?.label],
   );
   const scopedPapers = useMemo(
-    () => papers.filter((paper) => paper.parse_status === "analyzed" && paper.subject === SUBJECT && sameChapter(paper.chapter_name, selectedChapter?.label)),
-    [papers, selectedChapter?.label],
+    () => papers.filter((paper) => paper.parse_status === "analyzed" && paper.subject === activeSubject && sameChapter(paper.chapter_name, selectedChapter?.label)),
+    [activeSubject, papers, selectedChapter?.label],
   );
   const scopedSets = useMemo(
-    () => savedSets.filter((set) => set.subject === SUBJECT && sameChapter(set.chapter_name, selectedChapter?.label)),
-    [savedSets, selectedChapter?.label],
+    () => savedSets.filter((set) => set.subject === activeSubject && sameChapter(set.chapter_name, selectedChapter?.label)),
+    [activeSubject, savedSets, selectedChapter?.label],
   );
 
   useEffect(() => {
@@ -211,8 +225,10 @@ export default function ProbableQuestionsPage() {
           section_id: selectedTopic.value,
           session_id: sessionId,
           difficulty,
-          subject: SUBJECT,
+          subject: activeSubject,
           chapter: selectedChapter.label,
+          class_level: classLevel,
+          ...(planningScope ? { catalog_source: planningScope.catalogSource } : {}),
           strict_grounding: true,
           retrieval_required: true,
           fallback_to_general_knowledge: false,
@@ -257,7 +273,7 @@ export default function ProbableQuestionsPage() {
           analysis_id: analysisId,
           paper_ids: analysisId ? null : paperIds,
           class_level: classLevel,
-          subject: SUBJECT,
+          subject: activeSubject,
           chapter_name: selectedChapter.label,
           generation_mode: generationMode,
           count: questionCount,
@@ -304,18 +320,18 @@ export default function ProbableQuestionsPage() {
           <div className={styles.builderSection}>
             <div className={styles.sectionLabel}>
               <span>01</span>
-              <div><p>Learning scope</p><strong>{SUBJECT} · {classLevel}</strong></div>
+              <div><p>Learning scope</p><strong>{activeSubject} · {classLevel}</strong></div>
             </div>
 
             <label className={styles.field}>
               <span>Chapter</span>
-              <select value={selectedChapter?.value || ""} onChange={(event) => updateScope(event.target.value)} disabled={!chapters.length}>
-                {chapters.map((chapter) => <option key={chapter.value} value={chapter.value}>{chapter.label}</option>)}
+              <select value={selectedChapter?.value || ""} onChange={(event) => updateScope(event.target.value)} disabled={!scopeChapters.length || Boolean(planningScope)}>
+                {scopeChapters.map((chapter) => <option key={chapter.value} value={chapter.value}>{chapter.label}</option>)}
               </select>
             </label>
             <label className={styles.field}>
               <span>Topic</span>
-              <select value={selectedTopic?.value || ""} onChange={(event) => updateScope(selectedChapter?.value || "", event.target.value)} disabled={!selectedChapter?.topics.length}>
+              <select value={selectedTopic?.value || ""} onChange={(event) => updateScope(selectedChapter?.value || "", event.target.value)} disabled={!selectedChapter?.topics.length || Boolean(planningScope)}>
                 {(selectedChapter?.topics || []).map((topic) => <option key={topic.value} value={topic.value}>{topic.label}</option>)}
               </select>
             </label>

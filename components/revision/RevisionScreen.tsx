@@ -29,7 +29,10 @@ export function RevisionScreen({
   bodyClassName,
 }: RevisionScreenProps) {
   return (
-    <section className={[styles.screen, className].filter(Boolean).join(" ")}>
+    <section
+      className={[styles.screen, className].filter(Boolean).join(" ")}
+      aria-labelledby="revision-screen-title"
+    >
       <div className={styles.ambient} aria-hidden="true">
         <span />
         <span />

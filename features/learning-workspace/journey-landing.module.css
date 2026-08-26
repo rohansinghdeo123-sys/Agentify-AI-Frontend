@@ -42,7 +42,7 @@
 
 .intro > p:first-child {
   color: var(--market-teal);
-  font-size: 0.67rem;
+  font-size: 0.75rem;
   font-weight: 830;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -109,7 +109,7 @@
 
 .routeMeta span {
   color: var(--market-teal);
-  font-size: 0.58rem;
+  font-size: 0.75rem;
   font-weight: 820;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -123,10 +123,16 @@
 }
 
 .routeMeta p {
+  max-width: 38rem;
   color: var(--market-muted);
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 650;
+  line-height: 1.5;
   text-align: right;
+}
+
+.routeMeta p strong {
+  color: var(--market-text);
 }
 
 .route {
@@ -162,6 +168,26 @@
 .station[data-mode="exam"] {
   --station-accent: #b7791f;
   --station-rgb: 183, 121, 31;
+}
+
+:global([data-theme="dark"]) .station {
+  --station-accent: #5eead4;
+  --station-rgb: 94, 234, 212;
+}
+
+:global([data-theme="dark"]) .station[data-mode="study"] {
+  --station-accent: #67e8f9;
+  --station-rgb: 103, 232, 249;
+}
+
+:global([data-theme="dark"]) .station[data-mode="revision"] {
+  --station-accent: #c4b5fd;
+  --station-rgb: 196, 181, 253;
+}
+
+:global([data-theme="dark"]) .station[data-mode="exam"] {
+  --station-accent: #f6c96b;
+  --station-rgb: 246, 201, 107;
 }
 
 .stationLink {
@@ -244,7 +270,7 @@
   background: rgba(var(--station-rgb), 0.08);
   padding: 0.36rem 0.62rem;
   color: var(--station-accent);
-  font-size: 0.56rem;
+  font-size: 0.75rem;
   font-weight: 820;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -260,7 +286,7 @@
 
 .stationCopy > small {
   color: var(--station-accent);
-  font-size: 0.56rem;
+  font-size: 0.75rem;
   font-weight: 810;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -277,7 +303,7 @@
 .stationCopy > span {
   max-width: 54ch;
   color: var(--market-muted);
-  font-size: clamp(0.72rem, 1vw, 0.82rem);
+  font-size: clamp(0.875rem, 1vw, 0.95rem);
   line-height: 1.58;
 }
 
@@ -301,7 +327,7 @@
 
 .stationOutcome small {
   color: var(--market-faint);
-  font-size: 0.5rem;
+  font-size: 0.75rem;
   font-weight: 770;
   letter-spacing: 0.11em;
   text-transform: uppercase;
@@ -309,13 +335,13 @@
 
 .stationOutcome strong {
   color: var(--market-text);
-  font-size: 0.7rem;
+  font-size: 0.875rem;
   font-weight: 700;
 }
 
 .openIndicator {
   display: inline-flex;
-  min-height: 2.25rem;
+  min-height: 2.75rem;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
@@ -325,7 +351,7 @@
   background: rgba(var(--station-rgb), 0.09);
   padding: 0.45rem 0.68rem;
   color: var(--station-accent);
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   font-weight: 790;
   transition: background-color 190ms ease, color 190ms ease, transform 190ms ease;
 }
@@ -352,6 +378,10 @@
   background: var(--station-accent);
   color: #ffffff;
   transform: translateX(2px);
+}
+
+:global([data-theme="dark"]) .stationLink:hover .openIndicator {
+  color: #07101c;
 }
 
 .stationLink:focus-visible {
@@ -385,6 +415,55 @@
 
   .stationLink {
     min-height: 13rem;
+  }
+}
+
+@media (min-width: 50.01rem) and (max-height: 62rem) {
+  .page {
+    padding-top: 4.35rem;
+    padding-bottom: 1.5rem;
+  }
+
+  .intro h1 {
+    margin-top: 0.5rem;
+    font-size: clamp(2.8rem, 5vw, 4rem);
+  }
+
+  .introCopy {
+    margin-top: 0.7rem;
+    line-height: 1.55;
+  }
+
+  .routePanel {
+    margin-top: 1.25rem;
+    padding: 1.1rem;
+  }
+
+  .routeMeta {
+    padding-bottom: 0.72rem;
+  }
+
+  .route {
+    gap: 0.72rem;
+    margin-top: 0.72rem;
+  }
+
+  .stationLink {
+    min-height: 12.25rem;
+    padding: 1rem;
+  }
+
+  .stationCopy {
+    gap: 0.26rem;
+    margin-top: 0.68rem;
+  }
+
+  .stationCopy h2 {
+    font-size: clamp(1.5rem, 2.3vw, 1.95rem);
+  }
+
+  .stationOutcome {
+    padding-top: 0.62rem;
   }
 }
 

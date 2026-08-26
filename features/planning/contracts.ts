@@ -457,6 +457,68 @@ function isPlanningCoverage(value: unknown): value is PlanningCoverage {
   );
 }
 
+function sameStringArray(left: string[], right: string[]) {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function hasConsistentChapterRoadmap(
+  learningUnits: PlanningLearningUnit[],
+  nextStep: PlanningNextStep,
+  progress: PlanningProgress,
+  coverage: PlanningCoverage,
+) {
+  const units = [...learningUnits];
+  const orderedUnits = [...units].sort((left, right) => left.order - right.order);
+  const unitIds = units.map((unit) => unit.id);
+  const unitIdSet = new Set(unitIds);
+  const unitById = new Map(units.map((unit) => [unit.id, unit]));
+  const orders = units.map((unit) => unit.order);
+
+  if (unitIdSet.size !== units.length || new Set(orders).size !== units.length) return false;
+  if ([...orders].sort((left, right) => left - right).some((order, index) => order !== index + 1)) return false;
+
+  const nextUnit = unitById.get(nextStep.unit_id);
+  if (!nextUnit || nextStep.title !== nextUnit.title || nextStep.importance !== nextUnit.importance) return false;
+  if (!sameStringArray(nextStep.learning_types, nextUnit.learning_types)) return false;
+
+  if (units.some((unit) => {
+    if (new Set(unit.ncert_subtopics.map((subtopic) => subtopic.id)).size !== unit.ncert_subtopics.length) return true;
+    if (new Set(unit.prerequisite_unit_ids).size !== unit.prerequisite_unit_ids.length) return true;
+    if (new Set(unit.dependent_unit_ids).size !== unit.dependent_unit_ids.length) return true;
+    return unit.prerequisite_unit_ids.some((id) => {
+      const prerequisite = unitById.get(id);
+      return !prerequisite || prerequisite.id === unit.id || prerequisite.order >= unit.order;
+    }) || unit.dependent_unit_ids.some((id) => {
+      const dependent = unitById.get(id);
+      return !dependent || dependent.id === unit.id || dependent.order <= unit.order;
+    });
+  })) return false;
+
+  for (const unit of units) {
+    const expectedDependents = units
+      .filter((candidate) => candidate.prerequisite_unit_ids.includes(unit.id))
+      .map((candidate) => candidate.id);
+    if (unit.dependent_unit_ids.length !== expectedDependents.length) return false;
+    if (unit.dependent_unit_ids.some((id) => !expectedDependents.includes(id))) return false;
+  }
+
+  if (coverage.unit_count !== units.length) return false;
+  if (coverage.included_unit_ids.length !== units.length) return false;
+  if (new Set(coverage.included_unit_ids).size !== units.length) return false;
+  if (coverage.included_unit_ids.some((id, index) => id !== orderedUnits[index]?.id)) return false;
+
+  if (progress.total_units !== units.length) return false;
+  if (progress.mastered_units !== units.filter((unit) => unit.status === "mastered").length) return false;
+  if (progress.learning_units !== units.filter((unit) => unit.status === "learning").length) return false;
+  if (progress.practising_units !== units.filter((unit) => unit.status === "practising").length) return false;
+  if (progress.needs_review_units !== units.filter((unit) => unit.status === "needs_review").length) return false;
+  if (progress.recommended_units !== units.filter((unit) => unit.status === "recommended").length) return false;
+  if (progress.percentage !== Math.round((progress.mastered_units / progress.total_units) * 100)) return false;
+
+  const expectedNextUnit = orderedUnits.find((unit) => unit.status !== "mastered") || orderedUnits.at(-1);
+  return Boolean(expectedNextUnit && nextStep.unit_id === expectedNextUnit.id);
+}
+
 export function normalizePlanningDraft(value: unknown): PlanningDraft | null {
   if (!isRecord(value)) return null;
   const legacyChapter = [
@@ -721,7 +783,7 @@ function isPlanningSelectionFactor(value: unknown): value is PlanningSelectionFa
 }
 
 function isPlanningPortfolioChapter(value: unknown): value is PlanningPortfolioChapter {
-  return Boolean(
+  if (!(
     isRecord(value)
     && nonEmptyString(value.curriculum_key)
     && nonEmptyString(value.chapter_slug)
@@ -729,6 +791,7 @@ function isPlanningPortfolioChapter(value: unknown): value is PlanningPortfolioC
     && isPlanningChapterProficiency(value.chapter_proficiency)
     && value.roadmap_version === "planning_roadmap_v2"
     && isPlanningCurriculum(value.curriculum)
+    && value.curriculum.key === value.curriculum_key
     && Array.isArray(value.learning_units)
     && value.learning_units.length > 0
     && value.learning_units.every(isPlanningLearningUnit)
@@ -740,7 +803,14 @@ function isPlanningPortfolioChapter(value: unknown): value is PlanningPortfolioC
     && Number.isFinite(value.candidate_score)
     && Array.isArray(value.selection_factors)
     && value.selection_factors.every(isPlanningSelectionFactor)
-    && typeof value.selected_for_today === "boolean",
+    && typeof value.selected_for_today === "boolean"
+  )) return false;
+
+  return hasConsistentChapterRoadmap(
+    value.learning_units as PlanningLearningUnit[],
+    value.next_step as PlanningNextStep,
+    value.progress as PlanningProgress,
+    value.coverage as PlanningCoverage,
   );
 }
 
@@ -822,13 +892,74 @@ export function isPlanningPortfolio(value: unknown): value is PlanningPortfolio 
   const globalNextStep = value.global_next_step as PlanningPortfolioNextStep;
   if (selectedChapter.chapter_slug !== globalNextStep.chapter_slug) return false;
   if (selectedChapter.curriculum_key !== globalNextStep.curriculum_key) return false;
+  if (selectedChapter.chapter !== globalNextStep.chapter) return false;
+  if (selectedChapter.chapter_proficiency !== globalNextStep.chapter_proficiency) return false;
+  if (selectedChapter.candidate_score !== globalNextStep.candidate_score) return false;
   if (selectedChapter.next_step.unit_id !== globalNextStep.unit_id) return false;
-  if ((value.today_route as PlanningPortfolioTodayRoute).items.some((item) => (
+  if (selectedChapter.next_step.title !== globalNextStep.title) return false;
+  if (selectedChapter.next_step.reason !== globalNextStep.reason) return false;
+  if (selectedChapter.next_step.importance !== globalNextStep.importance) return false;
+  if (!sameStringArray(selectedChapter.next_step.learning_types, globalNextStep.learning_types)) return false;
+  if (!sameStringArray(selectedChapter.next_step.approach, globalNextStep.approach)) return false;
+  if (selectedChapter.next_step.outcome !== globalNextStep.outcome) return false;
+  if (
+    selectedChapter.next_step.estimated_minutes.min !== globalNextStep.estimated_minutes.min
+    || selectedChapter.next_step.estimated_minutes.max !== globalNextStep.estimated_minutes.max
+  ) return false;
+
+  const todayRoute = value.today_route as PlanningPortfolioTodayRoute;
+  if (todayRoute.items.some((item) => (
     item.chapter_slug !== selectedChapter.chapter_slug
     || item.curriculum_key !== selectedChapter.curriculum_key
+    || item.chapter !== selectedChapter.chapter
   ))) return false;
-  const totalUnits = chapters.reduce((total, chapter) => total + chapter.progress.total_units, 0);
-  if ((value.aggregate_progress as PlanningPortfolioProgress).total_units !== totalUnits) return false;
+  if (todayRoute.items.some((item) => item.unit_id !== globalNextStep.unit_id)) return false;
+  if (todayRoute.items.some((item) => item.title !== globalNextStep.title)) return false;
+  if (todayRoute.items[0]?.unit_id !== globalNextStep.unit_id) return false;
+  if (new Set(todayRoute.items.map((item) => `${item.unit_id}:${item.role}`)).size !== todayRoute.items.length) return false;
+  if (
+    todayRoute.estimated_minutes.min !== globalNextStep.estimated_minutes.min
+    || todayRoute.estimated_minutes.max !== globalNextStep.estimated_minutes.max
+  ) return false;
+  if (todayRoute.total_minutes < todayRoute.estimated_minutes.min) return false;
+  if (todayRoute.total_minutes > todayRoute.estimated_minutes.max) return false;
+
+  const selectedBudget: Record<PlanningStudyTime, number | null> = {
+    "15": 15,
+    "30": 30,
+    "60": 60,
+    "120_plus": 120,
+    no_limit: null,
+  };
+  const studyTime = value.study_time_today as PlanningStudyTime | null;
+  const sessionDuration = value.session_duration_minutes as number | null;
+  const expectedSource = studyTime !== null
+    ? "student_choice"
+    : sessionDuration !== null
+      ? "session_state"
+      : "default_focus";
+  const expectedBudget = studyTime !== null
+    ? selectedBudget[studyTime]
+    : sessionDuration !== null
+      ? Math.floor(sessionDuration / 5) * 5
+      : 30;
+  if (todayRoute.source !== expectedSource || todayRoute.budget_minutes !== expectedBudget) return false;
+
+  const expectedMastered = chapters.reduce((total, chapter) => total + chapter.progress.mastered_units, 0);
+  const expectedActive = chapters.reduce((total, chapter) => (
+    total
+    + chapter.progress.learning_units
+    + chapter.progress.practising_units
+    + chapter.progress.recommended_units
+  ), 0);
+  const expectedNeedsReview = chapters.reduce((total, chapter) => total + chapter.progress.needs_review_units, 0);
+  const expectedTotal = chapters.reduce((total, chapter) => total + chapter.progress.total_units, 0);
+  const aggregate = value.aggregate_progress as PlanningPortfolioProgress;
+  if (aggregate.mastered_units !== expectedMastered) return false;
+  if (aggregate.active_units !== expectedActive) return false;
+  if (aggregate.needs_review_units !== expectedNeedsReview) return false;
+  if (aggregate.total_units !== expectedTotal) return false;
+  if (aggregate.percentage !== Math.round((expectedMastered / expectedTotal) * 100)) return false;
   return true;
 }
 

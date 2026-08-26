@@ -61,11 +61,14 @@ export default function StudyHomePage() {
   );
   const firstName = profile?.name?.split(" ")[0] || "Student";
 
-  const startSession = (kind: "open" | "syllabus") => {
-    const scope = kind === "syllabus" && selectedChapter && selectedTopic
+  const startSession = (intent: "learn" | "clarify" | "practice") => {
+    const syllabusGrounded = intent !== "clarify";
+    const scope = syllabusGrounded && selectedChapter && selectedTopic
       ? syllabusStudyScope(selectedChapter, selectedTopic, source === "published" ? "published" : "starter")
       : openStudyScope();
-    router.push(studySessionHref(createConversationId(), scope, { fresh: true }));
+    const destination = studySessionHref(createConversationId(), scope, { fresh: true });
+    const entry = intent === "clarify" ? "ask_ai" : intent;
+    router.push(`${destination}&entry=${entry}`);
   };
 
   if (legacyHandoff) {
@@ -75,39 +78,29 @@ export default function StudyHomePage() {
   return (
     <StudyScreen
       eyebrow="AgentifyAI / Study Lab"
-      title={`What should we understand today, ${firstName}?`}
-      description="Start with an open question or anchor your tutor to one published chapter. Every conversation opens in a quiet, focused learning room."
+      title={`What do you need help with, ${firstName}?`}
+      description="Learn a planned concept, ask one doubt directly, or check what you understand. Choose one route and Study Lab will keep the session focused."
       aside={<StudySyncPill state={syncState} />}
     >
       <div className={styles.workspace}>
         <section className={styles.startPanel} aria-labelledby="start-study-heading">
           <div className={styles.panelHeading}>
             <div>
-              <p>Choose your learning route</p>
-              <h2 id="start-study-heading">Start a focused session</h2>
+              <p>Choose what you need now</p>
+              <h2 id="start-study-heading">Three simple ways to study</h2>
             </div>
             <span className={styles.sourceBadge} data-source={source}>
               {source === "published" ? "Published syllabus" : settled ? "Starter syllabus" : "Checking syllabus"}
             </span>
           </div>
 
-          <button type="button" className={styles.openTutor} onClick={() => startSession("open")}>
-            <span className={styles.routeIcon}><AppIcon name="spark" /></span>
-            <span className={styles.routeCopy}>
-              <small>Open tutor</small>
-              <strong>Ask anything you want to understand</strong>
-              <span>Best for doubts, examples, step-by-step help, and continuing a natural learning conversation.</span>
-            </span>
-            <span className={styles.routeAction}>Start <AppIcon name="arrowRight" /></span>
-          </button>
-
           <div className={styles.syllabusRoute}>
             <div className={styles.syllabusCopy}>
               <span className={styles.routeIcon}><AppIcon name="book" /></span>
               <div>
-                <small>Syllabus-grounded tutor</small>
-                <strong>Learn from one selected topic</strong>
-                <p>The tutor will use this topic as the visible learning source and tell you when material is unavailable.</p>
+                <small>01 · Learn a planned concept</small>
+                <strong>Continue the concept you are ready to learn</strong>
+                <p>Use the concept carried from Planning, or choose one here. Your tutor stays anchored to the selected syllabus source.</p>
               </div>
             </div>
 
@@ -139,11 +132,44 @@ export default function StudyHomePage() {
               <button
                 type="button"
                 disabled={!settled || !selectedChapter || !selectedTopic}
-                onClick={() => startSession("syllabus")}
+                onClick={() => startSession("learn")}
               >
-                Learn this topic <AppIcon name="arrowRight" />
+                Start learning <AppIcon name="arrowRight" />
               </button>
             </div>
+          </div>
+
+          <div className={styles.quickRoutes} aria-label="Direct Study Lab routes">
+            <button
+              type="button"
+              className={styles.quickRoute}
+              data-route="clarify"
+              onClick={() => startSession("clarify")}
+            >
+              <span className={styles.routeIcon}><AppIcon name="spark" /></span>
+              <span className={styles.routeCopy}>
+                <small>02 · Clarify a doubt</small>
+                <strong>Ask AI directly</strong>
+                <span>Type the question in your own words and get a calm, step-by-step explanation.</span>
+              </span>
+              <span className={styles.routeAction}>Ask AI <AppIcon name="arrowRight" /></span>
+            </button>
+
+            <button
+              type="button"
+              className={styles.quickRoute}
+              data-route="practice"
+              disabled={!settled || !selectedChapter || !selectedTopic}
+              onClick={() => startSession("practice")}
+            >
+              <span className={styles.routeIcon}><AppIcon name="check" /></span>
+              <span className={styles.routeCopy}>
+                <small>03 · Check understanding</small>
+                <strong>Practise one focused question</strong>
+                <span>Answer first, then let your tutor explain what is clear and what needs another look.</span>
+              </span>
+              <span className={styles.routeAction}>Check me <AppIcon name="arrowRight" /></span>
+            </button>
           </div>
         </section>
 
@@ -173,7 +199,7 @@ export default function StudyHomePage() {
             <div className={styles.emptyRecent}>
               <AppIcon name="study" />
               <strong>Your first conversation starts here</strong>
-              <span>Ask a question above. Study Lab will keep the thread ready for you to continue.</span>
+              <span>Choose one of the three study routes. Study Lab will keep the conversation ready for you to continue.</span>
             </div>
           )}
 

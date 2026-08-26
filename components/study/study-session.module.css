@@ -89,7 +89,7 @@
 .headerActions button,
 .syncState {
   display: inline-flex;
-  min-height: 2.45rem;
+  min-height: 2.75rem;
   align-items: center;
   justify-content: center;
   gap: 0.42rem;
@@ -97,7 +97,7 @@
   border-radius: 0.82rem;
   background: color-mix(in srgb, var(--study-surface) 90%, transparent);
   color: var(--study-muted);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 760;
   white-space: nowrap;
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.055);
@@ -127,7 +127,7 @@
 .headingBlock p {
   overflow: hidden;
   color: var(--study-accent);
-  font-size: 0.64rem;
+  font-size: 0.75rem;
   font-weight: 850;
   letter-spacing: 0.13em;
   text-overflow: ellipsis;
@@ -157,7 +157,7 @@
   margin-top: 0.32rem;
   overflow: hidden;
   color: var(--study-muted);
-  font-size: 0.69rem;
+  font-size: 0.75rem;
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -244,14 +244,14 @@
   justify-content: space-between;
   gap: 1rem;
   color: var(--study-accent);
-  font-size: 0.64rem;
+  font-size: 0.75rem;
   font-weight: 800;
 }
 
 .userMessage time,
 .coachMeta time {
   color: var(--study-muted);
-  font-size: 0.61rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
@@ -266,7 +266,7 @@
 .userMessage > button {
   margin-top: 0.55rem;
   color: var(--study-muted);
-  font-size: 0.64rem;
+  font-size: 0.75rem;
   font-weight: 700;
 }
 
@@ -296,7 +296,7 @@
   background: color-mix(in srgb, var(--study-accent) 9%, transparent);
   padding: 0.22rem 0.44rem;
   color: var(--study-accent);
-  font-size: 0.57rem;
+  font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -356,7 +356,7 @@
 .answerBlock h3 {
   margin-bottom: 0.55rem;
   color: var(--study-accent);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 850;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -381,7 +381,7 @@
 }
 
 .thinking span {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   line-height: 1.5;
 }
 
@@ -392,7 +392,7 @@
   border-radius: 0.85rem;
   background: color-mix(in srgb, var(--study-accent) 6%, transparent);
   color: var(--study-muted);
-  font-size: 0.68rem;
+  font-size: 0.75rem;
 }
 
 .sourceNote { padding: 0.65rem 0.75rem; }
@@ -411,7 +411,7 @@
 }
 
 .sourceDrawer summary::-webkit-details-marker { display: none; }
-.sourceDrawer summary small { color: var(--study-muted); font-size: 0.6rem; font-weight: 650; }
+.sourceDrawer summary small { color: var(--study-muted); font-size: 0.75rem; font-weight: 650; }
 
 .sourceList {
   display: grid;
@@ -428,9 +428,9 @@
   padding: 0.65rem;
 }
 
-.sourceList strong { color: var(--study-text); font-size: 0.68rem; }
-.sourceList span { font-size: 0.61rem; }
-.sourceList p { color: var(--study-muted); font-size: 0.66rem; line-height: 1.55; }
+.sourceList strong { color: var(--study-text); font-size: 0.75rem; }
+.sourceList span { font-size: 0.75rem; }
+.sourceList p { color: var(--study-muted); font-size: 0.75rem; line-height: 1.55; }
 
 .tutorActions {
   display: flex;
@@ -444,7 +444,7 @@
 .tutorActions summary,
 .quietAction {
   display: inline-flex;
-  min-height: 2.2rem;
+  min-height: 2.75rem;
   cursor: pointer;
   align-items: center;
   justify-content: center;
@@ -454,7 +454,7 @@
   background: color-mix(in srgb, var(--study-surface) 86%, transparent);
   padding: 0.45rem 0.66rem;
   color: var(--study-muted);
-  font-size: 0.63rem;
+  font-size: 0.75rem;
   font-weight: 720;
 }
 
@@ -486,13 +486,13 @@
 
 .tutorActions details > div button {
   display: flex;
-  min-height: 2.25rem;
+  min-height: 2.75rem;
   align-items: center;
   gap: 0.45rem;
   border-radius: 0.55rem;
   padding: 0.45rem 0.55rem;
   color: var(--study-muted);
-  font-size: 0.66rem;
+  font-size: 0.75rem;
   font-weight: 700;
   text-align: left;
 }
@@ -525,7 +525,7 @@
 .emptyRoom > p {
   margin-top: 1.25rem;
   color: var(--study-accent);
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   font-weight: 850;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -559,13 +559,13 @@
 }
 
 .starters button {
-  min-height: 2.5rem;
+  min-height: 2.75rem;
   border: 1px solid var(--study-border);
   border-radius: 999px;
   background: color-mix(in srgb, var(--study-surface) 82%, transparent);
   padding: 0.55rem 0.82rem;
   color: var(--study-text);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 740;
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.045);
   transition: transform 160ms ease, border-color 160ms ease, color 160ms ease;
@@ -600,7 +600,7 @@
   margin-bottom: 0.35rem;
   padding-inline: 0.25rem;
   color: var(--study-muted);
-  font-size: 0.63rem;
+  font-size: 0.75rem;
   font-weight: 650;
 }
 
@@ -632,8 +632,8 @@
 
 .composerPromptMark {
   display: inline-flex;
-  width: 2.35rem;
-  height: 2.35rem;
+  width: 2.75rem;
+  height: 2.75rem;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
@@ -648,7 +648,7 @@
 .composerCard .studyTextarea {
   display: block;
   width: 100%;
-  min-height: 2.35rem;
+  min-height: 2.75rem;
   max-height: 10rem;
   resize: none;
   appearance: none;
@@ -691,8 +691,10 @@
 .iconButton,
 .sendButton {
   display: inline-flex;
-  width: 2.35rem;
-  height: 2.35rem;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  min-height: 2.75rem;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--study-border);
@@ -758,8 +760,8 @@
 .composerMenu > button:disabled { opacity: 0.42; }
 .composerMenu svg { width: 1rem; height: 1rem; color: var(--study-accent); }
 .composerMenu span { display: grid; gap: 0.14rem; }
-.composerMenu strong { font-size: 0.7rem; }
-.composerMenu small { color: var(--study-muted); font-size: 0.61rem; }
+.composerMenu strong { font-size: 0.75rem; }
+.composerMenu small { color: var(--study-muted); font-size: 0.75rem; }
 
 .composerMenu i {
   position: relative;
@@ -794,7 +796,7 @@
 .attachmentChip {
   display: inline-flex;
   max-width: 16rem;
-  min-height: 1.85rem;
+  min-height: 2.75rem;
   align-items: center;
   gap: 0.35rem;
   border: 1px solid var(--study-border);
@@ -802,7 +804,7 @@
   background: var(--study-soft);
   padding: 0.32rem 0.5rem;
   color: var(--study-muted);
-  font-size: 0.6rem;
+  font-size: 0.75rem;
   font-weight: 680;
 }
 
@@ -813,12 +815,19 @@
 }
 
 .attachmentChip svg { width: 0.75rem; height: 0.75rem; flex: 0 0 auto; }
-.attachmentChip button { display: inline-flex; color: inherit; }
+.attachmentChip button {
+  display: inline-flex;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+}
 .attachmentChip button:hover { color: #dc2626; }
 
 .errorNotice {
   display: flex;
-  min-height: 2.4rem;
+  min-height: 2.75rem;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
@@ -827,12 +836,47 @@
   border-radius: 0.8rem;
   background: color-mix(in srgb, #dc2626 7%, var(--study-surface));
   padding: 0.5rem 0.7rem;
-  color: color-mix(in srgb, #dc2626 80%, var(--study-text));
-  font-size: 0.66rem;
+  color: color-mix(in srgb, #dc2626 72%, var(--study-text));
+  font-size: 0.75rem;
   font-weight: 680;
 }
 
-.errorNotice button { font-weight: 800; text-decoration: underline; text-underline-offset: 2px; }
+.errorCopy,
+.errorActions {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.errorCopy svg { width: 0.85rem; height: 0.85rem; flex: 0 0 auto; }
+.errorCopy > span { min-width: 0; overflow-wrap: anywhere; }
+.errorActions { flex: 0 0 auto; }
+
+.errorNotice button {
+  min-height: 2.75rem;
+  border-radius: 0.65rem;
+  padding-inline: 0.65rem;
+  color: inherit;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.errorNotice button:hover { background: color-mix(in srgb, #dc2626 9%, transparent); }
+
+:global([data-theme="dark"]) .composerCard {
+  border-color: color-mix(in srgb, var(--study-accent-bright) 28%, var(--study-border));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--study-accent) 9%, var(--study-surface)), var(--study-surface));
+}
+
+:global([data-theme="dark"]) .iconButton { color: var(--study-text); }
+
+:global([data-theme="dark"]) .errorNotice {
+  border-color: color-mix(in srgb, #fb7185 46%, transparent);
+  background: color-mix(in srgb, #be123c 17%, var(--study-surface));
+  color: color-mix(in srgb, #fecdd3 88%, var(--study-text));
+}
 
 .session :where(button, a, summary):focus-visible {
   outline: 3px solid color-mix(in srgb, var(--study-accent-bright) 42%, transparent);
@@ -863,7 +907,7 @@
   }
 
   .headingBlock { gap: 0.7rem; }
-  .backLink { min-height: 2.3rem; padding-inline: 0.6rem; font-size: 0; }
+  .backLink { min-height: 2.75rem; padding-inline: 0.75rem; font-size: 0; }
   .backLink svg { width: 0.95rem; height: 0.95rem; }
   .headingBlock h1 { font-size: 1.12rem; }
   .headingBlock > div > span { max-width: 76vw; }
@@ -892,6 +936,16 @@
   .tutorActions { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 0.25rem; scrollbar-width: none; }
   .tutorActions::-webkit-scrollbar { display: none; }
   .tutorActions > button, .tutorActions summary { flex: 0 0 auto; }
+}
+
+@media (max-width: 430px) {
+  .composerCard { border-radius: 1.2rem; }
+  .composerInputRow { gap: 0.25rem; }
+  .composerToolbar,
+  .toolCluster { gap: 0.25rem; }
+  .errorNotice { align-items: flex-start; gap: 0.35rem; }
+  .errorCopy { padding-block: 0.65rem; line-height: 1.45; }
+  .errorActions { align-self: stretch; }
 }
 
 @media (max-height: 680px) {

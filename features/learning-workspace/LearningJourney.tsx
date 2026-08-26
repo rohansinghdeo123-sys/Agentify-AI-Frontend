@@ -2,11 +2,16 @@ import { AppIcon } from "@/components/ui/Polished";
 import { LEARNING_WORKSPACE_STEPS } from "@/features/learning-workspace/config";
 import Link from "next/link";
 import type { CSSProperties } from "react";
+import { recommendLearningWorkspace, type LearningRecommendation } from "./recommendation";
 import styles from "./journey-landing.module.css";
 
 const STEP_LABELS = ["Plan", "Understand", "Recall", "Test"] as const;
 
-export default function LearningJourney() {
+export default function LearningJourney({
+  recommendation = recommendLearningWorkspace(null),
+}: {
+  recommendation?: LearningRecommendation;
+}) {
   return (
     <section
       className={styles.page}
@@ -27,16 +32,18 @@ export default function LearningJourney() {
             <span>Four focused workspaces</span>
             <strong>Start where you need help now</strong>
           </div>
-          <p>No forced sequence. You stay in control.</p>
+          <p><strong>{recommendation.label}:</strong> {recommendation.reason}</p>
         </div>
 
         <ol className={styles.route} aria-label="Choose Planning, Study, Revision, or Exam">
-          {LEARNING_WORKSPACE_STEPS.map((step, index) => (
+          {LEARNING_WORKSPACE_STEPS.map((step, index) => {
+            const recommended = step.id === recommendation.mode;
+            return (
             <li
               key={step.id}
               className={styles.station}
               data-mode={step.id}
-              data-recommended={index === 0 ? "true" : undefined}
+              data-recommended={recommended ? "true" : undefined}
               style={{ "--journey-delay": `${index * 110}ms` } as CSSProperties}
             >
               <Link
@@ -48,7 +55,7 @@ export default function LearningJourney() {
                   <span className={styles.stationNode} aria-hidden="true">
                     <AppIcon name={step.icon} />
                   </span>
-                  <span className={styles.phase}>{index === 0 ? "Suggested start" : STEP_LABELS[index]}</span>
+                  <span className={styles.phase}>{recommended ? recommendation.label : STEP_LABELS[index]}</span>
                 </span>
 
                 <span className={styles.stationCopy}>
@@ -68,7 +75,8 @@ export default function LearningJourney() {
                 </span>
               </Link>
             </li>
-          ))}
+            );
+          })}
         </ol>
       </div>
     </section>

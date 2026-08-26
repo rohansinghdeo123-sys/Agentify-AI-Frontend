@@ -44,6 +44,7 @@
 .detailPage,
 .emptyDetail,
 .errorDetail {
+  --exam-functional-danger-ink: #a9213a;
   --exam-functional-teal-ink: #075f73;
   --exam-functional-gold-ink: #8a5a00;
 }
@@ -52,6 +53,7 @@
 :global([data-theme="dark"]) .detailPage,
 :global([data-theme="dark"]) .emptyDetail,
 :global([data-theme="dark"]) .errorDetail {
+  --exam-functional-danger-ink: var(--ds-danger);
   --exam-functional-teal-ink: var(--ds-accent-teal);
   --exam-functional-gold-ink: var(--ds-accent-gold-strong);
 }
@@ -276,7 +278,7 @@
 }
 
 .primaryButton {
-  background: linear-gradient(135deg, #0e7490, #0f8f82);
+  background: linear-gradient(135deg, #0e7490, #0f766e);
   box-shadow: 0 12px 26px rgba(14, 116, 144, 0.2);
   color: #fff;
   width: 100%;
@@ -298,7 +300,7 @@
 }
 
 .dangerButton {
-  background: #d94a57;
+  background: #b42334;
   color: #fff;
 }
 
@@ -419,7 +421,7 @@
   color: var(--color-text-tertiary);
   font-size: 0.68rem;
   font-weight: 800;
-  min-height: 36px;
+  min-height: 44px;
   padding: 0 11px;
 }
 
@@ -531,7 +533,7 @@
 .statusPill[data-status="failed"] {
   background: color-mix(in srgb, var(--color-accent-red) 10%, transparent);
   border-color: color-mix(in srgb, var(--color-accent-red) 24%, transparent);
-  color: var(--color-accent-red);
+  color: var(--exam-functional-danger-ink, #a9213a);
 }
 
 .rowArrow {
@@ -947,7 +949,7 @@
   align-items: center;
   background: color-mix(in srgb, var(--color-accent-red) 12%, transparent);
   border-radius: 12px;
-  color: var(--color-accent-red);
+  color: var(--exam-functional-danger-ink, #a9213a);
   display: flex;
   height: 44px;
   justify-content: center;

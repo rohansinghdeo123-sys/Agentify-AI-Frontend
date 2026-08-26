@@ -114,6 +114,7 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
   const refreshAbortRef = useRef<AbortController | null>(null);
   const lastRefreshAtRef = useRef(0);
   const currentInputRef = useRef("");
+  const activeChapterSlugRef = useRef("");
 
   const classOptions = useMemo(() => Array.from(new Set(catalogChapters.map((chapter) => chapter.classLevel)))
     .map((value) => ({ label: value || "Your class", value }))
@@ -158,6 +159,10 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
       : null
   ), [portfolio, portfolioState]);
   currentInputRef.current = JSON.stringify({ userId, scopes });
+
+  useEffect(() => {
+    activeChapterSlugRef.current = portfolioState?.activeChapterSlug || "";
+  }, [portfolioState?.activeChapterSlug]);
 
   useEffect(() => {
     if (authBusy) return;
@@ -347,13 +352,15 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
   }, [changeSetup, draft]);
 
   const selectActiveChapter = useCallback((chapterSlug: string) => {
+    if (!portfolioState?.portfolio.chapters.some((chapter) => chapter.chapter_slug === chapterSlug)) return;
+    activeChapterSlugRef.current = chapterSlug;
     setPortfolioState((current) => {
       if (!current || !current.portfolio.chapters.some((chapter) => chapter.chapter_slug === chapterSlug)) return current;
       const next = { ...current, activeChapterSlug: chapterSlug };
       if (userId) writePlanningPortfolioState(userId, next);
       return next;
     });
-  }, [userId]);
+  }, [portfolioState, userId]);
 
   const createPortfolio = useCallback(async (signal?: AbortSignal) => {
     if (!userId || authBusy || generating || generationInFlightRef.current) return null;
@@ -437,7 +444,7 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
         setRefreshNotice("Your saved roadmap is still available, but its latest progress could not be verified. Try again.");
         return;
       }
-      const state = writePlanningPortfolio(userId, refreshed, portfolioState.activeChapterSlug);
+      const state = writePlanningPortfolio(userId, refreshed, activeChapterSlugRef.current);
       setPortfolioState(state);
       setRefreshNotice("");
     } catch (refreshError) {

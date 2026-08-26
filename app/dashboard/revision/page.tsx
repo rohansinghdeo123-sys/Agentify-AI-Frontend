@@ -7,6 +7,7 @@ import {
   normalizeRevisionValue,
   readRevisionScope,
   resolveRevisionScope,
+  revisionHandoffHref,
   revisionHomeHref,
   revisionLessonHref,
   revisionToolsHref,
@@ -26,7 +27,7 @@ import {
 } from "@/lib/revision";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./hub.module.css";
 
 type QueueState =
@@ -48,6 +49,17 @@ function matchQueueEntry(
   return null;
 }
 
+function findQueueRecommendation(
+  data: RevisionQueueResponse,
+  chapters: ReturnType<typeof useCatalog>["chapters"],
+) {
+  for (const entry of data.queue) {
+    const matched = matchQueueEntry(entry, chapters);
+    if (matched) return { entry, scope: matched };
+  }
+  return null;
+}
+
 export default function RevisionHomePage() {
   const { userId, loading, getAuthHeaders } = useAuth();
   const { chapters, source } = useCatalog();
@@ -61,6 +73,10 @@ export default function RevisionHomePage() {
 
   const [progress, setProgress] = useState<RevisionProgress | null>(null);
   const [queue, setQueue] = useState<QueueState>({ status: "loading", data: null });
+  const [queueRequest, setQueueRequest] = useState(0);
+  const recommendationHeadingRef = useRef<HTMLHeadingElement>(null);
+  const recommendationRetryRef = useRef<HTMLButtonElement>(null);
+  const restoreRecommendationFocusRef = useRef(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -91,7 +107,25 @@ export default function RevisionHomePage() {
     return () => {
       active = false;
     };
-  }, [getAuthHeaders, loading, userId]);
+  }, [getAuthHeaders, loading, queueRequest, userId]);
+
+  useEffect(() => {
+    if (queue.status === "loading" || !restoreRecommendationFocusRef.current) return;
+    restoreRecommendationFocusRef.current = false;
+    const timer = window.setTimeout(() => {
+      const target = queue.status === "ready"
+        ? recommendationHeadingRef.current
+        : recommendationRetryRef.current;
+      target?.focus({ preventScroll: true });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [queue.status]);
+
+  const retryRecommendations = useCallback(() => {
+    restoreRecommendationFocusRef.current = true;
+    setQueue({ status: "loading", data: null });
+    setQueueRequest((request) => request + 1);
+  }, []);
 
   const replaceScope = useCallback(
     (next: RevisionScope) => {
@@ -113,22 +147,19 @@ export default function RevisionHomePage() {
       : null;
   }, [chapters, progress]);
 
-  const recommendedScope = useMemo(() => {
-    if (queue.status !== "ready") return null;
-    for (const entry of queue.data.queue) {
-      const matched = matchQueueEntry(entry, chapters);
-      if (matched) return matched;
-    }
-    return null;
-  }, [chapters, queue]);
+  const recommendation = queue.status === "ready"
+    ? findQueueRecommendation(queue.data, chapters)
+    : null;
 
+  const recommendedScope = recommendation?.scope || null;
   const continueScope = pendingContinueScope || recommendedScope;
   const continueReason = pendingContinueScope
     ? "Resume where you stopped"
     : recommendedScope
       ? "Recommended from recent practice"
-      : "Start your first guided session";
-  const continueLabels = continueScope ? getRevisionScopeLabels(chapters, continueScope) : null;
+      : queue.status === "loading"
+        ? "Checking your best next step"
+        : "Start a focused revision";
   const chapterReviewed = selectedChapter?.topics.reduce((count, topic) => {
     const status = progress?.topics[revisionScopeKey(selectedChapter.value, topic.value)]?.status;
     return count + (status === "reviewed" ? 1 : 0);
@@ -141,6 +172,16 @@ export default function RevisionHomePage() {
     chapter: selectedChapter?.value || scope.chapter,
     topic: selectedTopic?.value || scope.topic,
   };
+  const actionScope = continueScope || sessionScope;
+  const actionLabels = getRevisionScopeLabels(chapters, actionScope);
+  const recommendationDetail = pendingContinueScope
+    ? "Finish the explanation and memory check you already started."
+    : recommendation
+      ? recommendation.entry.reason || `A focused ${recommendation.entry.suggested_minutes}-minute review based on recent practice.`
+      : "Open the selected topic for a clear explanation, short notes, and a memory check.";
+  const recommendationTime = !pendingContinueScope && recommendation?.entry.suggested_minutes
+    ? `${recommendation.entry.suggested_minutes} min`
+    : null;
 
   return (
     <section className={styles.hub}>
@@ -153,9 +194,9 @@ export default function RevisionHomePage() {
         <header className={styles.hero}>
           <div className={styles.heroCopy}>
             <p className={styles.eyebrow}>AgentifyAI / Revision Lab</p>
-            <h1>Revise the chapter. Understand the key ideas.</h1>
+            <h1>Strengthen what matters next.</h1>
             <p className={styles.intro}>
-              Work through one topic at a time with a clear explanation, must-remember notes, and an honest memory check—then reinforce it with focused study tools.
+              Continue a topic or choose one from the chapter library. Each revision combines a clear explanation, concise notes, and one honest memory check.
             </p>
           </div>
 
@@ -179,25 +220,37 @@ export default function RevisionHomePage() {
               {queue.status === "ready" ? <span className={styles.dueBadge}>{dueCount} due</span> : null}
             </div>
 
-            <Link
-              href={revisionLessonHref(continueScope || sessionScope)}
-              className={styles.continueCard}
-            >
+            <div className={styles.continueCard}>
               <span className={styles.continueIcon}><AppIcon name={pendingContinueScope ? "history" : "spark"} /></span>
               <div className={styles.continueCopy}>
                 <small>{continueReason}</small>
-                <strong>{continueLabels?.topic || labels.topic}</strong>
-                <span>{continueLabels?.chapter || labels.chapter}</span>
+                <strong>{actionLabels.topic}</strong>
+                <span>{actionLabels.chapter}{recommendationTime ? ` · ${recommendationTime}` : ""}</span>
+                <p>{recommendationDetail}</p>
               </div>
-              <span className={styles.continueAction}>
-                {pendingContinueScope ? "Continue" : recommendedScope ? "Review now" : "Begin"}
+              <Link
+                href={revisionLessonHref(actionScope)}
+                className={styles.continueAction}
+                aria-label={`Continue revision for ${actionLabels.topic}`}
+              >
+                Continue
                 <AppIcon name="arrowRight" />
-              </span>
-            </Link>
+              </Link>
+            </div>
 
-            <div className={styles.queueBlock}>
+            <nav className={styles.handoffRow} aria-label={`Other ways to work on ${actionLabels.topic}`}>
+              <span>Use this topic in</span>
+              <Link href={revisionHandoffHref("study", actionScope)}>
+                <AppIcon name="study" /> Study
+              </Link>
+              <Link href={revisionHandoffHref("exam", actionScope)}>
+                <AppIcon name="check" /> Exam
+              </Link>
+            </nav>
+
+            <div className={styles.queueBlock} aria-busy={queue.status === "loading"}>
               <div className={styles.queueHeading}>
-                <span>Recommended next</span>
+                <h3 ref={recommendationHeadingRef} tabIndex={-1}>Recommended next</h3>
                 <small>{queue.status === "loading" ? "Checking your learning signals…" : "Based on recent practice"}</small>
               </div>
 
@@ -206,11 +259,19 @@ export default function RevisionHomePage() {
                   <span /><span /><span />
                 </div>
               ) : queue.status === "unavailable" ? (
-                <div className={styles.queueEmpty}>
+                <div className={styles.queueEmpty} data-tone="error">
                   <AppIcon name="clock" />
                   <div>
                     <strong>Personal recommendations are offline</strong>
                     <span>Your chapter library still works—choose the topic you want to strengthen.</span>
+                    <button
+                      ref={recommendationRetryRef}
+                      type="button"
+                      className={styles.queueRetry}
+                      onClick={retryRecommendations}
+                    >
+                      Try recommendations again
+                    </button>
                   </div>
                 </div>
               ) : dueEntries.length ? (

@@ -14,6 +14,12 @@ import { titleFromMessages } from "@/features/study/conversationUtils";
 import { useStudyConversations } from "@/features/study/hooks/useStudyConversations";
 import { useStudyDraftPersistence } from "@/features/study/hooks/useStudyDraftPersistence";
 import {
+  appendPendingStudyTurn,
+  createStudyTutorRequestSnapshot,
+  historyBeforeRetriedStudyTurn,
+  type StudyTutorRequestSnapshot,
+} from "@/features/study/retry";
+import {
   openStudyScope,
   readStudyScope,
   studyHistoryHref,
@@ -415,7 +421,7 @@ function StudyComposer({
   const canSend = Boolean(value.trim() || attachments.length) || loading;
   return (
     <div className={styles.composerWrap}>
-      <div className={styles.composerMeta}>
+      <div className={styles.composerMeta} role="status" aria-live="polite">
         <span>{loading ? `${coachName} is responding…` : "Enter to send · Shift+Enter for a new line"}</span>
         <span>{speechSupported ? "Voice available" : "Text ready"}</span>
       </div>
@@ -509,9 +515,9 @@ function StudyComposer({
 }
 
 const STARTERS = [
-  { label: "Explain", prompt: "Explain this concept from the basics with one simple example." },
-  { label: "Solve a doubt", prompt: "Help me understand why this topic works the way it does, step by step." },
-  { label: "Test me", prompt: "Ask me one intelligent practice question, wait for my answer, then evaluate it." },
+  { label: "Learn it", prompt: "Explain this concept from the basics with one simple example." },
+  { label: "Ask a doubt", prompt: "Help me understand why this topic works the way it does, step by step." },
+  { label: "Check me", prompt: "Ask me one focused practice question, wait for my answer, then explain what I understood and what I should revisit." },
 ];
 
 export default function StudySessionWorkspace() {
@@ -534,7 +540,10 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
     [routeScope, savedScope],
   );
   const freshSession = searchParams.get("fresh") === "1";
-  const planningAskEntry = searchParams.get("entry") === "ask_ai" && scope.catalogSource === "planning_manifest";
+  const entry = searchParams.get("entry") || "";
+  const directAskEntry = entry === "ask_ai";
+  const practiceEntry = entry === "practice";
+  const planningAskEntry = directAskEntry && scope.catalogSource === "planning_manifest";
   const authBusy = loading || authLoading;
   const [coachName, setCoachName] = useState("Aria");
   const [messages, setMessages] = useState<CoachMessage[]>([]);
@@ -544,14 +553,17 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
   const [socraticMode, setSocraticMode] = useState(true);
   const [loadingAnswer, setLoadingAnswer] = useState(false);
   const [error, setError] = useState("");
+  const [failedRequest, setFailedRequest] = useState<StudyTutorRequestSnapshot | null>(null);
   const [stages, setStages] = useState(createStages);
   const [composerMenuOpen, setComposerMenuOpen] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
   const [listening, setListening] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const lastRequestRef = useRef<StudyTutorRequestSnapshot | null>(null);
   const activityRef = useRef(false);
   const restoredRef = useRef("");
+  const entryPreparedRef = useRef("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -649,10 +661,17 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
   }, [conversationId]);
 
   useEffect(() => {
-    if (!planningAskEntry || !hydrated) return;
+    if ((!directAskEntry && !practiceEntry) || !hydrated) return;
     const timer = window.setTimeout(() => inputRef.current?.focus({ preventScroll: false }), 0);
     return () => window.clearTimeout(timer);
-  }, [hydrated, planningAskEntry]);
+  }, [directAskEntry, hydrated, practiceEntry]);
+
+  useEffect(() => {
+    if (!hydrated || !practiceEntry || entryPreparedRef.current === conversationId) return;
+    entryPreparedRef.current = conversationId;
+    const focus = scope.source === "syllabus" ? scope.topicLabel : "this concept";
+    setInput((current) => current || `Ask me one focused question about ${focus}. Wait for my answer, then explain what I understood and what I should revisit.`);
+  }, [conversationId, hydrated, practiceEntry, scope.source, scope.topicLabel]);
 
   const updateLastCoachMessage = (patch: Partial<CoachMessage>) => {
     setMessages((current) => {
@@ -674,14 +693,31 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
 
   const sendMessage = async (
     override?: string,
-    options?: { replaceLastAssistant?: boolean; directAnswer?: boolean; fromVoice?: boolean },
+    options?: {
+      replaceLastTurn?: boolean;
+      directAnswer?: boolean;
+      fromVoice?: boolean;
+      requestSnapshot?: StudyTutorRequestSnapshot;
+    },
   ) => {
-    const typed = (override ?? input).trim();
-    const prompt = typed || (attachments.length ? "Please explain the attached study material." : "");
+    const requestedSnapshot = options?.requestSnapshot;
+    const typed = (requestedSnapshot?.prompt ?? override ?? input).trim();
+    const requestAttachments = requestedSnapshot?.attachments ?? attachments;
+    const prompt = typed || (requestAttachments.length ? "Please explain the attached study material." : "");
     if (!prompt || !userId || authBusy || loadingAnswer) return;
     activityRef.current = true;
-    const turnAttachments = [...attachments];
-    const contextMessages = options?.replaceLastAssistant && messages.at(-1)?.role === "coach" ? messages.slice(0, -1) : messages;
+    const request = requestedSnapshot ?? createStudyTutorRequestSnapshot({
+      prompt,
+      attachments: requestAttachments,
+      strictAttachmentGrounding,
+      directAnswer: Boolean(options?.directAnswer),
+      socraticMode,
+      fromVoice: Boolean(options?.fromVoice),
+    });
+    lastRequestRef.current = request;
+    const contextMessages = options?.replaceLastTurn
+      ? historyBeforeRetriedStudyTurn(messages)
+      : messages;
     const tutorContext = buildTutorContextMessage(prompt, contextMessages);
     const mentor = inferMentorProfile(prompt, contextMessages);
     const controller = new AbortController();
@@ -693,16 +729,10 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
     setStrictAttachmentGrounding(false);
     setComposerMenuOpen(false);
     setError("");
+    setFailedRequest(null);
     setLoadingAnswer(true);
     setStages(createStages().map((stage) => stage.id === "received" ? { ...stage, status: "active" } : stage));
-    setMessages((current) => {
-      const base = options?.replaceLastAssistant && current.at(-1)?.role === "coach" ? current.slice(0, -1) : current;
-      return [
-        ...base,
-        { role: "user", content: prompt, timestamp: getTime(), attachments: turnAttachments },
-        { role: "coach", content: "", timestamp: "" },
-      ];
-    });
+    setMessages((current) => appendPendingStudyTurn(current, request, getTime(), Boolean(options?.replaceLastTurn)));
 
     try {
       const result = await streamCoachTurn(
@@ -713,13 +743,13 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
           prompt,
           groundingContextPrompt: tutorContext.message,
           scope,
-          attachments: turnAttachments,
-          directAnswer: Boolean(options?.directAnswer),
-          socraticMode,
-          strictAttachmentGrounding,
+          attachments: request.attachments,
+          directAnswer: request.directAnswer,
+          socraticMode: request.socraticMode,
+          strictAttachmentGrounding: request.strictAttachmentGrounding,
           intent: mentor.intent,
           mentorDirective: buildMentorDirective(mentor),
-          systemGuardrail: scope.source === "syllabus" || strictAttachmentGrounding
+          systemGuardrail: scope.source === "syllabus" || request.strictAttachmentGrounding
             ? DATA_GROUNDED_TUTOR_GUARDRAIL
             : REASONING_FIRST_TUTOR_GUARDRAIL,
           studentState: {
@@ -768,11 +798,12 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
           ))
           .catch(() => undefined);
       }
-      if (options?.fromVoice) speakTutorResponse(result.answer);
+      if (request.fromVoice) speakTutorResponse(result.answer);
     } catch (requestError) {
       if (controller.signal.aborted) return;
       const message = studyErrorMessage(requestError);
       setError(message);
+      setFailedRequest(request);
       updateLastCoachMessage({ content: TUTOR_TEMPORARY_ERROR_MESSAGE, timestamp: getTime() });
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
@@ -796,19 +827,51 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
   };
 
   const fillPrompt = (prompt: string) => {
+    setFailedRequest(null);
     setInput(prompt);
     window.setTimeout(() => inputRef.current?.focus(), 0);
   };
 
   const regenerate = () => {
-    const lastPrompt = [...messages].reverse().find((message) => message.role === "user")?.content;
-    if (lastPrompt) void sendMessage(lastPrompt, { replaceLastAssistant: true });
+    const lastUser = [...messages].reverse().find((message) => message.role === "user");
+    if (!lastUser?.content.trim()) return;
+    const remembered = failedRequest?.prompt === lastUser.content.trim()
+      ? failedRequest
+      : lastRequestRef.current?.prompt === lastUser.content.trim()
+        ? lastRequestRef.current
+        : null;
+    const restoredAttachments = (lastUser.attachments || []).filter((attachment): attachment is PendingAttachment => (
+      typeof (attachment as PendingAttachment).data_url === "string"
+      && Boolean((attachment as PendingAttachment).data_url)
+    ));
+    if (!remembered && (lastUser.attachments?.length || 0) !== restoredAttachments.length) {
+      setFailedRequest(null);
+      setInput(lastUser.content);
+      setError("Reattach the original files before retrying this question so the tutor keeps the same evidence.");
+      window.setTimeout(() => inputRef.current?.focus(), 0);
+      return;
+    }
+    const request = remembered ?? createStudyTutorRequestSnapshot({
+      prompt: lastUser.content,
+      attachments: restoredAttachments,
+      strictAttachmentGrounding: restoredAttachments.length > 0,
+      directAnswer: false,
+      socraticMode,
+      fromVoice: false,
+    });
+    void sendMessage(undefined, { replaceLastTurn: true, requestSnapshot: request });
+  };
+
+  const retryFailedRequest = () => {
+    if (!failedRequest) return;
+    void sendMessage(undefined, { replaceLastTurn: true, requestSnapshot: failedRequest });
   };
 
   const handleAttachmentSelect = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     event.target.value = "";
     setComposerMenuOpen(false);
+    setFailedRequest(null);
     if (attachments.length + files.length > 5) {
       setError("Attach up to five images, PDFs, or text notes at a time.");
       return;
@@ -880,6 +943,19 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
       ? "NCERT roadmap"
       : scope.catalogSource === "published" ? "Published syllabus" : "Starter syllabus"
     : "Open tutor";
+  const emptyTitle = practiceEntry
+    ? `Ready for a quick check on ${scope.topicLabel}?`
+    : directAskEntry && scope.source !== "syllabus"
+      ? "What would you like to clarify?"
+      : scope.source === "syllabus"
+        ? `Let’s understand ${scope.topicLabel}.`
+        : "What should we learn today?";
+  const emptyDescription = practiceEntry
+    ? "Send the prepared check when you are ready. Answer in your own words, then your tutor will show what is clear and what needs another look."
+    : scope.source === "syllabus"
+      ? `Your tutor will stay anchored to ${scope.chapterLabel} and show available source evidence.`
+      : `Ask naturally, ${profile?.name?.split(" ")[0] || "Student"}. Add a screenshot or note whenever the question needs it.`;
+  const canRetry = Boolean(failedRequest);
 
   return (
     <section className={styles.session} data-source={scope.source}>
@@ -957,13 +1033,9 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
         ) : (
           <div className={styles.emptyRoom}>
             <span className={styles.emptyMark}><ChatThinkingLogo state="idle" size={92} label="" /></span>
-            <p>{sourceLabel}</p>
-            <h2>{scope.source === "syllabus" ? `Let’s understand ${scope.topicLabel}.` : "What should we learn today?"}</h2>
-            <span>
-              {scope.source === "syllabus"
-                ? `Your tutor will stay anchored to ${scope.chapterLabel} and show available source evidence.`
-                : `Ask naturally, ${profile?.name?.split(" ")[0] || "Student"}. Add a screenshot or note whenever the question needs it.`}
-            </span>
+            <p>{practiceEntry ? "Understanding check" : sourceLabel}</p>
+            <h2>{emptyTitle}</h2>
+            <span>{emptyDescription}</span>
             <div className={styles.starters}>
               {STARTERS.map((starter) => <button key={starter.label} type="button" onClick={() => fillPrompt(starter.prompt)}>{starter.label}</button>)}
             </div>
@@ -972,7 +1044,15 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
       </div>
 
       <footer className={styles.composerDock}>
-        {error ? <div className={styles.errorNotice} role="alert"><span>{error}</span><button type="button" onClick={() => setError("")}>Dismiss</button></div> : null}
+        {error ? (
+          <div className={styles.errorNotice} role="alert">
+            <span className={styles.errorCopy}><AppIcon name="x" /><span>{error}</span></span>
+            <span className={styles.errorActions}>
+              {canRetry ? <button type="button" onClick={retryFailedRequest}>Try again</button> : null}
+              <button type="button" onClick={() => setError("")}>Dismiss</button>
+            </span>
+          </div>
+        ) : null}
         <StudyComposer
           value={input}
           coachName={coachName}
@@ -989,10 +1069,14 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
           menuTriggerRef={menuTriggerRef}
           firstMenuActionRef={firstMenuActionRef}
           planningAskTopic={planningAskEntry ? scope.topicLabel : undefined}
-          onChange={setInput}
+          onChange={(value) => {
+            setFailedRequest(null);
+            setInput(value);
+          }}
           onKeyDown={handleComposerKeyDown}
           onAttachmentSelect={(event) => void handleAttachmentSelect(event)}
           onRemoveAttachment={(name) => {
+            setFailedRequest(null);
             setAttachments((current) => {
               const next = current.filter((attachment) => attachment.name !== name);
               if (!next.length) setStrictAttachmentGrounding(false);

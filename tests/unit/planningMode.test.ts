@@ -643,6 +643,26 @@ describe("NCERT-ordered Planning roadmap", () => {
     invalidCounts.requested_chapter_count = 3;
     expect(normalizePlanningPortfolio(invalidCounts)).toBeNull();
 
+    const invalidChapterProgress = structuredClone(portfolio());
+    invalidChapterProgress.chapters[1].progress.recommended_units = 0;
+    expect(normalizePlanningPortfolio(invalidChapterProgress)).toBeNull();
+
+    const invalidCoverage = structuredClone(portfolio());
+    invalidCoverage.chapters[0].coverage.included_unit_ids = invalidCoverage.chapters[0].coverage.included_unit_ids.slice(1);
+    expect(normalizePlanningPortfolio(invalidCoverage)).toBeNull();
+
+    const invalidAggregate = structuredClone(portfolio());
+    invalidAggregate.aggregate_progress.active_units = 1;
+    expect(normalizePlanningPortfolio(invalidAggregate)).toBeNull();
+
+    const invalidRouteBudget = structuredClone(portfolio());
+    invalidRouteBudget.today_route.budget_minutes = 15;
+    expect(normalizePlanningPortfolio(invalidRouteBudget)).toBeNull();
+
+    const invalidGlobalStep = structuredClone(portfolio());
+    invalidGlobalStep.global_next_step.title = "A contradictory recommendation";
+    expect(normalizePlanningPortfolio(invalidGlobalStep)).toBeNull();
+
     const crossUser = portfolio();
     crossUser.user_id = "another-student";
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(crossUser), {
@@ -691,6 +711,11 @@ describe("NCERT-ordered Planning roadmap", () => {
     const provider = readSource("features/planning/PlanningExperience.tsx");
     expect(provider).toContain("portfolioMatchesCatalog(portfolioState.portfolio, catalogChapters)");
     expect(provider).toContain("portfolioMatchesCatalog(portfolioState.portfolio, supportCatalog)");
+    expect(provider).toContain("activeChapterSlugRef.current = chapterSlug");
+    expect(provider).toContain("writePlanningPortfolio(userId, refreshed, activeChapterSlugRef.current)");
+    const active = readSource("features/planning/PlanningActive.tsx");
+    expect(active).toContain('isGlobalChapter ? "Why this chapter now" : "Why this unit next"');
+    expect(active).toContain("activePortfolioChapter?.next_step.reason");
   });
 
   it.each([
@@ -1090,7 +1115,7 @@ describe("NCERT-ordered Planning roadmap", () => {
     expect(readActivePlanningPlanState(userId).plan?.scope.chapterProficiency).toBe("new_to_it");
     const provider = readSource("features/planning/PlanningExperience.tsx");
     const active = readSource("features/planning/PlanningActive.tsx");
-    expect(provider).toContain("writePlanningPortfolio(userId, refreshed, portfolioState.activeChapterSlug)");
+    expect(provider).toContain("writePlanningPortfolio(userId, refreshed, activeChapterSlugRef.current)");
     expect(provider).toContain("refreshInFlightRef.current");
     expect(active).toContain('document.addEventListener("visibilitychange"');
     expect(active).toContain("Refreshing your latest learning progress");

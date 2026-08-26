@@ -1,6 +1,12 @@
 "use client";
 
 import { AppIcon, type AppIconName } from "@/components/ui/Polished";
+import { useRouteHeadingFocus } from "@/components/exam/useRouteHeadingFocus";
+import {
+  planningExamDestinationHref,
+  planningMcqHref,
+  readPlanningExamScope,
+} from "@/features/exam/mcq/planningScope";
 import { useCatalog } from "@/lib/catalog";
 import {
   EXAM_ROUTES,
@@ -70,10 +76,17 @@ export default function ExamModePage() {
   const searchParams = useSearchParams();
   const { chapters } = useCatalog();
   const scope = readExamScope(searchParams);
-  const labels = getExamScopeLabels(chapters, scope);
+  const planningScope = readPlanningExamScope(searchParams);
+  const activeScope = planningScope
+    ? { chapter: planningScope.chapter, topic: planningScope.topic }
+    : scope;
+  const labels = planningScope
+    ? { chapter: planningScope.chapterLabel, topic: planningScope.topicLabel }
+    : getExamScopeLabels(chapters, scope);
+  const headingRef = useRouteHeadingFocus();
 
   return (
-    <main className={styles.hub}>
+    <div className={styles.hub}>
       <div className={styles.ambient} aria-hidden="true">
         <span />
         <span />
@@ -83,7 +96,7 @@ export default function ExamModePage() {
         <header className={styles.hero}>
           <div className={styles.heroCopy}>
             <p className={styles.eyebrow}>AgentifyAI / Exam Lab</p>
-            <h1>One clear workspace for every exam task.</h1>
+            <h1 ref={headingRef} tabIndex={-1}>One clear workspace for every exam task.</h1>
             <p className={styles.intro}>
               Choose what you want to accomplish now. Each tool opens on its own full-screen canvas, so your attention stays on one job at a time.
             </p>
@@ -96,11 +109,32 @@ export default function ExamModePage() {
           </div>
         </header>
 
+        {planningScope ? (
+          <aside className={styles.recommendation} aria-labelledby="exam-roadmap-recommendation">
+            <span className={styles.recommendationIcon} aria-hidden="true">
+              <AppIcon name="spark" />
+            </span>
+            <div className={styles.recommendationCopy}>
+              <p>From your Planning roadmap</p>
+              <h2 id="exam-roadmap-recommendation">Quick-check {planningScope.topicLabel}</h2>
+              <span>
+                Planning passed this focus into Exam Lab. Use a short MCQ check before moving into longer written practice.
+              </span>
+            </div>
+            <Link className={styles.recommendationAction} href={planningMcqHref(planningScope)}>
+              Start quick check
+              <AppIcon name="arrowRight" />
+            </Link>
+          </aside>
+        ) : null}
+
         <section className={styles.grid} aria-label="Exam Lab workspaces">
           {DESTINATIONS.map((destination) => (
             <Link
               key={destination.route}
-              href={examHref(destination.route, scope)}
+              href={planningScope
+                ? planningExamDestinationHref(destination.route, planningScope)
+                : examHref(destination.route, activeScope)}
               className={styles.card}
               data-tone={destination.tone}
             >
@@ -133,6 +167,6 @@ export default function ExamModePage() {
           Your selected chapter and topic move with you across every Exam Lab workspace.
         </p>
       </div>
-    </main>
+    </div>
   );
 }

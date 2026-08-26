@@ -1,6 +1,7 @@
 "use client";
 
 import { AppIcon } from "@/components/ui/Polished";
+import { useRouteHeadingFocus } from "@/components/exam/useRouteHeadingFocus";
 import { useAuth } from "@/context/AuthContext";
 import {
   generateWrittenQuestion,
@@ -12,11 +13,16 @@ import {
   type WrittenSession,
 } from "@/features/exam/written";
 import { WrittenFeedbackView } from "@/features/exam/WrittenFeedbackView";
+import {
+  planningExamCatalogChapter,
+  planningExamQuery,
+  readPlanningExamScope,
+} from "@/features/exam/mcq/planningScope";
 import { BUILTIN_CHAPTERS, findChapterForTopic, reconcileSelection, useCatalog } from "@/lib/catalog";
 import { DEFAULT_CLASS_LEVEL, QUESTION_TYPES, SUBJECT } from "@/lib/examConfig";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import styles from "./workspace.module.css";
 
 type PracticeMode = "generated" | "custom";
@@ -62,9 +68,18 @@ export default function AnswerWorkspacePage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const backendURL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
+  const planningScope = useMemo(() => readPlanningExamScope(searchParams), [searchParams]);
+  const planningChapter = useMemo(
+    () => planningScope ? planningExamCatalogChapter(planningScope) : null,
+    [planningScope],
+  );
+  const scopeChapters = useMemo(
+    () => planningChapter ? [planningChapter] : chapters,
+    [chapters, planningChapter],
+  );
 
-  const initialTopic = normalizeScope(searchParams.get("topic") || "alkanes") || "alkanes";
-  const initialChapter = normalizeScope(searchParams.get("chapter") || "")
+  const initialTopic = planningScope?.topic || normalizeScope(searchParams.get("topic") || "alkanes") || "alkanes";
+  const initialChapter = planningScope?.chapter || normalizeScope(searchParams.get("chapter") || "")
     || findChapterForTopic(BUILTIN_CHAPTERS, initialTopic)
     || "hydrocarbon";
 
@@ -84,26 +99,34 @@ export default function AnswerWorkspacePage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [draftReady, setDraftReady] = useState(false);
+  const preserveUnrelatedDraftRef = useRef(false);
+  const headingRef = useRouteHeadingFocus();
 
   const selection = useMemo(
-    () => reconcileSelection(chapters, chapter, topic),
-    [chapter, chapters, topic],
+    () => planningScope
+      ? { chapter: planningScope.chapter, topic: planningScope.topic, changed: false }
+      : reconcileSelection(scopeChapters, chapter, topic),
+    [chapter, planningScope, scopeChapters, topic],
   );
-  const selectedChapter = chapters.find((item) => item.value === selection.chapter) || chapters[0];
+  const selectedChapter = scopeChapters.find((item) => item.value === selection.chapter) || scopeChapters[0];
   const selectedTopic = selectedChapter?.topics.find((item) => item.value === selection.topic) || selectedChapter?.topics[0];
-  const classLevel = profile?.classLevel || DEFAULT_CLASS_LEVEL;
-  const scopeQuery = queryFor(selectedChapter?.value || chapter, selectedTopic?.value || topic);
+  const classLevel = planningScope?.classLevel || profile?.classLevel || DEFAULT_CLASS_LEVEL;
+  const activeSubject = planningScope?.subject || SUBJECT;
+  const scopeQuery = planningScope
+    ? planningExamQuery(planningScope)
+    : queryFor(selectedChapter?.value || chapter, selectedTopic?.value || topic);
   const draftKey = userId ? `agentifyai:exam:written:v1:${userId}` : "";
   const hasUnsavedDraft = stage === "write" && !feedback && (
     Boolean(answer.trim()) || Boolean(customQuestion.trim()) || Boolean(customAnswer.trim()) || Boolean(question)
   );
 
   useEffect(() => {
+    if (planningScope) return;
     if (!selection.changed) return;
     setChapter(selection.chapter);
     setTopic(selection.topic);
     router.replace(`/dashboard/exam/workspace?${queryFor(selection.chapter, selection.topic)}`, { scroll: false });
-  }, [router, selection]);
+  }, [planningScope, router, selection]);
 
   useEffect(() => {
     if (!draftKey) return;
@@ -112,6 +135,11 @@ export default function AnswerWorkspacePage() {
       if (raw) {
         const draft = JSON.parse(raw) as Partial<WrittenDraft>;
         if (draft.version === 1 && (draft.mode === "generated" || draft.mode === "custom")) {
+          if (planningScope && (draft.chapter !== planningScope.chapter || draft.topic !== planningScope.topic)) {
+            preserveUnrelatedDraftRef.current = true;
+            setNotice("Your earlier draft remains saved. This workspace is ready for the focus selected in Planning.");
+            return;
+          }
           setMode(draft.mode);
           setStage(draft.stage === "write" ? "write" : "setup");
           if (draft.chapter) setChapter(draft.chapter);
@@ -131,11 +159,12 @@ export default function AnswerWorkspacePage() {
     } finally {
       setDraftReady(true);
     }
-  }, [draftKey]);
+  }, [draftKey, planningScope]);
 
   useEffect(() => {
     if (!draftReady || !draftKey) return;
     if (!hasUnsavedDraft || !mode) {
+      if (preserveUnrelatedDraftRef.current) return;
       window.sessionStorage.removeItem(draftKey);
       return;
     }
@@ -167,6 +196,7 @@ export default function AnswerWorkspacePage() {
   }, [hasUnsavedDraft]);
 
   const updateRouteScope = (nextChapter: string, nextTopic: string) => {
+    if (planningScope) return;
     setChapter(nextChapter);
     setTopic(nextTopic);
     router.replace(`/dashboard/exam/workspace?${queryFor(nextChapter, nextTopic)}`, { scroll: false });
@@ -179,7 +209,7 @@ export default function AnswerWorkspacePage() {
     if (!selectedChapter || !selectedTopic) throw new Error("Choose a chapter and topic first.");
     const nextSession = await startWrittenSession(await getContext(), {
       class_level: classLevel,
-      subject: SUBJECT,
+      subject: activeSubject,
       chapter_name: selectedChapter.label,
       topic: selectedTopic.label,
       marks_focus: marksFocus,
@@ -269,7 +299,7 @@ export default function AnswerWorkspacePage() {
   };
 
   return (
-    <main className={styles.page} data-stage={stage}>
+    <div className={styles.page} data-stage={stage}>
       <div className={styles.frame}>
         <header className={styles.topbar}>
           <div className={styles.breadcrumbs} aria-label="Breadcrumb">
@@ -292,7 +322,7 @@ export default function AnswerWorkspacePage() {
         <section className={styles.titleRow}>
           <div>
             <p className={styles.eyebrow}>Focused written practice</p>
-            <h1 tabIndex={-1}>{stage === "feedback" ? "Teacher feedback" : "Answer Workspace"}</h1>
+            <h1 ref={headingRef} tabIndex={-1}>{stage === "feedback" ? "Teacher feedback" : "Answer Workspace"}</h1>
             <p>{stage === "feedback" ? "Review what earned marks and what will lift your next response." : "One question, one answer, one clear path to improvement."}</p>
           </div>
           <ol className={styles.steps} aria-label="Workspace progress">
@@ -349,15 +379,15 @@ export default function AnswerWorkspacePage() {
                     <label>
                       <span>Chapter</span>
                       <select value={selectedChapter?.value || chapter} onChange={(event) => {
-                        const nextChapter = chapters.find((item) => item.value === event.target.value) || chapters[0];
+                        const nextChapter = scopeChapters.find((item) => item.value === event.target.value) || scopeChapters[0];
                         updateRouteScope(nextChapter.value, nextChapter.topics[0]?.value || "");
-                      }}>
-                        {chapters.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                      }} disabled={Boolean(planningScope)}>
+                        {scopeChapters.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                       </select>
                     </label>
                     <label>
                       <span>Topic</span>
-                      <select value={selectedTopic?.value || topic} onChange={(event) => updateRouteScope(selectedChapter.value, event.target.value)}>
+                      <select value={selectedTopic?.value || topic} onChange={(event) => updateRouteScope(selectedChapter.value, event.target.value)} disabled={Boolean(planningScope)}>
                         {(selectedChapter?.topics || []).map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                       </select>
                     </label>
@@ -374,7 +404,7 @@ export default function AnswerWorkspacePage() {
                   </div>
                   <div className={styles.scopeSummary}>
                     <span>{classLevel}</span>
-                    <span>{SUBJECT}</span>
+                    <span>{activeSubject}</span>
                     <span>{selectedTopic?.label}</span>
                   </div>
                   <button className={styles.primaryButton} type="submit" disabled={busy || !marksFocus || Number(marksFocus) < 1}>
@@ -462,6 +492,6 @@ export default function AnswerWorkspacePage() {
           </section>
         ) : null}
       </div>
-    </main>
+    </div>
   );
 }

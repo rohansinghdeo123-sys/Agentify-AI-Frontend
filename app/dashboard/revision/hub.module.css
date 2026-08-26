@@ -17,6 +17,7 @@
     var(--ds-bg-app);
   background-size: 3.2rem 3.2rem, 3.2rem 3.2rem, auto, auto, auto;
   color: var(--ds-text-primary);
+  color-scheme: light;
   scrollbar-gutter: stable;
 }
 
@@ -24,6 +25,7 @@
   --revision-hub-success-ink: #6ee7b7;
   --revision-hub-warning-ink: #f6c96b;
   --revision-hub-danger-ink: #fda4af;
+  color-scheme: dark;
 }
 
 .ambient {
@@ -253,21 +255,13 @@
     var(--ds-surface);
   padding: 0.9rem;
   color: inherit;
-  text-decoration: none;
-  transition:
-    border-color var(--ds-duration-normal) var(--ds-ease-standard),
-    box-shadow var(--ds-duration-normal) var(--ds-ease-standard),
-    transform var(--ds-duration-normal) var(--ds-ease-standard);
+  overflow: hidden;
 }
 
-.continueCard:hover {
-  border-color: color-mix(in srgb, var(--ds-accent-teal) 48%, var(--ds-border));
-  box-shadow: var(--ds-shadow-md);
-  transform: translateY(-2px);
-}
-
-.continueCard:focus-visible,
+.continueAction:focus-visible,
+.handoffRow a:focus-visible,
 .queueRow:focus-visible,
+.queueRetry:focus-visible,
 .topicButton:focus-visible,
 .primaryButton:focus-visible,
 .secondaryButton:focus-visible,
@@ -299,18 +293,90 @@
   white-space: nowrap;
 }
 
+.continueCopy p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0.28rem 0 0;
+  color: var(--ds-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.46;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .continueAction {
   display: inline-flex;
+  min-height: 2.75rem;
+  flex: 0 0 auto;
   align-items: center;
+  justify-content: center;
   gap: 0.32rem;
-  color: var(--ds-accent-teal);
-  font-size: 0.71rem;
+  border: 1px solid color-mix(in srgb, #0f766e 72%, var(--ds-border));
+  border-radius: var(--ds-radius-full);
+  background: #0f766e;
+  padding: 0.58rem 0.78rem;
+  color: #fff;
+  font-size: 0.75rem;
   font-weight: 780;
+  text-decoration: none;
+  transition:
+    box-shadow var(--ds-duration-fast) var(--ds-ease-standard),
+    transform var(--ds-duration-fast) var(--ds-ease-standard);
+}
+
+.continueAction:hover {
+  box-shadow: 0 0.55rem 1.2rem color-mix(in srgb, var(--ds-accent-teal) 18%, transparent);
+  transform: translateY(-1px);
 }
 
 .continueAction svg {
   width: 0.84rem;
   height: 0.84rem;
+}
+
+.handoffRow {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.45rem;
+  border-bottom: 1px solid var(--ds-border-subtle);
+  padding: 0 0.1rem 0.8rem;
+}
+
+.handoffRow > span {
+  margin-right: auto;
+  color: var(--ds-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.handoffRow a {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.32rem;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-full);
+  background: var(--ds-surface);
+  padding: 0.52rem 0.72rem;
+  color: var(--ds-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 760;
+  text-decoration: none;
+  transition:
+    border-color var(--ds-duration-fast) var(--ds-ease-standard),
+    color var(--ds-duration-fast) var(--ds-ease-standard);
+}
+
+.handoffRow a:hover {
+  border-color: var(--ds-border-strong);
+  color: var(--ds-text-primary);
+}
+
+.handoffRow svg {
+  width: 0.85rem;
+  height: 0.85rem;
 }
 
 .queueBlock {
@@ -326,15 +392,25 @@
   gap: 0.8rem;
 }
 
-.queueHeading span {
+.queueHeading h3 {
+  margin: 0;
   color: var(--ds-text-secondary);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 770;
+}
+
+.queueHeading h3:focus {
+  outline: none;
+}
+
+.queueHeading h3:focus-visible {
+  border-radius: 0.2rem;
+  box-shadow: var(--ds-shadow-focus);
 }
 
 .queueHeading small {
   color: var(--ds-text-muted);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
 }
 
 .queueList {
@@ -462,6 +538,27 @@ a.queueRow:hover {
   line-height: 1.45;
 }
 
+.queueEmpty[data-tone="error"] {
+  border-color: color-mix(in srgb, var(--revision-hub-danger-ink) 28%, var(--ds-border));
+  color: var(--revision-hub-danger-ink);
+}
+
+.queueRetry {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.62rem;
+  border: 1px solid color-mix(in srgb, var(--revision-hub-danger-ink) 32%, var(--ds-border));
+  border-radius: var(--ds-radius-full);
+  background: var(--ds-surface);
+  padding: 0.5rem 0.76rem;
+  color: var(--ds-text-primary);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 760;
+}
+
 .chapterSelect {
   display: grid;
   gap: 0.3rem;
@@ -486,6 +583,11 @@ a.queueRow:hover {
   font: inherit;
   font-size: 0.78rem;
   font-weight: 700;
+}
+
+.chapterSelect option {
+  background: var(--ds-surface-elevated);
+  color: var(--ds-text-primary);
 }
 
 .topicList {
@@ -599,7 +701,7 @@ a.queueRow:hover {
 .primaryButton,
 .secondaryButton {
   display: inline-flex;
-  min-height: 2.65rem;
+  min-height: 2.75rem;
   align-items: center;
   justify-content: center;
   gap: 0.43rem;
@@ -703,6 +805,50 @@ a.queueRow:hover {
     flex-direction: column;
   }
 
+  .continueCard {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .continueCopy {
+    flex-basis: calc(100% - 3.5rem);
+  }
+
+  .continueCopy strong,
+  .continueCopy span,
+  .queueCopy strong,
+  .queueCopy small,
+  .topicName,
+  .selectionFooter strong {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .continueAction {
+    width: 100%;
+  }
+
+  .handoffRow {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .handoffRow > span {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+
+  .queueRow {
+    grid-template-columns: 1.4rem minmax(0, 1fr);
+  }
+
+  .bucket {
+    grid-column: 2;
+    justify-self: start;
+  }
+
   .primaryActions,
   .primaryButton,
   .secondaryButton {
@@ -724,13 +870,15 @@ a.queueRow:hover {
   }
 
   .continueCard,
+  .continueAction,
+  .handoffRow a,
   .primaryButton,
   .secondaryButton,
   .topicButton {
     transition: none;
   }
 
-  .continueCard:hover,
+  .continueAction:hover,
   .primaryButton:hover,
   .secondaryButton:hover {
     transform: none;

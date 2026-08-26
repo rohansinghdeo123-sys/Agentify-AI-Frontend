@@ -1,4 +1,7 @@
+"use client";
+
 import { AppIcon } from "@/components/ui/Polished";
+import { useRouteHeadingFocus } from "./useRouteHeadingFocus";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import styles from "./exam-screen.module.css";
@@ -26,8 +29,10 @@ export function ExamScreen({
   className,
   bodyClassName,
 }: ExamScreenProps) {
+  const headingRef = useRouteHeadingFocus();
+
   return (
-    <main className={[styles.screen, className].filter(Boolean).join(" ")}>
+    <div className={[styles.screen, className].filter(Boolean).join(" ")}>
       <div className={styles.ambient} aria-hidden="true" />
       <div className={styles.inner}>
         <header className={styles.header}>
@@ -39,7 +44,7 @@ export function ExamScreen({
               </Link>
             ) : null}
             <p className={styles.eyebrow}>{eyebrow}</p>
-            <h1>{title}</h1>
+            <h1 ref={headingRef} tabIndex={-1}>{title}</h1>
             <p className={styles.description}>{description}</p>
           </div>
           {actions ? <div className={styles.actions}>{actions}</div> : null}
@@ -47,7 +52,7 @@ export function ExamScreen({
 
         <div className={[styles.body, bodyClassName].filter(Boolean).join(" ")}>{children}</div>
       </div>
-    </main>
+    </div>
   );
 }
 

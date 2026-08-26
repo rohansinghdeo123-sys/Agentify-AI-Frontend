@@ -14,6 +14,10 @@ import {
   studySessionHref,
   syllabusStudyScope,
 } from "@/features/study/routes";
+import {
+  appendPendingStudyTurn,
+  createStudyTutorRequestSnapshot,
+} from "@/features/study/retry";
 
 function source(relativePath: string) {
   return readFileSync(join(process.cwd(), relativePath), "utf8");
@@ -52,7 +56,7 @@ describe("focused Study Lab architecture", () => {
   it("ships independent home, session, and history routes", () => {
     routes.forEach((route) => expect(existsSync(join(process.cwd(), route)), route).toBe(true));
 
-    expect(source(routes[0])).toContain("Start a focused session");
+    expect(source(routes[0])).toContain("Three simple ways to study");
     expect(source(routes[1])).toContain("Conversation library");
     expect(source(routes[2])).toContain("StudySessionWorkspace");
   });
@@ -61,6 +65,75 @@ describe("focused Study Lab architecture", () => {
     const workspace = source("components/study/StudySessionWorkspace.tsx");
 
     expect(workspace).toContain("<StudySessionRoom key={conversationId} conversationId={conversationId} />");
+  });
+
+  it("offers clear learn, doubt, and understanding-check entry routes without changing the tutor backend", () => {
+    const home = source("app/dashboard/study/page.tsx");
+    const workspace = source("components/study/StudySessionWorkspace.tsx");
+
+    expect(home).toContain("Learn a planned concept");
+    expect(home).toContain("Clarify a doubt");
+    expect(home).toContain("Check understanding");
+    expect(home).toContain('startSession("clarify")');
+    expect(home).toContain('startSession("practice")');
+    expect(home).toContain('const entry = intent === "clarify" ? "ask_ai" : intent');
+    expect(workspace).toContain('const directAskEntry = entry === "ask_ai"');
+    expect(workspace).toContain('const practiceEntry = entry === "practice"');
+    expect(workspace).toContain("Ready for a quick check on");
+    expect(workspace).toContain("streamCoachTurn(");
+  });
+
+  it("retries one failed tutor turn in place with the original grounding request", () => {
+    const request = createStudyTutorRequestSnapshot({
+      prompt: "Explain the diagram",
+      attachments: [{
+        id: "diagram-1",
+        name: "diagram.png",
+        mime_type: "image/png",
+        size_bytes: 1200,
+        data_url: "data:image/png;base64,abc",
+      }],
+      strictAttachmentGrounding: true,
+      directAnswer: true,
+      socraticMode: false,
+      fromVoice: false,
+    });
+    const transcript = [
+      { role: "user" as const, content: "Earlier question", timestamp: "10:00" },
+      { role: "coach" as const, content: "Earlier answer", timestamp: "10:01" },
+      { role: "user" as const, content: request.prompt, timestamp: "10:02", attachments: request.attachments },
+      { role: "coach" as const, content: "Temporary error", timestamp: "10:03" },
+    ];
+
+    const retried = appendPendingStudyTurn(transcript, request, "10:04", true);
+    expect(retried.map((message) => message.role)).toEqual(["user", "coach", "user", "coach"]);
+    expect(retried.filter((message) => message.content === request.prompt)).toHaveLength(1);
+    expect(retried.at(-2)?.attachments).toEqual(request.attachments);
+    expect(retried.at(-2)?.attachments).not.toBe(request.attachments);
+    expect(request).toMatchObject({ strictAttachmentGrounding: true, directAnswer: true, socraticMode: false });
+
+    const workspace = source("components/study/StudySessionWorkspace.tsx");
+    expect(workspace).toContain("setFailedRequest(request)");
+    expect(workspace).toContain("requestSnapshot: failedRequest");
+    expect(workspace).not.toContain("replaceLastAssistant");
+  });
+
+  it("keeps Study controls touch-friendly, theme-readable, and inside the dashboard landmark", () => {
+    const homeCss = source("app/dashboard/study/home.module.css");
+    const sessionCss = source("components/study/study-session.module.css");
+    const workspace = source("components/study/StudySessionWorkspace.tsx");
+    const appShell = source("components/app-shell/AppShell.tsx");
+
+    expect(homeCss).toContain(':global([data-theme="dark"]) .scopeControls option');
+    expect(homeCss).toContain(".quickRoutes { grid-template-columns: 1fr; }");
+    expect(sessionCss).toContain("min-width: 2.75rem");
+    expect(sessionCss).toContain("min-height: 2.75rem");
+    expect(sessionCss).not.toMatch(/min-height:\s*2\.(?:[0-6]\d*)rem/);
+    expect(sessionCss).not.toMatch(/font-size:\s*0\.(?:[0-6]\d*)rem/);
+    expect(sessionCss).toContain(':global([data-theme="dark"]) .composerCard');
+    expect(workspace).toContain('role="status" aria-live="polite"');
+    expect(workspace).not.toContain("<main");
+    expect(appShell.match(/<main\b/g)).toHaveLength(1);
   });
 
   it("keeps revision and exam generation out of the active Study workspace", () => {
@@ -276,7 +349,7 @@ describe("focused Study Lab architecture", () => {
     expect(api).toContain("selected_topic:");
     expect(api).toContain("class_level:");
     const workspace = source("components/study/StudySessionWorkspace.tsx");
-    expect(workspace).toContain('searchParams.get("entry") === "ask_ai"');
+    expect(workspace).toContain('const directAskEntry = entry === "ask_ai"');
     expect(workspace).toContain("planningAskTopic");
     expect(workspace).toContain('scope.catalogSource === "planning_manifest" && result.interactionId');
     expect(workspace).toContain("recordPlanningStudyEvidence");

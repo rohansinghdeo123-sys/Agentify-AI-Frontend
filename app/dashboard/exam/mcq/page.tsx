@@ -5,7 +5,7 @@ import { AppIcon } from "@/components/ui/Polished";
 import { useAuth } from "@/context/AuthContext";
 import { examApiRequest } from "@/features/exam/api";
 import { type ExamQuestion, normalizeExamQuestion } from "@/features/exam/contracts";
-import { readPlanningMcqScope } from "@/features/exam/mcq/planningScope";
+import { planningExamHubHref, readPlanningMcqScope } from "@/features/exam/mcq/planningScope";
 import {
   MCQ_DRAFT_VERSION,
   clearMcqDraft,
@@ -152,7 +152,9 @@ export default function McqExamPage() {
     [activeChapterValue, activeTopicValue, userId],
   );
   const scopeQuery = `chapter=${encodeURIComponent(activeChapterValue)}&topic=${encodeURIComponent(activeTopicValue)}`;
-  const hubHref = `/dashboard/exam?${scopeQuery}`;
+  const hubHref = planningScope
+    ? planningExamHubHref(planningScope)
+    : `/dashboard/exam?${scopeQuery}`;
   const revisionHref = `/dashboard/revision/${encodeURIComponent(activeChapterValue)}?topic=${encodeURIComponent(activeTopicValue)}`;
   const workspaceHref = `/dashboard/exam/workspace?${scopeQuery}`;
 

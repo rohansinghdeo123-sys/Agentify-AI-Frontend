@@ -14,6 +14,8 @@ export type RevisionScope = {
   topic: string;
 };
 
+export type RevisionHandoffTarget = "study" | "exam";
+
 type SearchParamsReader = {
   get(name: string): string | null;
 };
@@ -77,6 +79,16 @@ export function revisionToolsHref(scope: RevisionScope) {
   const chapter = normalizeRevisionValue(scope.chapter) || DEFAULT_REVISION_SCOPE.chapter;
   const topic = normalizeRevisionValue(scope.topic) || DEFAULT_REVISION_SCOPE.topic;
   return `/dashboard/revision/${encodeURIComponent(chapter)}/tools?topic=${encodeURIComponent(topic)}`;
+}
+
+export function revisionHandoffHref(
+  target: RevisionHandoffTarget,
+  scope: RevisionScope,
+) {
+  const chapter = normalizeRevisionValue(scope.chapter) || DEFAULT_REVISION_SCOPE.chapter;
+  const topic = normalizeRevisionValue(scope.topic) || DEFAULT_REVISION_SCOPE.topic;
+  const params = new URLSearchParams({ chapter, topic });
+  return `/dashboard/${target}?${params.toString()}`;
 }
 
 export function getRevisionScopeLabels(chapters: CatalogChapter[], scope: RevisionScope) {

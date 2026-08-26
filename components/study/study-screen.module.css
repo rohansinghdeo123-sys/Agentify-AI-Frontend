@@ -85,7 +85,7 @@
 
 .backLink {
   display: inline-flex;
-  min-height: 2.6rem;
+  min-height: 2.75rem;
   align-items: center;
   gap: 0.45rem;
   margin-bottom: 1.4rem;
@@ -106,7 +106,7 @@
 
 .eyebrow {
   color: var(--study-screen-accent);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 850;
   letter-spacing: 0.17em;
   text-transform: uppercase;
@@ -142,7 +142,7 @@
 
 .syncPill {
   display: inline-flex;
-  min-height: 2.5rem;
+  min-height: 2.75rem;
   align-items: center;
   gap: 0.5rem;
   border: 1px solid var(--dashboard-border, rgba(15, 23, 42, 0.12));
@@ -150,7 +150,7 @@
   background: var(--dashboard-surface-strong, rgba(255, 255, 255, 0.88));
   padding: 0.55rem 0.82rem;
   color: var(--dashboard-muted, #64748b);
-  font-size: 0.73rem;
+  font-size: 0.75rem;
   font-weight: 750;
 }
 

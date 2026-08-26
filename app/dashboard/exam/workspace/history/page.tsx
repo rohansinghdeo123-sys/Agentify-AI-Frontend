@@ -1,6 +1,7 @@
 "use client";
 
 import { AppIcon } from "@/components/ui/Polished";
+import { useRouteHeadingFocus } from "@/components/exam/useRouteHeadingFocus";
 import { useAuth } from "@/context/AuthContext";
 import {
   fetchWeaknesses,
@@ -49,6 +50,7 @@ export default function WrittenHistoryPage() {
   const [filter, setFilter] = useState<AttemptFilter>("all");
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
+  const headingRef = useRouteHeadingFocus();
 
   const loadReview = useCallback(async () => {
     if (!userId) return;
@@ -89,7 +91,7 @@ export default function WrittenHistoryPage() {
   }), [attempts, filter]);
 
   return (
-    <main className={styles.page}>
+    <div className={styles.page}>
       <div className={styles.frame}>
         <header className={styles.topbar}>
           <div className={styles.breadcrumbs} aria-label="Breadcrumb">
@@ -107,7 +109,7 @@ export default function WrittenHistoryPage() {
         <section className={styles.titleRow}>
           <div>
             <p className={styles.eyebrow}>Written performance</p>
-            <h1 tabIndex={-1}>History & insights</h1>
+            <h1 ref={headingRef} tabIndex={-1}>History & insights</h1>
             <p>Review evaluated answers and the recurring skills to strengthen next.</p>
           </div>
           <Link className={styles.primaryButton} href={`/dashboard/exam/workspace?${scopeQuery}`}>
@@ -211,6 +213,6 @@ export default function WrittenHistoryPage() {
           </section>
         ) : null}
       </div>
-    </main>
+    </div>
   );
 }

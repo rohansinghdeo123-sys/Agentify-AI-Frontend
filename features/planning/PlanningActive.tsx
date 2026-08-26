@@ -344,6 +344,11 @@ export default function PlanningActive() {
   const { roadmap, scope } = activePlan;
   const nextUnit = getPlanningUnit(roadmap, roadmap.next_step.unit_id);
   const isGlobalChapter = portfolio?.global_next_step.chapter_slug === roadmap.chapter_slug;
+  const activePortfolioChapter = portfolio?.chapters.find((chapter) => chapter.chapter_slug === roadmap.chapter_slug);
+  const portfolioReasonLabel = isGlobalChapter ? "Why this chapter now" : "Why this unit next";
+  const portfolioReason = isGlobalChapter
+    ? portfolio?.global_next_step.selection_reason
+    : activePortfolioChapter?.next_step.reason;
   const showTodayRoute = Boolean(isGlobalChapter && roadmap.daily_route?.items.length);
   const firstRouteUnit = roadmap.daily_route?.items[0]
     ? getPlanningUnit(roadmap, roadmap.daily_route.items[0].unit_id)
@@ -416,7 +421,7 @@ export default function PlanningActive() {
             </nav>
             <p className={styles.portfolioReason}>
               <AppIcon name="spark" />
-              <span><strong>Why this chapter now:</strong> {portfolio.global_next_step.selection_reason}</span>
+              <span><strong>{portfolioReasonLabel}:</strong> {portfolioReason}</span>
             </p>
           </section>
         ) : null}

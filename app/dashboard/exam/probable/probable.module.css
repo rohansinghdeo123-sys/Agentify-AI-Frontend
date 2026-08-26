@@ -241,6 +241,7 @@
   font-weight: 850;
   grid-column: 2;
   justify-content: flex-start;
+  min-height: 44px;
 }
 
 .groundingNote {
@@ -262,7 +263,7 @@
 }
 
 .generateButton {
-  background: linear-gradient(135deg, #0e7490, #0f8f82);
+  background: linear-gradient(135deg, #0e7490, #0f766e);
   border-radius: 11px;
   box-shadow: 0 12px 26px rgba(14, 116, 144, 0.22);
   color: #fff;
@@ -613,7 +614,7 @@
   font-weight: 850;
   gap: 7px;
   margin-top: 18px;
-  min-height: 43px;
+  min-height: 44px;
   padding: 0 14px;
 }
 

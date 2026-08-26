@@ -87,7 +87,7 @@
 .eyebrow {
   margin: 0 0 0.6rem;
   color: var(--ds-accent-teal);
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 820;
   letter-spacing: 0.18em;
   line-height: 1.4;
@@ -103,6 +103,10 @@
   letter-spacing: -0.058em;
   line-height: 0.98;
   text-wrap: balance;
+}
+
+.hero h1:focus {
+  outline: none;
 }
 
 .intro {
@@ -128,7 +132,7 @@
 
 .scope span {
   color: var(--ds-text-muted);
-  font-size: 0.61rem;
+  font-size: 0.75rem;
   font-weight: 780;
   letter-spacing: 0.13em;
   text-transform: uppercase;
@@ -146,10 +150,105 @@
 .scope small {
   overflow: hidden;
   color: var(--ds-accent-teal);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 680;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.recommendation {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--ds-accent-teal) 26%, var(--ds-border));
+  border-radius: var(--ds-radius-xl);
+  background:
+    linear-gradient(110deg, color-mix(in srgb, var(--ds-accent-teal-soft) 78%, transparent), transparent 62%),
+    color-mix(in srgb, var(--ds-surface-elevated) 92%, transparent);
+  padding: 0.85rem 0.95rem;
+  box-shadow: var(--ds-shadow-sm);
+  backdrop-filter: blur(18px);
+}
+
+.recommendationIcon {
+  display: inline-flex;
+  width: 2.75rem;
+  height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--ds-accent-teal) 28%, var(--ds-border));
+  border-radius: 0.9rem;
+  background: color-mix(in srgb, var(--ds-accent-teal-soft) 68%, var(--ds-surface-elevated));
+  color: var(--ds-accent-teal);
+}
+
+.recommendationIcon svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.recommendationCopy {
+  min-width: 0;
+}
+
+.recommendationCopy p {
+  margin: 0 0 0.16rem;
+  color: var(--ds-accent-teal);
+  font-size: 0.75rem;
+  font-weight: 820;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.recommendationCopy h2 {
+  margin: 0;
+  color: var(--ds-text-primary);
+  font-size: clamp(1rem, 1.5vw, 1.16rem);
+  font-weight: 760;
+  letter-spacing: -0.025em;
+}
+
+.recommendationCopy span {
+  display: block;
+  margin-top: 0.22rem;
+  color: var(--ds-text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.recommendationAction {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.42rem;
+  border: 1px solid color-mix(in srgb, var(--ds-accent-teal) 55%, var(--ds-border));
+  border-radius: 0.8rem;
+  background: var(--ds-text-primary);
+  padding: 0 0.9rem;
+  color: var(--ds-bg-app);
+  font-size: 0.76rem;
+  font-weight: 780;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    box-shadow var(--ds-duration-fast) var(--ds-ease-standard),
+    transform var(--ds-duration-fast) var(--ds-ease-standard);
+}
+
+.recommendationAction svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.recommendationAction:hover {
+  transform: translateY(-1px);
+}
+
+.recommendationAction:focus-visible {
+  outline: none;
+  box-shadow: var(--ds-shadow-focus);
 }
 
 .grid {
@@ -242,7 +341,7 @@
 .number {
   color: var(--ds-text-muted);
   font-family: var(--ds-font-mono);
-  font-size: 0.67rem;
+  font-size: 0.75rem;
   font-weight: 680;
   letter-spacing: 0.12em;
 }
@@ -273,7 +372,7 @@
 .cardCopy p {
   margin: 0 0 0.3rem;
   color: var(--card-accent);
-  font-size: 0.64rem;
+  font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -304,7 +403,7 @@
 
 .cardFooter small {
   color: var(--ds-text-muted);
-  font-size: 0.64rem;
+  font-size: 0.75rem;
   font-weight: 650;
   letter-spacing: 0.02em;
 }
@@ -314,7 +413,7 @@
   align-items: center;
   gap: 0.35rem;
   color: var(--card-accent);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 780;
 }
 
@@ -351,7 +450,7 @@
 .footerNote {
   margin: -0.35rem 0 0;
   color: var(--ds-text-muted);
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   text-align: center;
 }
 
@@ -385,6 +484,15 @@
     min-width: 0;
   }
 
+  .recommendation {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .recommendationAction {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
   .grid {
     grid-template-columns: 1fr;
   }
@@ -405,6 +513,14 @@
     flex-direction: column;
     gap: 0.55rem;
   }
+
+  .recommendation {
+    grid-template-columns: 1fr;
+  }
+
+  .recommendationIcon {
+    display: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -415,7 +531,8 @@
 
   .cardGlow,
   .icon,
-  .openAction svg {
+  .openAction svg,
+  .recommendationAction {
     transition: none;
   }
 

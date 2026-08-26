@@ -6,6 +6,11 @@ import { useAuth } from "@/context/AuthContext";
 import { examApiUpload, examApiRequest } from "@/features/exam/api";
 import type { PaperOut, PaperUploadResponse } from "@/features/exam/contracts";
 import {
+  planningExamCatalogChapter,
+  planningExamQuery,
+  readPlanningExamScope,
+} from "@/features/exam/mcq/planningScope";
+import {
   formatExamDate,
   formatExamFileSize,
   formatExamLabel,
@@ -43,13 +48,20 @@ export default function QuestionPaperLabPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const requestedTopic = normalizeTopic(searchParams.get("topic") || "alkanes") || "alkanes";
+  const planningScope = useMemo(() => readPlanningExamScope(searchParams), [searchParams]);
+  const planningChapter = useMemo(
+    () => planningScope ? planningExamCatalogChapter(planningScope) : null,
+    [planningScope],
+  );
+  const scopeChapters = planningChapter ? [planningChapter] : chapters;
+  const requestedTopic = planningScope?.topic || normalizeTopic(searchParams.get("topic") || "alkanes") || "alkanes";
   const requestedChapter =
-    searchParams.get("chapter") || findChapterForTopic(BUILTIN_CHAPTERS, requestedTopic) || "hydrocarbon";
-  const selectedChapter = chapters.find((item) => item.value === requestedChapter) || chapters[0];
+    planningScope?.chapter || searchParams.get("chapter") || findChapterForTopic(BUILTIN_CHAPTERS, requestedTopic) || "hydrocarbon";
+  const selectedChapter = scopeChapters.find((item) => item.value === requestedChapter) || scopeChapters[0];
   const selectedTopic =
     selectedChapter?.topics.find((item) => item.value === requestedTopic) || selectedChapter?.topics[0];
-  const classLevel = profile?.classLevel || DEFAULT_CLASS_LEVEL;
+  const classLevel = planningScope?.classLevel || profile?.classLevel || DEFAULT_CLASS_LEVEL;
+  const activeSubject = planningScope?.subject || SUBJECT;
 
   const [papers, setPapers] = useState<PaperOut[]>([]);
   const [paperFile, setPaperFile] = useState<File | null>(null);
@@ -63,14 +75,16 @@ export default function QuestionPaperLabPage() {
   const [notice, setNotice] = useState("");
 
   const scopeQuery = useMemo(() => {
+    if (planningScope) return planningExamQuery(planningScope);
     const params = new URLSearchParams();
     if (selectedChapter?.value) params.set("chapter", selectedChapter.value);
     if (selectedTopic?.value) params.set("topic", selectedTopic.value);
     return params.toString();
-  }, [selectedChapter?.value, selectedTopic?.value]);
+  }, [planningScope, selectedChapter?.value, selectedTopic?.value]);
 
   const updateScope = (chapterValue: string, topicValue?: string) => {
-    const chapter = chapters.find((item) => item.value === chapterValue) || chapters[0];
+    if (planningScope) return;
+    const chapter = scopeChapters.find((item) => item.value === chapterValue) || scopeChapters[0];
     const topic = chapter?.topics.find((item) => item.value === topicValue) || chapter?.topics[0];
     const params = new URLSearchParams(searchParams.toString());
     if (chapter?.value) params.set("chapter", chapter.value);
@@ -83,13 +97,13 @@ export default function QuestionPaperLabPage() {
     setFetching(true);
     setError("");
     try {
-      const params = new URLSearchParams({ subject: SUBJECT, limit: "100", offset: "0" });
+      const params = new URLSearchParams({ subject: activeSubject, limit: "100", offset: "0" });
       const data = await examApiRequest<{ total: number; papers: PaperOut[] }>(
         `/exam/papers?${params.toString()}`,
         {
           getAuthHeaders,
           timeoutMs: 18000,
-          cacheKey: `exam-papers:${userId}:${SUBJECT}`,
+          cacheKey: `exam-papers:${userId}:${activeSubject}`,
           cacheTtlMs: 30000,
           forceFresh: true,
         },
@@ -100,7 +114,7 @@ export default function QuestionPaperLabPage() {
     } finally {
       setFetching(false);
     }
-  }, [getAuthHeaders, userId]);
+  }, [activeSubject, getAuthHeaders, userId]);
 
   useEffect(() => {
     if (loading || !userId) return;
@@ -164,7 +178,7 @@ export default function QuestionPaperLabPage() {
       const form = new FormData();
       form.append("file", paperFile);
       form.append("class_level", classLevel);
-      form.append("subject", SUBJECT);
+      form.append("subject", activeSubject);
       form.append("chapter_name", selectedChapter.label);
       form.append("exam_type", examType);
       if (paperTitle.trim()) form.append("paper_title", paperTitle.trim());
@@ -219,9 +233,9 @@ export default function QuestionPaperLabPage() {
               <select
                 value={selectedChapter?.value || ""}
                 onChange={(event) => updateScope(event.target.value)}
-                disabled={!chapters.length}
+                disabled={!scopeChapters.length || Boolean(planningScope)}
               >
-                {chapters.map((chapter) => (
+                {scopeChapters.map((chapter) => (
                   <option key={chapter.value} value={chapter.value}>{chapter.label}</option>
                 ))}
               </select>
@@ -232,7 +246,7 @@ export default function QuestionPaperLabPage() {
               <select
                 value={selectedTopic?.value || ""}
                 onChange={(event) => updateScope(selectedChapter?.value || "", event.target.value)}
-                disabled={!selectedChapter?.topics.length}
+                disabled={!selectedChapter?.topics.length || Boolean(planningScope)}
               >
                 {(selectedChapter?.topics || []).map((topic) => (
                   <option key={topic.value} value={topic.value}>{topic.label}</option>

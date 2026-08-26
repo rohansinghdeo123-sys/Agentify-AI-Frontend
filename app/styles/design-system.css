@@ -212,7 +212,7 @@
 
   [data-theme="dark"] .ds-button-primary {
     border-color: rgba(94, 234, 212, 0.24);
-    background: linear-gradient(180deg, #148b8a 0%, #0f6f73 100%);
+    background: linear-gradient(180deg, #0f766e 0%, #115e59 100%);
   }
 
   .ds-button-secondary {
@@ -285,7 +285,7 @@
   }
 
   .ds-field::placeholder {
-    color: var(--ds-text-disabled);
+    color: var(--ds-text-muted);
   }
 
   .ds-field:focus {

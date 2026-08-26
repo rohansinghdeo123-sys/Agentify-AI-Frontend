@@ -546,7 +546,7 @@
   border-radius: 0.72rem;
   background: var(--ds-bg-subtle);
   color: var(--plan-muted);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 850;
 }
 
@@ -633,7 +633,7 @@
   border-radius: 0.7rem;
   background: var(--ds-accent-teal-soft);
   color: var(--plan-teal);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 900;
 }
 
@@ -756,7 +756,7 @@
   border-radius: 0.7rem;
   background: var(--ds-accent-teal-soft);
   color: var(--plan-teal);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 900;
 }
 
@@ -917,7 +917,7 @@
   border-radius: 0.68rem;
   background: var(--ds-bg-subtle);
   color: var(--plan-teal);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 850;
 }
 
@@ -951,7 +951,7 @@
   background: var(--ds-accent-teal-soft);
   padding: 0.32rem 0.52rem;
   color: var(--plan-teal);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-style: normal;
   font-weight: 780;
   white-space: nowrap;
@@ -1202,7 +1202,7 @@
   background: var(--ds-accent-teal-soft);
   color: var(--plan-teal);
   content: counter(approach-step);
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 900;
 }
 
@@ -1305,7 +1305,7 @@
   border-radius: 999px;
   background: var(--ds-accent-teal-soft);
   color: var(--plan-secondary);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 840;
   letter-spacing: 0.02em;
 }
@@ -1632,7 +1632,7 @@
   background: var(--ds-accent-teal-soft);
   color: var(--plan-teal);
   content: counter(learning-step);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 850;
 }
 

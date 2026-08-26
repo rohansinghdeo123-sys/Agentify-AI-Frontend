@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   readRevisionScope,
+  revisionHandoffHref,
   revisionHomeHref,
   revisionLessonHref,
   revisionToolsHref,
@@ -90,6 +91,32 @@ describe("focused Revision Lab architecture", () => {
     expect(storage).toContain("window.localStorage");
     expect(storage).toContain("window.sessionStorage");
   });
+
+  it("keeps recommendations recoverable and hands scoped topics to Study and Exam", () => {
+    const home = source(routes[0]);
+
+    expect(home).toContain("retryRecommendations");
+    expect(home).toContain("Try recommendations again");
+    expect(home).toContain("recommendationRetryRef");
+    expect(home).toContain("focus({ preventScroll: true })");
+    expect(home).toContain('revisionHandoffHref("study", actionScope)');
+    expect(home).toContain('revisionHandoffHref("exam", actionScope)');
+    expect(home).toContain("recommendation.entry.reason");
+    expect(home).toContain("suggested_minutes");
+  });
+
+  it("keeps Revision controls readable, touch-safe, and contained on mobile", () => {
+    const hubCss = source("app/dashboard/revision/hub.module.css");
+    const screenCss = source("components/revision/revision-screen.module.css");
+
+    expect(hubCss).toContain("color-scheme: light");
+    expect(hubCss).toContain("color-scheme: dark");
+    expect(hubCss).toMatch(/\.queueRetry\s*\{[^}]*min-height:\s*2\.75rem/);
+    expect(hubCss).toMatch(/\.handoffRow a\s*\{[^}]*min-height:\s*2\.75rem/);
+    expect(hubCss).toContain("overflow-wrap: anywhere");
+    expect(screenCss).toMatch(/\.backLink\s*\{[^}]*min-height:\s*2\.75rem/);
+    expect(screenCss).toMatch(/\.actions :where\(a, button\)\s*\{[^}]*min-height:\s*2\.75rem/);
+  });
 });
 
 describe("Revision note extraction", () => {
@@ -163,6 +190,8 @@ describe("Revision route scope", () => {
     expect(revisionHomeHref(scope)).toBe("/dashboard/revision?chapter=basic_concepts&topic=states_of_matter");
     expect(revisionLessonHref(scope)).toBe("/dashboard/revision/basic_concepts?topic=states_of_matter");
     expect(revisionToolsHref(scope)).toBe("/dashboard/revision/basic_concepts/tools?topic=states_of_matter");
+    expect(revisionHandoffHref("study", scope)).toBe("/dashboard/study?chapter=basic_concepts&topic=states_of_matter");
+    expect(revisionHandoffHref("exam", scope)).toBe("/dashboard/exam?chapter=basic_concepts&topic=states_of_matter");
   });
 
   it("reads a chapter segment and topic query without stale UI state", () => {

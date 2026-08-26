@@ -1,6 +1,7 @@
 "use client";
 
 import { AppIcon } from "@/components/ui/Polished";
+import { useRouteHeadingFocus } from "@/components/exam/useRouteHeadingFocus";
 import { useAuth } from "@/context/AuthContext";
 import { fetchAttemptFeedback, type WrittenFeedback } from "@/features/exam/written";
 import { WrittenFeedbackView } from "@/features/exam/WrittenFeedbackView";
@@ -19,6 +20,7 @@ export default function AttemptFeedbackPage() {
   const [feedback, setFeedback] = useState<WrittenFeedback | null>(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
+  const headingRef = useRouteHeadingFocus();
 
   const loadFeedback = useCallback(async () => {
     if (!userId || !Number.isInteger(attemptId) || attemptId < 1) {
@@ -46,7 +48,7 @@ export default function AttemptFeedbackPage() {
   }, [loadFeedback, loading]);
 
   return (
-    <main className={styles.page}>
+    <div className={styles.page}>
       <div className={styles.frame}>
         <header className={styles.topbar}>
           <div className={styles.breadcrumbs} aria-label="Breadcrumb">
@@ -62,7 +64,7 @@ export default function AttemptFeedbackPage() {
         <section className={styles.titleRow}>
           <div>
             <p className={styles.eyebrow}>Saved evaluation</p>
-            <h1 tabIndex={-1}>Teacher feedback</h1>
+            <h1 ref={headingRef} tabIndex={-1}>Teacher feedback</h1>
             <p>Attempt #{Number.isFinite(attemptId) ? attemptId : "--"} · Review the evidence, rubric, and stronger answer.</p>
           </div>
         </section>
@@ -90,6 +92,6 @@ export default function AttemptFeedbackPage() {
           </section>
         ) : null}
       </div>
-    </main>
+    </div>
   );
 }

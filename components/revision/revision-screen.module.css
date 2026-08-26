@@ -16,6 +16,7 @@
     var(--ds-bg-app);
   background-size: 3.2rem 3.2rem, 3.2rem 3.2rem, auto, auto, auto;
   color: var(--ds-text-primary);
+  color-scheme: light;
 }
 
 :global([data-theme="dark"]) .screen {
@@ -23,6 +24,7 @@
   --revision-success-ink: #6ee7b7;
   --revision-warning-ink: #f6c96b;
   --revision-danger-ink: #fda4af;
+  color-scheme: dark;
 }
 
 .ambient {
@@ -76,6 +78,7 @@
 
 .header {
   display: flex;
+  max-width: 100%;
   align-items: flex-end;
   justify-content: space-between;
   gap: clamp(1.25rem, 3vw, 3rem);
@@ -89,7 +92,7 @@
 
 .backLink {
   display: inline-flex;
-  min-height: 2.5rem;
+  min-height: 2.75rem;
   align-items: center;
   gap: 0.46rem;
   margin: 0 0 0.82rem;
@@ -151,12 +154,18 @@
   outline: none;
 }
 
+.headingBlock h1:focus-visible {
+  border-radius: 0.25rem;
+  box-shadow: var(--ds-shadow-focus);
+}
+
 .description {
   max-width: 72ch;
   margin: 0.72rem 0 0;
   color: var(--ds-text-muted);
   font-size: clamp(0.86rem, 1.15vw, 0.98rem);
   line-height: 1.68;
+  overflow-wrap: anywhere;
 }
 
 .headerAside {
@@ -175,7 +184,13 @@
   gap: 0.6rem;
 }
 
+.actions :where(a, button) {
+  min-height: 2.75rem;
+}
+
 .body {
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
   min-height: 0;
   flex: 1;
@@ -192,6 +207,7 @@
   color: var(--ds-text-secondary);
   font-size: 0.82rem;
   line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 
 .statusDot {
@@ -230,6 +246,16 @@
 
 .status > div {
   color: var(--ds-text-secondary);
+}
+
+.status button {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+}
+
+.status button:focus-visible {
+  outline: none;
+  box-shadow: var(--ds-shadow-focus);
 }
 
 @keyframes headerReveal {
