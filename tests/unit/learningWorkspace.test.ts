@@ -154,14 +154,31 @@ describe("learning workspace journey", () => {
     const destinationLinks = markup.match(/href="\/dashboard\/(?:planning|study|revision|exam)"/g) ?? [];
 
     expect(destinationLinks).toHaveLength(4);
-    expect(markup).toContain("What do you want to do");
-    expect(markup).toContain("Four focused workspaces");
+    expect(markup).toContain("One clear route from");
+    expect(markup).toContain("Start with clarity");
+    expect(markup).toContain("Move at your pace");
     expect(markup).toContain("Choose your chapters and starting confidence");
     expect(markup).toContain("Suggested start");
+    expect(markup).toContain('data-mode="planning" data-recommended="true"');
     expect(markup).not.toContain("<header");
     expect(markup).not.toContain("<aside");
     expect(markup).not.toContain("<nav");
     expect(markup).not.toContain("Progress snapshot");
     expect(markup).not.toContain("Recent work");
+  });
+
+  it("moves the visual recommendation without changing the four available routes", () => {
+    const markup = renderToStaticMarkup(createElement(LearningJourney, {
+      recommendation: {
+        mode: "exam",
+        label: "Suggested for you",
+        reason: "Your current evidence is ready for a short diagnostic.",
+        basis: "mastery",
+      },
+    }));
+
+    expect(markup).toContain('data-mode="exam" data-recommended="true"');
+    expect(markup).toContain("Your current evidence is ready for a short diagnostic.");
+    expect(markup.match(/data-recommended="true"/g)).toHaveLength(1);
   });
 });
