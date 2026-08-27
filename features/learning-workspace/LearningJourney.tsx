@@ -12,6 +12,10 @@ export default function LearningJourney({
 }: {
   recommendation?: LearningRecommendation;
 }) {
+  const recommendationBadge = recommendation.basis === "setup"
+    ? "Suggested start"
+    : "Suggested for you";
+
   return (
     <section
       className={styles.page}
@@ -58,7 +62,7 @@ export default function LearningJourney({
                   <span className={styles.stationTopline}>
                     <span className={styles.sequence}>{String(step.step).padStart(2, "0")}</span>
                     <span className={styles.phase}>
-                      {recommended ? recommendation.label : STEP_LABELS[index]}
+                      {recommended ? recommendationBadge : STEP_LABELS[index]}
                     </span>
                   </span>
 
@@ -70,7 +74,7 @@ export default function LearningJourney({
 
                   <span className={styles.stationOutcome} id={`${step.id}-outcome`}>
                     <span>
-                      <small>{recommended ? recommendation.label : "Outcome"}</small>
+                      <small>{recommended ? recommendationBadge : "Outcome"}</small>
                       <strong>{recommended ? recommendation.reason : step.outcome}</strong>
                     </span>
                     <span className={styles.openIndicator} aria-hidden="true">

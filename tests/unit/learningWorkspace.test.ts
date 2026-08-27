@@ -171,13 +171,15 @@ describe("learning workspace journey", () => {
     const markup = renderToStaticMarkup(createElement(LearningJourney, {
       recommendation: {
         mode: "exam",
-        label: "Suggested for you",
+        label: "Suggested from your latest check",
         reason: "Your current evidence is ready for a short diagnostic.",
         basis: "mastery",
       },
     }));
 
     expect(markup).toContain('data-mode="exam" data-recommended="true"');
+    expect(markup).toContain("Suggested for you");
+    expect(markup).not.toContain("Suggested from your latest check");
     expect(markup).toContain("Your current evidence is ready for a short diagnostic.");
     expect(markup.match(/data-recommended="true"/g)).toHaveLength(1);
   });
