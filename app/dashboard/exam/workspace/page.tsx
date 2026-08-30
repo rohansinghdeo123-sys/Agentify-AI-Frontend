@@ -64,7 +64,7 @@ function queryFor(chapter: string, topic: string) {
 
 export default function AnswerWorkspacePage() {
   const { profile, userId, loading, getAuthHeaders } = useAuth();
-  const { chapters } = useCatalog();
+  const { chapters, settled: catalogSettled } = useCatalog();
   const searchParams = useSearchParams();
   const router = useRouter();
   const backendURL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
@@ -122,11 +122,14 @@ export default function AnswerWorkspacePage() {
 
   useEffect(() => {
     if (planningScope) return;
+    // Published chapters are not necessarily present in the instantaneous
+    // starter catalog. Preserve their URL until the real catalog has settled.
+    if (!catalogSettled) return;
     if (!selection.changed) return;
     setChapter(selection.chapter);
     setTopic(selection.topic);
     router.replace(`/dashboard/exam/workspace?${queryFor(selection.chapter, selection.topic)}`, { scroll: false });
-  }, [planningScope, router, selection]);
+  }, [catalogSettled, planningScope, router, selection]);
 
   useEffect(() => {
     if (!draftKey) return;

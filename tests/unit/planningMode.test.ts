@@ -1163,6 +1163,9 @@ describe("NCERT-ordered Planning roadmap", () => {
 
   it("renders one next step, optional daily route, honest progress, and progressively disclosed NCERT cards", () => {
     const active = readSource("features/planning/PlanningActive.tsx");
+    expect(active).toContain("roadmap.curriculum.source_reference.authority");
+    expect(active).toContain('? "published"');
+    expect(active).toContain(': "planning_manifest"');
     expect(active).toContain("Your global next step");
     expect(active).toContain("Next step in this chapter");
     expect(active).toContain("One best next step, separate progress for every chapter");

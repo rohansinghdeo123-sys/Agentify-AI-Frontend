@@ -84,7 +84,7 @@ function getErrorMessage(error: unknown, fallback: string) {
 
 export default function McqExamPage() {
   const { profile, userId, loading, getAuthHeaders } = useAuth();
-  const { chapters } = useCatalog();
+  const { chapters, settled: catalogSettled } = useCatalog();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -205,6 +205,9 @@ export default function McqExamPage() {
   // an obsolete value, and every focused Exam route remains deep-linkable.
   useEffect(() => {
     if (planningScope) return;
+    // Do not replace a valid published-only deep link with a starter-catalog
+    // fallback while the authenticated catalog request is still in flight.
+    if (!catalogSettled) return;
     if (!selectedChapter || !selectedTopic || stage !== "configure") return;
     if (requestedChapter !== selectedChapter.value || requestedTopic !== selectedTopic.value) {
       replaceScope(selectedChapter.value, selectedTopic.value);
@@ -214,6 +217,7 @@ export default function McqExamPage() {
     requestedChapter,
     requestedTopic,
     planningScope,
+    catalogSettled,
     selectedChapter,
     selectedTopic,
     stage,

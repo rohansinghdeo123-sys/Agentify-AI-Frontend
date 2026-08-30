@@ -543,7 +543,9 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
   const entry = searchParams.get("entry") || "";
   const directAskEntry = entry === "ask_ai";
   const practiceEntry = entry === "practice";
-  const planningAskEntry = directAskEntry && scope.catalogSource === "planning_manifest";
+  const planningAskEntry = directAskEntry && ["planning_manifest", "published"].includes(
+    scope.catalogSource || "",
+  );
   const authBusy = loading || authLoading;
   const [coachName, setCoachName] = useState("Aria");
   const [messages, setMessages] = useState<CoachMessage[]>([]);
@@ -790,7 +792,10 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
         socratic: result.socratic,
       });
       setStages((current) => current.map((stage) => ({ ...stage, status: "done" })));
-      if (scope.catalogSource === "planning_manifest" && result.interactionId) {
+      if (
+        ["planning_manifest", "published"].includes(scope.catalogSource || "")
+        && result.interactionId
+      ) {
         void getAuthHeaders()
           .then((headers) => recordPlanningStudyEvidence(
             { backendURL: process.env.NEXT_PUBLIC_BACKEND_URL, headers },

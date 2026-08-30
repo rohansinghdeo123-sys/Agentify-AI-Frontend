@@ -157,6 +157,17 @@ describe("focused Exam Lab architecture", () => {
     expect(mcq).toContain("Retry save");
   });
 
+  it("preserves published-only chapter deep links until the catalog settles", () => {
+    [
+      "app/dashboard/exam/mcq/page.tsx",
+      "app/dashboard/exam/workspace/page.tsx",
+    ].forEach((file) => {
+      const contents = source(file);
+      expect(contents, file).toContain("settled: catalogSettled");
+      expect(contents, file).toContain("if (!catalogSettled) return;");
+    });
+  });
+
   it("protects Exam mutations from automatic replay", () => {
     const api = source("features/exam/api.ts");
 

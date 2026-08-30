@@ -368,9 +368,13 @@ export default function PlanningActive() {
         : "Your first win starts with one clear step";
 
   const openStudy = (unit: PlanningLearningUnit, intent: "learn" | "ask") => {
+    const catalogSource = roadmap.curriculum.source_reference.authority
+      === "approved_content_pipeline"
+      ? "published"
+      : "planning_manifest";
     const studyScope: StudyScope = {
       source: "syllabus",
-      catalogSource: "planning_manifest",
+      catalogSource,
       classLevel: roadmap.class_level,
       subject: scope.subject,
       chapterId: roadmap.chapter_slug,

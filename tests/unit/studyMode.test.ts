@@ -351,9 +351,9 @@ describe("focused Study Lab architecture", () => {
     const workspace = source("components/study/StudySessionWorkspace.tsx");
     expect(workspace).toContain('const directAskEntry = entry === "ask_ai"');
     expect(workspace).toContain("planningAskTopic");
-    expect(workspace).toContain('scope.catalogSource === "planning_manifest" && result.interactionId');
+    expect(workspace).toContain('["planning_manifest", "published"].includes(scope.catalogSource || "")');
     expect(workspace).toContain("recordPlanningStudyEvidence");
-    expect(workspace).toContain('scope.catalogSource === "planning_manifest"');
+    expect(workspace).toContain('"published"');
     expect(workspace).toContain('"NCERT roadmap"');
   });
 
