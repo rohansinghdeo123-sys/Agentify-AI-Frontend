@@ -12,6 +12,7 @@ import {
   getPlanningLearningUnits,
   getPlanningUnit,
   type PlanningDepth,
+  type PlanningDailyRoute,
   type PlanningDifficulty,
   type PlanningImportance,
   type PlanningLearningUnit,
@@ -79,6 +80,17 @@ function ncertSectionLabel(id: string, title: string) {
 
 function timeRange(range: { min: number; max: number }) {
   return range.min === range.max ? `${range.min} min` : `${range.min}–${range.max} min`;
+}
+
+function todayRouteTimeLabel(route: PlanningDailyRoute) {
+  const recommended = `${route.total_minutes} min recommended`;
+  if (route.source === "student_choice" && route.budget_minutes === null) {
+    return `${recommended} · no time ceiling`;
+  }
+  if (route.budget_minutes !== null && route.source !== "default_focus") {
+    return `${recommended} · ${route.budget_minutes} min available`;
+  }
+  return recommended;
 }
 
 function practiceHref(roadmap: PlanningRoadmap, unit: PlanningLearningUnit) {
@@ -481,7 +493,7 @@ export default function PlanningActive() {
                   <p className={styles.eyebrow}>Today’s route</p>
                   <h2>{roadmap.daily_route.source === "default_focus" ? "A focused first win" : "Your available-session route"}</h2>
                 </div>
-                <span>{timeRange(roadmap.daily_route.estimated_minutes)}</span>
+                <span>{todayRouteTimeLabel(roadmap.daily_route)}</span>
               </div>
               <ol>
                 {roadmap.daily_route.items.map((item, index) => (

@@ -24,7 +24,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const authReady = !loading;
-  const isAdminRoute = pathname?.startsWith("/dashboard/internal");
+  const isAdminRoute = pathname === "/dashboard/admin" || pathname?.startsWith("/dashboard/internal");
   const displayName = profile?.name || user?.displayName || user?.email?.split("@")[0] || "Student";
   const classLevel = profile?.classLevel || accountProfile?.class_level || "";
 
@@ -35,10 +35,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       router.replace("/login");
       return;
     }
+    // Internal pages own their backend-verified role checks. A founder must be
+    // able to inspect operations even when the student profile is incomplete
+    // or its onboarding record is temporarily unavailable.
+    if (isAdminRoute) return;
     if (!profileError && accountProfile && !accountProfile.onboarding_completed) {
       router.replace("/onboarding");
     }
-  }, [accountProfile, authError, authReady, profileError, router, sessionExpired, user]);
+  }, [accountProfile, authError, authReady, isAdminRoute, profileError, router, sessionExpired, user]);
 
   useEffect(() => {
     if (!authReady || !user || !isFounderAdmin) return;
@@ -117,6 +121,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   if (!user) return null;
 
+  if (isAdminRoute) {
+    return (
+      <div className="min-h-[100dvh] bg-[var(--agentify-page-bg)] text-[var(--agentify-primary-text)]">
+        {children}
+      </div>
+    );
+  }
+
   if (profileError || !accountProfile) {
     return (
       <main
@@ -144,14 +156,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   if (!accountProfile.onboarding_completed) return null;
-
-  if (isAdminRoute) {
-    return (
-      <div className="min-h-[100dvh] bg-[var(--agentify-page-bg)] text-[var(--agentify-primary-text)]">
-        {children}
-      </div>
-    );
-  }
 
   return (
     <AppShell

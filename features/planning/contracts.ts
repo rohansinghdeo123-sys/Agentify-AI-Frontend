@@ -675,8 +675,6 @@ export function isPlanningRoadmap(value: unknown): value is PlanningRoadmap {
   const expectedNextUnit = orderedUnits.find((unit) => unit.status !== "mastered") || orderedUnits.at(-1);
   if (!expectedNextUnit || nextStep.unit_id !== expectedNextUnit.id) return false;
   const dailyRoute = value.daily_route as PlanningDailyRoute;
-  if (nextStep.estimated_minutes.min !== dailyRoute.estimated_minutes.min) return false;
-  if (nextStep.estimated_minutes.max !== dailyRoute.estimated_minutes.max) return false;
   const sessionDuration = value.session_duration_minutes as number | null;
   const studyTime = value.study_time_today as PlanningStudyTime | null;
   const selectedBudget: Record<PlanningStudyTime, number | null> = {
@@ -702,12 +700,15 @@ export function isPlanningRoadmap(value: unknown): value is PlanningRoadmap {
   if (dailyRoute.total_minutes < dailyRoute.estimated_minutes.min) return false;
   if (dailyRoute.total_minutes > dailyRoute.estimated_minutes.max) return false;
   if (dailyRoute.items[0]?.unit_id !== nextStep.unit_id) return false;
-  if (dailyRoute.items.some((item) => item.unit_id !== nextStep.unit_id)) return false;
   const routeUnits = dailyRoute.items.map((item) => unitById.get(item.unit_id));
   if (routeUnits.some((unit) => !unit)) return false;
   if (new Set(dailyRoute.items.map((item) => `${item.unit_id}:${item.role}`)).size !== dailyRoute.items.length) return false;
   if (dailyRoute.items.some((item, index) => item.title !== routeUnits[index]?.title)) return false;
   if (routeUnits.some((unit, index) => index > 0 && Number(unit?.order) < Number(routeUnits[index - 1]?.order))) return false;
+  const routedUnitIds = dailyRoute.items.reduce<string[]>((ids, item) => (
+    ids.at(-1) === item.unit_id ? ids : [...ids, item.unit_id]
+  ), []);
+  if (new Set(routedUnitIds).size !== routedUnitIds.length) return false;
   if (dailyRoute.items.some((item, index) => (
     index > 0
     && item.unit_id === dailyRoute.items[index - 1]?.unit_id
@@ -913,14 +914,17 @@ export function isPlanningPortfolio(value: unknown): value is PlanningPortfolio 
     || item.curriculum_key !== selectedChapter.curriculum_key
     || item.chapter !== selectedChapter.chapter
   ))) return false;
-  if (todayRoute.items.some((item) => item.unit_id !== globalNextStep.unit_id)) return false;
-  if (todayRoute.items.some((item) => item.title !== globalNextStep.title)) return false;
   if (todayRoute.items[0]?.unit_id !== globalNextStep.unit_id) return false;
+  const selectedUnitsById = new Map(selectedChapter.learning_units.map((unit) => [unit.id, unit]));
+  const routeUnits = todayRoute.items.map((item) => selectedUnitsById.get(item.unit_id));
+  if (routeUnits.some((unit) => !unit)) return false;
+  if (todayRoute.items.some((item, index) => item.title !== routeUnits[index]?.title)) return false;
+  if (routeUnits.some((unit, index) => index > 0 && Number(unit?.order) < Number(routeUnits[index - 1]?.order))) return false;
+  const routedUnitIds = todayRoute.items.reduce<string[]>((ids, item) => (
+    ids.at(-1) === item.unit_id ? ids : [...ids, item.unit_id]
+  ), []);
+  if (new Set(routedUnitIds).size !== routedUnitIds.length) return false;
   if (new Set(todayRoute.items.map((item) => `${item.unit_id}:${item.role}`)).size !== todayRoute.items.length) return false;
-  if (
-    todayRoute.estimated_minutes.min !== globalNextStep.estimated_minutes.min
-    || todayRoute.estimated_minutes.max !== globalNextStep.estimated_minutes.max
-  ) return false;
   if (todayRoute.total_minutes < todayRoute.estimated_minutes.min) return false;
   if (todayRoute.total_minutes > todayRoute.estimated_minutes.max) return false;
 

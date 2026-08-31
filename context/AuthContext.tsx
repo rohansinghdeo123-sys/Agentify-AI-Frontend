@@ -50,6 +50,14 @@ type BackendAdminAccess = {
   verified: boolean;
 };
 
+// Client-side discovery only. Protected admin APIs still require the backend's
+// verified Firebase allow-list; these identities keep the Admin entry visible
+// while a cold backend is waking or deployment environment variables lag.
+const PRODUCT_OWNER_EMAILS = [
+  "amit.kumarmunda4@gmail.com",
+  "rohan.singhdeo123@gmail.com",
+] as const;
+
 type AuthProfile = {
   uid: string;
   role: AuthRole;
@@ -162,6 +170,7 @@ export function isAdminUser(user: User | null, claims: Record<string, unknown>) 
   // NEXT_PUBLIC_FOUNDER_ADMIN_EMAILS-only setup can still reveal and open the
   // founder console.
   const adminEmails = [
+    ...PRODUCT_OWNER_EMAILS,
     ...parseEnvList(process.env.NEXT_PUBLIC_ADMIN_EMAILS),
     ...parseEnvList(process.env.NEXT_PUBLIC_FOUNDER_ADMIN_EMAILS),
   ];
@@ -183,7 +192,10 @@ export function isFounderUser(user: User | null, claims: Record<string, unknown>
   if (!user) return false;
   if (hasFounderClaim(claims)) return true;
 
-  const founderEmails = parseEnvList(process.env.NEXT_PUBLIC_FOUNDER_ADMIN_EMAILS);
+  const founderEmails = [
+    ...PRODUCT_OWNER_EMAILS,
+    ...parseEnvList(process.env.NEXT_PUBLIC_FOUNDER_ADMIN_EMAILS),
+  ];
   return founderEmails.includes(user.email?.trim().toLowerCase() ?? "");
 }
 
@@ -366,15 +378,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setBackendAdminAccess(null);
       try {
         const token = await currentUser.getIdToken();
-        const access = await apiJson<BackendAdminAccess>(`${backendURL}/admin/me`, {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+        const requestAccess = (timeoutMs: number) => apiJson<BackendAdminAccess>(
+          `${backendURL}/admin/me`,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            forceFresh: true,
+            retries: 1,
+            timeoutMs,
           },
-          forceFresh: true,
-          retries: 1,
-          timeoutMs: 15000,
-        });
+        );
+        let access: BackendAdminAccess;
+        try {
+          access = await requestAccess(15000);
+        } catch (error) {
+          if (!isTemporaryBackendError(error)) throw error;
+          const ready = await ensureBackendReady(backendURL, {
+            forceFresh: true,
+            pollMs: 1500,
+            timeoutMs: 55000,
+          });
+          if (!ready) throw error;
+          access = await requestAccess(20000);
+        }
 
         if (authRef.current?.currentUser?.uid === currentUser.uid) {
           setBackendAdminAccess(access);

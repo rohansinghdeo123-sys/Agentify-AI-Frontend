@@ -1,330 +1,127 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/Polished";
-import { HealthBadge } from "./HealthBadge";
-import {
-  MUTED,
-  PANEL,
-  SOFT_PANEL,
-  TEXT,
-  classifyHealth,
-  formatBytes,
-  formatCompact,
-  formatPercent,
-  formatTime,
-} from "./format";
-import type { ContentReport, ReportChapter } from "./types";
+import { cn } from "@/lib/utils";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { HealthBadge, HealthDot } from "./HealthBadge";
+import { MUTED, PANEL, SOFT_PANEL, TEXT, classifyHealth, formatPercent, formatTime, humanize } from "./format";
+import type { AdminChapterEvidence, AdminContentEvidence, AdminContentEvidenceChapter, AdminEvidenceOverview, AdminSubtopicEvidence, HealthState } from "./types";
 
-const DIFFICULTY_LABEL = ["", "Very easy", "Easy", "Medium", "Hard", "Very hard"];
 const NUM = "font-mono tabular-nums";
+const EYEBROW = "text-xs font-bold uppercase tracking-[0.14em] text-[color:var(--agentify-muted-text)]";
+const DIFFICULTY = ["", "Very easy", "Easy", "Medium", "Hard", "Very hard"];
 
-// Pipeline stages a chapter passes through; the reached stage lights up.
-const STAGES = ["Ingested", "Concepts", "Embedded", "Published"] as const;
-function stageReached(chapter: ReportChapter): number {
-  if (chapter.status === "published" || chapter.status === "approved") return 4;
-  if (chapter.embedded_chunks > 0) return 3;
-  if (chapter.concept_count > 0) return 2;
-  if (chapter.chunk_count > 0) return 1;
-  return 0;
+function formatPercentagePoints(value: number | null | undefined) {
+  return value == null || Number.isNaN(Number(value)) ? "—" : `${Math.round(Number(value))}%`;
 }
 
-function Field({ label, value, tone }: { label: string; value: React.ReactNode; tone?: string }) {
-  return (
-    <div className="rounded-lg border border-[color:var(--agentify-border)] bg-[color:var(--agentify-hover-bg)] px-2.5 py-1.5">
-      <p className={cn("text-xs font-bold uppercase tracking-[0.1em]", MUTED)}>{label}</p>
-      <p className={cn("mt-0.5 text-xs font-semibold", NUM, tone || TEXT)}>{value}</p>
-    </div>
-  );
+function evidenceState(value?: string): HealthState {
+  const normalized = String(value || "").toLowerCase();
+  if (["ready", "verified", "healthy", "published"].includes(normalized)) return "healthy";
+  if (["lexical_only", "content_ready_unverified_provenance", "attention"].includes(normalized)) return "warning";
+  if (["incomplete", "mismatch", "database_unavailable", "readiness_check_failed"].includes(normalized)) return "error";
+  return classifyHealth(value);
 }
 
-function ChapterDetail({ chapter }: { chapter: ReportChapter }) {
-  const reached = stageReached(chapter);
-  return (
-    <div className="space-y-3">
-      {/* Pipeline stages */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        {STAGES.map((stage, i) => {
-          const done = i < reached;
-          const held = chapter.status === "needs_review" && i === reached;
-          return (
-            <span key={stage} className="flex items-center">
-              <span
-                className="rounded-md border px-2 py-1 text-xs font-semibold"
-                style={done
-                  ? { borderColor: "var(--ds-success)", background: "var(--ds-success-soft)", color: "var(--ds-success)" }
-                  : held
-                    ? { borderColor: "var(--ds-warning)", background: "var(--ds-warning-soft)", color: "var(--ds-warning)" }
-                    : { borderColor: "var(--agentify-border)", color: "var(--agentify-muted-text)" }}
-              >
-                {stage}
-              </span>
-              {i < STAGES.length - 1 ? <span className="mx-0.5 text-xs" style={{ color: done ? "var(--ds-success)" : "var(--agentify-muted-text)" }}>›</span> : null}
-            </span>
-          );
-        })}
-        {chapter.status === "needs_review" ? (
-          <span className="ml-1 rounded-full border border-[var(--ds-warning)] bg-[var(--ds-warning-soft)] px-2 py-1 text-xs font-bold text-[var(--ds-warning)]">held for review</span>
-        ) : null}
-      </div>
-
-      {/* Quality + data + provenance fields */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-        <Field label="Coverage" value={formatPercent(chapter.coverage_score)} tone={covTone(chapter.coverage_score)} />
-        <Field label="Extraction" value={formatPercent(chapter.extraction_quality)} />
-        <Field label="Error rate" value={formatPercent(chapter.error_rate)} tone={errTone(chapter.error_rate)} />
-        <Field label="Pages" value={`${chapter.extracted_page_count}/${chapter.page_count}`} />
-        <Field label="Chunks" value={`${chapter.embedded_chunks}/${chapter.chunk_count}`} />
-        <Field label="Memory" value={formatBytes(chapter.memory_bytes)} />
-        <Field label="Tokens" value={formatCompact(chapter.chunk_tokens)} />
-        <Field label="Vectors" value={chapter.embedding_dims ? `${chapter.embedding_dims}d` : "—"} />
-        <Field label="Ready" value={chapter.ready_for_approval ? "yes" : "no"} tone={chapter.ready_for_approval ? "text-[var(--ds-success)]" : "text-[var(--ds-warning)]"} />
-        <Field label="Version" value={chapter.version || "—"} />
-        <Field label="Published" value={chapter.published_at ? formatTime(chapter.published_at) : "—"} />
-        <Field label="Updated" value={chapter.updated_at ? formatTime(chapter.updated_at) : "—"} />
-      </div>
-
-      {/* Why it needs review */}
-      {chapter.missing_source_pages.length || (chapter.issues && chapter.issues.length) ? (
-        <div className={cn(SOFT_PANEL, "p-2.5")}>
-          <p className={cn("text-xs font-bold uppercase tracking-[0.1em]", "text-[var(--ds-warning)]")}>Review notes</p>
-          {chapter.missing_source_pages.length ? (
-            <p className={cn("mt-1 text-xs", MUTED)}>Uncovered pages: <span className={NUM}>{chapter.missing_source_pages.join(", ")}</span></p>
-          ) : null}
-          {(chapter.issues || []).slice(0, 6).map((issue, i) => (
-            <p key={i} className={cn("mt-1 text-xs", issue.severity === "error" ? "text-[var(--ds-danger)]" : MUTED)}>
-              • {issue.message}{issue.concept_id ? <span className="opacity-70"> ({issue.concept_id})</span> : null}
-            </p>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function errTone(rate: number): string {
-  if (rate <= 0) return "text-[var(--ds-success)]";
-  if (rate < 0.15) return "text-[var(--ds-warning)]";
-  return "text-[var(--ds-danger)]";
-}
-function covTone(score: number): string {
-  if (score >= 0.7) return "text-[var(--ds-success)]";
-  if (score >= 0.4) return "text-[var(--ds-warning)]";
+function toneForPercent(value: number, warning = 70) {
+  if (value >= 99) return "text-[var(--ds-success)]";
+  if (value >= warning) return "text-[var(--ds-warning)]";
   return "text-[var(--ds-danger)]";
 }
 
-function Kpi({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
+function Metric({ label, value, detail, tone }: { label: string; value: string; detail: string; tone?: string }) {
+  return <div className={cn(SOFT_PANEL, "min-w-0 p-4")}><p className={EYEBROW}>{label}</p><p className={cn("mt-2 text-xl font-semibold", NUM, tone || TEXT)}>{value}</p><p className={cn("mt-1 text-sm leading-5", MUTED)}>{detail}</p></div>;
+}
+
+function StatusProof({ state, label, value, detail }: { state: HealthState; label: string; value: string; detail: string }) {
+  return <div className={cn(PANEL, "p-5")}><div className="flex flex-wrap items-center justify-between gap-3"><p className={EYEBROW}>{label}</p><HealthBadge state={state} label={value} pulse={state === "healthy"} /></div><p className={cn("mt-3 text-sm leading-6", MUTED)}>{detail}</p></div>;
+}
+
+function SourceReference({ verified, missing }: { verified: number[]; missing: number[] }) {
+  if (!verified.length && !missing.length) return <span className="inline-flex rounded-lg border border-[var(--ds-danger)] bg-[var(--ds-danger-soft)] px-2.5 py-1.5 text-xs font-semibold text-[var(--ds-danger)]">No source-page reference</span>;
+  return <span className={cn("inline-flex flex-wrap items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold", missing.length ? "border-[var(--ds-warning)] bg-[var(--ds-warning-soft)]" : "border-[color:var(--agentify-border)] bg-[color:var(--agentify-card-bg)]")}><span>{missing.length ? "Verified / missing pages" : "Verified source pages"}</span><span className={cn(NUM, "text-[var(--ds-accent-teal)]")}>{verified.join(", ") || "none"}{missing.length ? ` / ${missing.join(", ")}` : ""}</span></span>;
+}
+
+function SubtopicEvidence({ subtopic }: { subtopic: AdminSubtopicEvidence }) {
+  const checks = [
+    subtopic.content_checks.has_definition ? "definition" : "",
+    subtopic.content_checks.has_explanation ? "explanation" : "",
+    subtopic.content_checks.key_point_count ? `${subtopic.content_checks.key_point_count} key points` : "",
+    subtopic.content_checks.example_count ? `${subtopic.content_checks.example_count} examples` : "",
+    subtopic.content_checks.formula_count ? `${subtopic.content_checks.formula_count} formulas` : "",
+  ].filter(Boolean);
   return (
-    <div className="rounded-xl border border-[color:var(--agentify-border)] bg-[color:var(--agentify-hover-bg)] px-3 py-2.5">
-      <p className={cn("text-xs font-bold uppercase tracking-[0.12em]", MUTED)}>{label}</p>
-      <p className={cn("mt-1 text-lg font-semibold tracking-tight", NUM, tone || TEXT)}>{value}</p>
-      {sub ? <p className={cn("mt-0.5 text-xs", MUTED)}>{sub}</p> : null}
+    <article className={cn(SOFT_PANEL, "p-4")}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><p className={EYEBROW}>Learning unit / subtopic</p><h4 className={cn("mt-1 text-base font-semibold leading-6", TEXT)}>{subtopic.title || subtopic.concept_id}</h4></div><HealthBadge state={subtopic.validation.passed ? "healthy" : "warning"} label={subtopic.validation.passed ? "validated" : `${subtopic.validation.issues.length} issues`} /></div>
+      <div className="mt-3 flex flex-wrap gap-2"><SourceReference verified={subtopic.source_proof.verified_page_numbers} missing={subtopic.source_proof.missing_page_numbers} /><span className={cn(SOFT_PANEL, "px-2.5 py-1.5 text-xs", MUTED)}>{DIFFICULTY[subtopic.difficulty_level] || `Difficulty ${subtopic.difficulty_level}`}</span>{subtopic.importance_level ? <span className={cn(SOFT_PANEL, "px-2.5 py-1.5 text-xs", MUTED)}>{humanize(subtopic.importance_level)} importance</span> : null}{subtopic.exam_weightage ? <span className={cn(SOFT_PANEL, "px-2.5 py-1.5 text-xs", MUTED)}>{humanize(subtopic.exam_weightage)} exam weight</span> : null}</div>
+      <p className={cn("mt-3 text-sm leading-6", MUTED)}>{checks.length ? `Structured checks: ${checks.join(" · ")}.` : "No structured teaching checks recorded."}</p>
+      {!subtopic.validation.passed ? <ul className="mt-3 space-y-1">{subtopic.validation.issues.map((issue, index) => <li key={`${issue.code}-${index}`} className={cn("text-sm", issue.severity === "error" ? "text-[var(--ds-danger)]" : "text-[var(--ds-warning)]")}>{issue.message || humanize(issue.code)}</li>)}</ul> : null}
+    </article>
+  );
+}
+
+function ChapterDetail({ detail }: { detail: AdminChapterEvidence }) {
+  const chapter = detail.chapter;
+  const retrieval = detail.retrieval_evidence;
+  const sourceRanges = retrieval.source_page_ranges.map((range) => range.page_start === range.page_end ? String(range.page_start) : `${range.page_start}–${range.page_end}`);
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><Metric label="Source coverage" value={formatPercent(chapter.coverage_score)} detail={`${detail.subtopics.filter((item) => item.source_proof.verified).length}/${detail.pagination.total} units verified`} /><Metric label="Extraction" value={formatPercent(chapter.extraction_quality)} detail="Stored extraction score" /><Metric label="Embedding proof" value={formatPercentagePoints(retrieval.embedding_coverage_percent)} detail={`${retrieval.embedded_chunk_count}/${retrieval.chunk_count} chunks`} tone={toneForPercent(retrieval.embedding_coverage_percent)} /><Metric label="Blocking issues" value={String(chapter.blocking_issue_count)} detail={chapter.blocking_issue_count ? "Requires review" : "Approval gate clear"} tone={chapter.blocking_issue_count ? "text-[var(--ds-danger)]" : "text-[var(--ds-success)]"} /></div>
+      <div className="grid gap-3 lg:grid-cols-2"><div className={cn(SOFT_PANEL, "p-4 text-sm")}><p className={EYEBROW}>Source integrity</p><div className="mt-2 flex items-center gap-2"><HealthDot state={chapter.source_integrity.published_hash_matches ? "healthy" : "error"} /><p className={cn("font-semibold", chapter.source_integrity.published_hash_matches ? "text-[var(--ds-success)]" : "text-[var(--ds-danger)]")}>{chapter.source_integrity.published_hash_matches ? "Published hash matches source" : "Published hash mismatch"}</p></div><p className={cn("mt-2 break-all", NUM, MUTED)}>source {chapter.source_integrity.source_hash || "—"}</p><p className={cn("mt-1 break-all", NUM, MUTED)}>published {chapter.source_integrity.published_source_hash || "—"}</p></div><div className={cn(SOFT_PANEL, "p-4 text-sm")}><p className={EYEBROW}>Retrieval source range</p><p className={cn("mt-2 leading-6", TEXT)}>{sourceRanges.length ? `Pages ${sourceRanges.join(", ")}` : "No chunk page ranges recorded."}</p><p className={cn("mt-2", MUTED)}>Stored dimensions: {retrieval.stored_embedding_dimensions.join(", ") || "none"}{retrieval.source_page_ranges_truncated ? " · range list truncated" : ""}</p></div></div>
+      {chapter.blocking_issues.length ? <div className="rounded-xl border border-[var(--ds-danger)] bg-[var(--ds-danger-soft)] p-4"><p className="font-semibold text-[var(--ds-danger)]">Blocking validation evidence</p><ul className="mt-2 list-disc space-y-1 pl-5">{chapter.blocking_issues.map((issue) => <li key={issue} className="text-sm text-[var(--ds-danger)]">{humanize(issue)}</li>)}</ul></div> : null}
+      <section aria-label={`Subtopic evidence for ${chapter.chapter_name}`}><div className="flex flex-wrap items-end justify-between gap-2"><div><p className={EYEBROW}>Progressive evidence</p><h4 className={cn("mt-1 text-lg font-semibold", TEXT)}>Learning units and source references</h4></div><p className={cn("text-sm", MUTED)}>{detail.subtopics.length} of {detail.pagination.total} shown</p></div><div className="mt-3 grid gap-3 lg:grid-cols-2">{detail.subtopics.map((subtopic) => <SubtopicEvidence key={subtopic.id} subtopic={subtopic} />)}</div>{detail.pagination.has_more ? <p className={cn("mt-3 text-sm", MUTED)}>More units exist than this bounded evidence response can display.</p> : null}</section>
     </div>
   );
 }
 
-function SubtopicTable({ chapter }: { chapter: ReportChapter }) {
-  if (!chapter.concepts.length) {
-    return <p className={cn("px-2 py-3 text-xs", MUTED)}>No subtopics generated for this chapter yet.</p>;
-  }
-  const sorted = [...chapter.concepts].sort((a, b) => b.chars - a.chars);
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[640px] border-collapse text-left text-xs">
-        <thead>
-          <tr className={cn("text-xs font-bold uppercase tracking-[0.1em]", MUTED)}>
-            <th className="px-2 py-1.5">Subtopic</th>
-            <th className="px-2 py-1.5">Difficulty</th>
-            <th className="px-2 py-1.5">Importance</th>
-            <th className="px-2 py-1.5">Weightage</th>
-            <th className={cn("px-2 py-1.5 text-right")}>Memory</th>
-            <th className={cn("px-2 py-1.5 text-right")}>Tokens</th>
-            <th className="px-2 py-1.5">Pages</th>
-            <th className={cn("px-2 py-1.5 text-right")}>Issues</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((c) => (
-            <tr key={c.concept_id} className="border-t border-[color:var(--agentify-border)] hover:bg-[color:var(--agentify-active-bg)]">
-              <td className={cn("px-2 py-1.5 font-medium", TEXT)}>{c.title || c.concept_id}</td>
-              <td className={cn("px-2 py-1.5", MUTED)}>{DIFFICULTY_LABEL[c.difficulty_level] || `L${c.difficulty_level}`}</td>
-              <td className={cn("px-2 py-1.5", MUTED)}>{c.importance_level || "—"}</td>
-              <td className={cn("px-2 py-1.5", MUTED)}>{c.typical_exam_weightage || "—"}</td>
-              <td className={cn("px-2 py-1.5 text-right", NUM, TEXT)}>{formatBytes(c.chars)}</td>
-              <td className={cn("px-2 py-1.5 text-right", NUM, MUTED)}>{formatCompact(c.tokens)}</td>
-              <td className={cn("px-2 py-1.5", NUM, MUTED)}>{c.source_pages.length ? c.source_pages.join(",") : "—"}</td>
-              <td className={cn("px-2 py-1.5 text-right", NUM, c.validation_issues ? "text-[var(--ds-danger)]" : MUTED)}>{c.validation_issues}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {chapter.concepts_truncated ? (
-        <p className={cn("mt-2 px-2 text-xs", MUTED)}>Showing {chapter.concepts.length} of {chapter.concept_count} subtopics.</p>
-      ) : null}
-    </div>
-  );
-}
-
-function ChapterRow({ chapter, maxMemory }: { chapter: ReportChapter; maxMemory: number }) {
+function ChapterEvidence({ chapter, loadChapterEvidence, refreshVersion }: { chapter: AdminContentEvidenceChapter; loadChapterEvidence: (chapterId: number) => Promise<AdminChapterEvidence>; refreshVersion: number }) {
+  const [detail, setDetail] = useState<AdminChapterEvidence | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [open, setOpen] = useState(false);
-  const embPct = chapter.chunk_count ? (chapter.embedded_chunks / chapter.chunk_count) * 100 : 0;
-  const memShare = maxMemory ? (chapter.memory_bytes / maxMemory) * 100 : 0;
+  const detailRef = useRef(false);
+  const loadingRef = useRef(false);
+  const state: HealthState = chapter.quality.ready && chapter.source_integrity.published_hash_matches ? "healthy" : chapter.quality.blocking_issue_count ? "error" : "warning";
+  const load = useCallback(async (force = false) => {
+    if ((!force && detailRef.current) || loadingRef.current) return;
+    loadingRef.current = true;
+    setLoading(true); setError("");
+    try {
+      setDetail(await loadChapterEvidence(chapter.chapter_id));
+      detailRef.current = true;
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Chapter evidence could not load.");
+    } finally {
+      loadingRef.current = false;
+      setLoading(false);
+    }
+  }, [chapter.chapter_id, loadChapterEvidence]);
+  useEffect(() => {
+    if (open && detailRef.current) void load(true);
+  }, [load, open, refreshVersion]);
   return (
-    <>
-      <tr
-        className="cursor-pointer border-t border-[color:var(--agentify-border)] hover:bg-[color:var(--agentify-active-bg)]"
-        onClick={() => setOpen((v) => !v)}
-      >
-        <td className="px-2 py-2">
-          <span className={cn("inline-block w-3 text-xs", MUTED)}>{open ? "▾" : "▸"}</span>
-          <span className={cn("text-xs", MUTED)}>{chapter.subject || "—"}</span>
-        </td>
-        <td className={cn("px-2 py-2 font-medium", TEXT)}>
-          <span className="line-clamp-1">{chapter.chapter_name || `Chapter ${chapter.chapter_number ?? ""}`}</span>
-          <span className={cn("text-xs", MUTED)}>Class {chapter.class_level || "—"}</span>
-        </td>
-        <td className="px-2 py-2"><HealthBadge state={classifyHealth(chapter.status)} label={chapter.status} /></td>
-        <td className={cn("px-2 py-2 text-right", NUM, MUTED)}>{chapter.page_count}</td>
-        <td className={cn("px-2 py-2 text-right", NUM, TEXT)}>{chapter.concept_count}</td>
-        <td className={cn("px-2 py-2 text-right", NUM, MUTED)}>{formatCompact(chapter.chunk_count)}</td>
-        <td className="px-2 py-2 text-right">
-          <span className={cn(NUM, TEXT)}>{formatBytes(chapter.memory_bytes)}</span>
-          <span className="mt-1 block h-1 overflow-hidden rounded-full bg-[color:var(--agentify-border)]">
-            <span className="block h-full rounded-full bg-[var(--ds-accent-teal)]" style={{ width: `${Math.max(3, memShare)}%` }} />
-          </span>
-        </td>
-        <td className={cn("px-2 py-2 text-right", NUM, embPct >= 99 ? "text-[var(--ds-success)]" : MUTED)}>{Math.round(embPct)}%</td>
-        <td className={cn("px-2 py-2 text-right", NUM, covTone(chapter.coverage_score))}>{formatPercent(chapter.coverage_score)}</td>
-        <td className={cn("px-2 py-2 text-right", NUM, errTone(chapter.error_rate))}>{formatPercent(chapter.error_rate)}</td>
-      </tr>
-      {open ? (
-        <tr className="border-t border-[color:var(--agentify-border)] bg-[color:var(--agentify-hover-bg)]">
-          <td colSpan={10} className="px-3 py-3">
-            <div className="space-y-3">
-              <ChapterDetail chapter={chapter} />
-              <SubtopicTable chapter={chapter} />
-            </div>
-          </td>
-        </tr>
-      ) : null}
-    </>
+    <details className={cn(PANEL, "group overflow-hidden")} onToggle={(event) => { const nextOpen = event.currentTarget.open; setOpen(nextOpen); if (nextOpen) void load(); }}>
+      <summary className="flex min-h-20 cursor-pointer list-none items-center justify-between gap-4 p-5 outline-none hover:bg-[color:var(--agentify-hover-bg)] focus-visible:ring-2 focus-visible:ring-[var(--ds-accent-teal)]"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><HealthDot state={state} /><span className={EYEBROW}>Chapter {chapter.chapter_number ?? "—"} · Class {chapter.class_level}</span></div><h3 className={cn("mt-2 text-lg font-semibold leading-6", TEXT)}>{chapter.chapter_name}</h3><p className={cn("mt-1 text-sm", MUTED)}>{chapter.counts.subtopics} learning units · {chapter.evidence.subtopics_with_verified_source_pages} source-verified · {formatPercent(chapter.quality.coverage_score)} coverage</p></div><div className="flex shrink-0 items-center gap-3"><HealthBadge state={classifyHealth(chapter.status)} label={chapter.status} /><span className={cn("text-2xl transition-transform group-open:rotate-90", MUTED)}>›</span></div></summary>
+      <div className="border-t border-[color:var(--agentify-border)] p-5">{loading ? <p className={cn("text-sm", MUTED)}>Loading sanitized chapter evidence…</p> : error ? <div className="rounded-xl border border-[var(--ds-danger)] bg-[var(--ds-danger-soft)] p-4"><p className="text-sm text-[var(--ds-danger)]">{error}</p><button type="button" className="mt-3 min-h-11 rounded-lg border border-[var(--ds-danger)] px-4 text-sm font-semibold text-[var(--ds-danger)]" onClick={() => void load()}>Retry evidence</button></div> : detail ? <ChapterDetail detail={detail} /> : null}</div>
+    </details>
   );
 }
 
-export function DataIngestionReport({ report }: { report: ContentReport | null }) {
-  const subjectMemory = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const ch of report?.chapters || []) {
-      map.set(ch.subject || "Unspecified", (map.get(ch.subject || "Unspecified") || 0) + ch.memory_bytes);
-    }
-    return [...map.entries()].sort((a, b) => b[1] - a[1]);
-  }, [report]);
-
-  const chapters = useMemo(
-    () => [...(report?.chapters || [])].sort((a, b) => b.memory_bytes - a.memory_bytes),
-    [report],
-  );
-
-  if (!report) {
-    return (
-      <EmptyState
-        icon="book"
-        title="Ingestion report unavailable"
-        detail="The content ingestion report could not be loaded from the backend. Ensure the content pipeline tables exist and retry."
-      />
-    );
-  }
-  if (!report.totals.chapters) {
-    return (
-      <EmptyState
-        icon="book"
-        title="No study content ingested yet"
-        detail="Once chapters are ingested and approved, their data size, subjects, and subtopics will appear here."
-      />
-    );
-  }
-
-  const t = report.totals;
-  const needsReview = chapters.filter((c) => c.status !== "published" && c.status !== "approved").length;
-  const maxMemory = Math.max(...chapters.map((c) => c.memory_bytes), 1);
-  const maxSubject = Math.max(...subjectMemory.map(([, v]) => v), 1);
-  const embPct = t.chunks ? (t.embedded_chunks / t.chunks) * 100 : 0;
-
+export function DataIngestionReport({ overview, content, loadChapterEvidence, refreshVersion }: { overview: AdminEvidenceOverview; content: AdminContentEvidence | null; loadChapterEvidence: (chapterId: number) => Promise<AdminChapterEvidence>; refreshVersion: number }) {
+  const subjects = useMemo(() => {
+    const grouped = new Map<string, AdminContentEvidenceChapter[]>();
+    for (const chapter of content?.items || []) grouped.set(chapter.subject || "Unspecified", [...(grouped.get(chapter.subject || "Unspecified") || []), chapter]);
+    return [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [content]);
+  const release = overview.readiness.release;
+  const retrieval = overview.readiness.semantic_retrieval;
+  if (!content) return <EmptyState icon="book" title="Curriculum evidence unavailable" detail="The sanitized content evidence endpoint did not return. Agent operations remain available; refresh to retry curriculum evidence." />;
+  if (!content.pagination.total) return <EmptyState icon="book" title="No curriculum has been ingested" detail="Published subjects, chapters and source references appear after the first quality-gated ingestion." />;
   return (
-    <div className={cn(PANEL, "p-4 sm:p-5")}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className={cn("text-sm font-semibold", TEXT)}>Knowledge base — data &amp; memory</p>
-          <p className={cn("mt-0.5 text-xs", MUTED)}>
-            {report.database_dialect} · {report.embeddings_enabled ? `vectors ${t.embedding_dims}d (${report.embeddings_model})` : "no embeddings (lexical only)"}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {needsReview > 0 ? (
-            <span className="rounded-full border border-[var(--ds-warning)] bg-[var(--ds-warning-soft)] px-2.5 py-1 text-xs font-bold text-[var(--ds-warning)]">
-              {needsReview} need review
-            </span>
-          ) : (
-            <span className="rounded-full border border-[var(--ds-success)] bg-[var(--ds-success-soft)] px-2.5 py-1 text-xs font-bold text-[var(--ds-success)]">all published</span>
-          )}
-          <HealthBadge state={report.embeddings_enabled ? "healthy" : "warning"} label={report.embeddings_enabled ? "Semantic" : "Lexical"} />
-        </div>
-      </div>
-
-      {/* KPI strip */}
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-        <Kpi label="Total memory" value={formatBytes(t.memory_bytes)} sub={`${formatBytes(t.embedding_bytes)} vectors`} tone="text-[var(--ds-success)]" />
-        <Kpi label="Indexed text" value={formatBytes(t.chunk_chars)} sub={`${formatCompact(t.chunks)} chunks`} />
-        <Kpi label="Tokens" value={formatCompact(t.tokens)} sub="estimated" />
-        <Kpi label="Embedded" value={`${Math.round(embPct)}%`} sub={`${formatCompact(t.embedded_chunks)}/${formatCompact(t.chunks)}`} tone={embPct >= 99 ? "text-[var(--ds-success)]" : undefined} />
-        <Kpi label="Subtopics" value={formatCompact(t.concepts)} sub={`${t.chapters} chapters`} />
-        <Kpi label="Error rate" value={formatPercent(t.error_rate)} sub={`${t.concepts_with_issues} flagged`} tone={errTone(t.error_rate)} />
-      </div>
-
-      {/* Memory by subject */}
-      {subjectMemory.length ? (
-        <div className="mt-4">
-          <p className={cn("mb-2 text-xs font-bold uppercase tracking-[0.12em]", MUTED)}>Memory by subject</p>
-          <div className="space-y-1.5">
-            {subjectMemory.map(([subject, bytes]) => (
-              <div key={subject} className="flex items-center gap-3">
-                <span className={cn("w-28 shrink-0 truncate text-xs font-medium", TEXT)}>{subject}</span>
-                <span className="h-2 flex-1 overflow-hidden rounded-full bg-[color:var(--agentify-border)]">
-                  <span className="block h-full rounded-full bg-[linear-gradient(90deg,#0E7490,#14B8A6)]" style={{ width: `${Math.max(3, (bytes / maxSubject) * 100)}%` }} />
-                </span>
-                <span className={cn("w-20 shrink-0 text-right text-xs", NUM, MUTED)}>{formatBytes(bytes)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {/* Dense chapter table */}
-      <div className="mt-5 overflow-x-auto">
-        <table className="w-full min-w-[820px] border-collapse text-left text-xs">
-          <thead>
-            <tr className={cn("text-xs font-bold uppercase tracking-[0.1em]", MUTED)}>
-              <th className="px-2 py-2">Subject</th>
-              <th className="px-2 py-2">Chapter</th>
-              <th className="px-2 py-2">Status</th>
-              <th className="px-2 py-2 text-right">Pages</th>
-              <th className="px-2 py-2 text-right">Subtopics</th>
-              <th className="px-2 py-2 text-right">Chunks</th>
-              <th className="px-2 py-2 text-right">Memory</th>
-              <th className="px-2 py-2 text-right">Emb%</th>
-              <th className="px-2 py-2 text-right">Cov</th>
-              <th className="px-2 py-2 text-right">Err</th>
-            </tr>
-          </thead>
-          <tbody>
-            {chapters.map((chapter) => (
-              <ChapterRow key={chapter.id} chapter={chapter} maxMemory={maxMemory} />
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <p className={cn("mt-3 text-xs", MUTED)}>Click a chapter to expand its subtopics (sorted by memory). Memory = indexed chunk text + embedding vectors.</p>
+    <div className="space-y-5">
+      <div className="grid gap-3 lg:grid-cols-2"><StatusProof state={evidenceState(release.status)} label="Curriculum release" value={release.status} detail={`${release.published.chapters || 0}/${release.expected.chapters || 0} expected chapters published · provenance ${humanize(release.release.provenance)}${release.release.restored_at ? ` · restored ${formatTime(release.release.restored_at)}` : ""}.`} /><StatusProof state={evidenceState(retrieval.status)} label="Retrieval contract" value={retrieval.status} detail={`${retrieval.configured_model || "No configured model"} · ${retrieval.stored_dimensions || 0} dimensions · ${retrieval.configured_endpoint_host || "no endpoint"}.`} /></div>
+      <section className={cn(PANEL, "p-5")} aria-labelledby="measured-evidence-heading"><div><p className={EYEBROW}>Measured validation signals</p><h3 id="measured-evidence-heading" className={cn("mt-1 text-xl font-semibold", TEXT)}>Published curriculum confidence</h3></div><div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4"><Metric label="Source-page proof" value={formatPercentagePoints(overview.content.source_page_coverage_percent)} detail={`${overview.content.subtopics} learning units`} /><Metric label="Embedding coverage" value={formatPercentagePoints(overview.content.embedding_coverage_percent)} detail={`${overview.content.embedded_chunks}/${overview.content.chunks} chunks`} tone={toneForPercent(overview.content.embedding_coverage_percent)} /><Metric label="Chapters ready" value={`${overview.content.chapters_ready}/${overview.content.chapters}`} detail={`${overview.content.published_chapters} published`} /><Metric label="Grounded answers" value={formatPercentagePoints(overview.quality.grounded_rate_percent)} detail={`${overview.quality.grounded_turns}/${overview.quality.retrieval_turns} retrieval turns`} /></div><p className={cn("mt-3 text-xs leading-5", MUTED)}>These are observed source, validation, embedding and grounding signals. They do not make a synthetic factual-accuracy claim.</p></section>
+      <section aria-labelledby="subject-inventory-heading"><div className="flex flex-wrap items-end justify-between gap-3"><div><p className={EYEBROW}>Curriculum inventory</p><h3 id="subject-inventory-heading" className={cn("mt-1 text-xl font-semibold", TEXT)}>Subjects and chapters</h3></div><p className={cn("text-sm", MUTED)}>{overview.content.subject_catalogs} subject catalogs · {content.pagination.total} chapters</p></div><div className="mt-5 space-y-7">{subjects.map(([subject, chapters]) => <section key={subject}><div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-1"><h4 className={cn("text-lg font-semibold", TEXT)}>{subject}</h4><span className={cn("text-sm", NUM, MUTED)}>{chapters.length} chapters · {chapters.reduce((sum, chapter) => sum + chapter.counts.subtopics, 0)} units</span></div><div className="space-y-3">{chapters.sort((a, b) => Number(a.chapter_number || 999) - Number(b.chapter_number || 999)).map((chapter) => <ChapterEvidence key={chapter.chapter_id} chapter={chapter} loadChapterEvidence={loadChapterEvidence} refreshVersion={refreshVersion} />)}</div></section>)}</div>{content.pagination.has_more ? <p className={cn("mt-4 text-sm", MUTED)}>Only the first {content.pagination.limit} chapters are shown. Refine the evidence query to inspect additional curricula.</p> : null}</section>
     </div>
   );
 }

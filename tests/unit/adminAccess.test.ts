@@ -12,6 +12,7 @@ function firebaseUser(fields: Partial<User>): User {
 }
 
 const AMIT_EMAIL = "amit.kumarmunda4@gmail.com";
+const ROHAN_EMAIL = "rohan.singhdeo123@gmail.com";
 
 describe("admin access", () => {
   afterEach(() => {
@@ -39,6 +40,17 @@ describe("admin access", () => {
       {},
       { role: "admin", founder: true, verified: true },
     )).toEqual({ isAdmin: true, isFounderAdmin: true });
+  });
+
+  it("keeps both product-owner entries discoverable while the backend wakes", () => {
+    vi.stubEnv("NEXT_PUBLIC_ADMIN_EMAILS", "");
+    vi.stubEnv("NEXT_PUBLIC_FOUNDER_ADMIN_EMAILS", "");
+
+    for (const email of [AMIT_EMAIL, ROHAN_EMAIL]) {
+      const user = firebaseUser({ uid: `${email}-uid`, email });
+      expect(isAdminUser(user, {})).toBe(true);
+      expect(isFounderUser(user, {})).toBe(true);
+    }
   });
 
   it("does not trust an unverified admin response", () => {

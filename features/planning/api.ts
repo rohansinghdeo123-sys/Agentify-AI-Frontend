@@ -6,6 +6,7 @@ import {
   type PlanningPortfolio,
   type PlanningRoadmap,
   type PlanningScope,
+  type PlanningStudyTime,
 } from "./contracts";
 
 export type PlanningRequestContext = {
@@ -66,25 +67,79 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
-const LEGACY_PLANNING_CHAPTERS = [
+const CLASS_11_CHEMISTRY_CHAPTERS = [
   {
     value: "some_basic_concepts_of_chemistry",
     label: "Some Basic Concepts of Chemistry",
     classLevel: "Class 11",
     subject: "Chemistry",
-    aliases: ["matter", "Basic Concepts of Chemistry", "basic-concepts-of-chemistry"],
+    aliases: ["matter", "Basic Concepts of Chemistry", "basic-concepts-of-chemistry", "ncert_class_11_chemistry_chapter_1_some_basic_concepts_of_chemistry"],
   },
   {
     value: "structure_of_atom",
     label: "Structure of Atom",
     classLevel: "Class 11",
     subject: "Chemistry",
-    aliases: ["Atomic Structure", "structure-of-atom", "NCERT Class 11 Chemistry Chapter 2"],
+    aliases: ["Atomic Structure", "structure-of-atom", "NCERT Class 11 Chemistry Chapter 2", "ncert_class_11_chemistry_chapter_2_structure_of_atom"],
+  },
+  {
+    value: "classification_of_elements_and_periodicity_in_properties",
+    label: "Classification of Elements and Periodicity in Properties",
+    classLevel: "Class 11",
+    subject: "Chemistry",
+    aliases: ["Periodicity", "Classification of Elements", "NCERT Class 11 Chemistry Chapter 3", "ncert_class_11_chemistry_chapter_3_classification_of_elements_and_periodicity_in_properties"],
+  },
+  {
+    value: "chemical_bonding_and_molecular_structure",
+    label: "Chemical Bonding and Molecular Structure",
+    classLevel: "Class 11",
+    subject: "Chemistry",
+    aliases: ["Chemical Bonding", "Molecular Structure", "NCERT Class 11 Chemistry Chapter 4", "ncert_class_11_chemistry_chapter_4_chemical_bonding_and_molecular_structure"],
+  },
+  {
+    value: "thermodynamics",
+    label: "Thermodynamics",
+    classLevel: "Class 11",
+    subject: "Chemistry",
+    aliases: ["Chemical Thermodynamics", "NCERT Class 11 Chemistry Chapter 5", "ncert_class_11_chemistry_chapter_5_thermodynamics"],
+  },
+  {
+    value: "equilibrium",
+    label: "Equilibrium",
+    classLevel: "Class 11",
+    subject: "Chemistry",
+    aliases: ["Chemical Equilibrium", "Ionic Equilibrium", "NCERT Class 11 Chemistry Chapter 6", "ncert_class_11_chemistry_chapter_6_equilibrium"],
+  },
+  {
+    value: "redox_reactions",
+    label: "Redox Reactions",
+    classLevel: "Class 11",
+    subject: "Chemistry",
+    aliases: ["Redox", "Oxidation and Reduction", "NCERT Class 11 Chemistry Chapter 7", "ncert_class_11_chemistry_chapter_7_redox_reactions"],
+  },
+  {
+    value: "organic_chemistry_some_basic_principles_and_techniques",
+    label: "Organic Chemistry - Some Basic Principles and Techniques",
+    classLevel: "Class 11",
+    subject: "Chemistry",
+    aliases: ["Organic Chemistry", "Basic Principles of Organic Chemistry", "NCERT Class 11 Chemistry Chapter 8", "ncert_class_11_chemistry_chapter_8_organic_chemistry_some_basic_principles_and_techniques"],
+  },
+  {
+    value: "hydrocarbons",
+    label: "Hydrocarbons",
+    classLevel: "Class 11",
+    subject: "Chemistry",
+    aliases: ["Hydrocarbon", "NCERT Class 11 Chemistry Chapter 9", "ncert_class_11_chemistry_chapter_9_hydrocarbons"],
   },
 ] as const;
 
+// Only these two existed before the backend published per-chapter Planning
+// capability metadata. Keep the legacy bridge narrow so a builtin Study
+// catalog never implies that an un-ingested Planning curriculum is available.
+const LEGACY_REGISTERED_PLANNING_CHAPTERS = CLASS_11_CHEMISTRY_CHAPTERS.slice(0, 2);
+
 /** Stable allow-list used only to validate an already-saved roadmap offline. */
-export const BUILTIN_PLANNING_CHAPTERS: PlanningCatalogChapter[] = LEGACY_PLANNING_CHAPTERS.map(
+export const BUILTIN_PLANNING_CHAPTERS: PlanningCatalogChapter[] = CLASS_11_CHEMISTRY_CHAPTERS.map(
   (chapter, index) => ({
     ...chapter,
     aliases: [...chapter.aliases],
@@ -103,13 +158,22 @@ function normalizePlanningClass(value: string) {
   return identity === "xi" ? "11" : identity;
 }
 
+function planningClassLabel(value: string) {
+  const normalized = normalizePlanningClass(value);
+  return /^\d+$/.test(normalized) ? `Class ${normalized}` : value.trim();
+}
+
+export function planningCatalogClassMatches(left: string, right: string) {
+  return normalizePlanningClass(left) === normalizePlanningClass(right);
+}
+
 function knownLegacyPlanningChapter(
   chapter: { value: string; label: string; aliases: string[] },
   classLevel: string,
   subject: string,
 ) {
   const chapterIdentities = [chapter.value, chapter.label, ...chapter.aliases].map(normalizeCatalogIdentity);
-  return LEGACY_PLANNING_CHAPTERS.find((candidate) => {
+  return LEGACY_REGISTERED_PLANNING_CHAPTERS.find((candidate) => {
     const knownChapterIdentities = [candidate.value, candidate.label, ...candidate.aliases]
       .map(normalizeCatalogIdentity);
     return normalizePlanningClass(classLevel) === normalizePlanningClass(candidate.classLevel)
@@ -128,6 +192,15 @@ export function planningCatalogChapterMatches(chapter: PlanningCatalogChapter, r
       || chapter.aliases?.some((alias) => normalizeCatalogIdentity(alias) === identity)
     ),
   );
+}
+
+export function planningCatalogScopeMatches(
+  chapter: Pick<PlanningCatalogChapter, "classLevel" | "subject">,
+  classLevel: string,
+  subject: string,
+) {
+  return planningCatalogClassMatches(chapter.classLevel, classLevel)
+    && normalizeCatalogIdentity(chapter.subject) === normalizeCatalogIdentity(subject);
 }
 
 /** Prevent saved/deep-linked roadmaps from rendering outside the supported Planning catalog. */
@@ -152,8 +225,8 @@ export async function fetchPlanningCatalog(
 ): Promise<PlanningCatalog> {
   const payload = await apiJson<unknown>(`${getBackendURL(context.backendURL)}/catalog`, {
     headers: await context.getAuthHeaders(),
-    cacheKey: `planning-catalog:${context.userId}`,
-    cacheTtlMs: 300000,
+    cacheKey: `planning-catalog:v2:${context.userId}`,
+    cacheTtlMs: 60000,
     retries: 1,
     timeoutMs: 10000,
     signal,
@@ -181,7 +254,7 @@ export async function fetchPlanningCatalog(
       label,
       value,
       subject,
-      classLevel,
+      classLevel: planningClassLabel(classLevel),
       order,
       ...(aliases?.length ? { aliases } : {}),
       planningSupported: true,
@@ -215,9 +288,14 @@ export async function fetchPlanningCatalog(
         aliases,
       });
     });
-  } else if (Array.isArray(payload.subjects)) {
-    // Short rollout bridge for catalogs deployed before `planning_chapters`.
-    // Missing capability metadata never exposes arbitrary shared chapters.
+  }
+
+  if (Array.isArray(payload.subjects)) {
+    // The published syllabus is also a Planning source of truth. Reading it in
+    // addition to the capability manifest keeps newly ingested chapters
+    // visible during rolling deployments where the manifest may still contain
+    // only the original registered curricula.
+    const publishedCatalog = payload.source === "published";
     payload.subjects.forEach((rawGroup) => {
       if (!isRecord(rawGroup) || !Array.isArray(rawGroup.chapters)) return;
       const subject = typeof rawGroup.subject === "string" ? rawGroup.subject.trim() : "";
@@ -241,7 +319,7 @@ export async function fetchPlanningCatalog(
             && capability.roadmap_version === "planning_roadmap_v2"
             && typeof capability.canonical_slug === "string"
             && Boolean(capability.canonical_slug.trim())
-          : rawChapter.planning_supported === true && Boolean(canonicalFallback);
+          : (rawChapter.planning_supported === true && Boolean(canonicalFallback)) || publishedCatalog;
         const legacyFallback = !capability
           && rawChapter.planning_supported === undefined
           && Boolean(canonicalFallback);
@@ -270,7 +348,7 @@ export async function fetchPlanningCatalog(
   }
   if (!chapters.length) {
     throw new PlanningApiError(
-      "Planning is currently available for Class 11 Chemistry — Some Basic Concepts of Chemistry and Structure of Atom.",
+      "No Planning-ready chapters are available in your published syllabus yet.",
       "invalid_response",
     );
   }
@@ -303,6 +381,53 @@ function normalizePlanningError(error: unknown, fallback: string) {
     error instanceof Error && error.message ? error.message : fallback,
     "service_unavailable",
   );
+}
+
+const STUDY_TIME_BUDGETS: Record<PlanningStudyTime, number | null> = {
+  "15": 15,
+  "30": 30,
+  "60": 60,
+  "120_plus": 120,
+  no_limit: null,
+};
+
+function validSessionDuration(value: number | undefined) {
+  return Number.isInteger(value) && Number(value) >= 15 && Number(value) <= 120
+    ? Number(value)
+    : null;
+}
+
+function assertPlanningTimeApplied(
+  response: Pick<PlanningRoadmap | PlanningPortfolio, "study_time_today" | "session_duration_minutes">
+    & { daily_route?: PlanningRoadmap["daily_route"]; today_route?: PlanningPortfolio["today_route"] },
+  scope: PlanningScope,
+) {
+  const selectedTime = scope.studyTimeToday || null;
+  const sessionDuration = validSessionDuration(scope.sessionDurationMinutes);
+  const route = response.daily_route || response.today_route;
+  const expectedSource = selectedTime
+    ? "student_choice"
+    : sessionDuration !== null
+      ? "session_state"
+      : "default_focus";
+  const expectedBudget = selectedTime
+    ? STUDY_TIME_BUDGETS[selectedTime]
+    : sessionDuration !== null
+      ? Math.floor(sessionDuration / 5) * 5
+      : 30;
+
+  if (
+    response.study_time_today !== selectedTime
+    || response.session_duration_minutes !== sessionDuration
+    || !route
+    || route.source !== expectedSource
+    || route.budget_minutes !== expectedBudget
+  ) {
+    throw new PlanningApiError(
+      "The planner did not apply your selected study time. Please build the roadmap again.",
+      "invalid_response",
+    );
+  }
 }
 
 export async function generatePlanningRoadmap(
@@ -343,6 +468,7 @@ export async function generatePlanningRoadmap(
     if (!roadmap) {
       throw new PlanningApiError("The planner returned an incomplete roadmap. Please try again.", "invalid_response");
     }
+    assertPlanningTimeApplied(roadmap, scope);
     return roadmap;
   } catch (error) {
     throw normalizePlanningError(error, "Your plan could not be created.");
@@ -403,11 +529,12 @@ export async function generatePlanningPortfolio(
     }
     if (
       normalized.user_id !== context.userId
-      || normalized.class_level !== firstScope.classLevel
-      || normalized.subject !== firstScope.subject
+      || normalizePlanningClass(normalized.class_level) !== normalizePlanningClass(firstScope.classLevel)
+      || normalizeCatalogIdentity(normalized.subject) !== normalizeCatalogIdentity(firstScope.subject)
     ) {
       throw new PlanningApiError("The planner returned a roadmap for a different student or syllabus. Please try again.", "invalid_response");
     }
+    assertPlanningTimeApplied(normalized, firstScope);
     return normalized;
   } catch (error) {
     throw normalizePlanningError(error, "Your multi-chapter roadmap could not be created.");

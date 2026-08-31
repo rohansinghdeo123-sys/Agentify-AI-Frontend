@@ -15,7 +15,9 @@ import {
   BUILTIN_PLANNING_CHAPTERS,
   fetchPlanningCatalog,
   generatePlanningPortfolio,
+  planningCatalogClassMatches,
   planningCatalogChapterMatches,
+  planningCatalogScopeMatches,
   planningErrorMessage,
   PlanningApiError,
   type PlanningCatalogChapter,
@@ -84,8 +86,7 @@ function portfolioMatchesCatalog(
   catalog: PlanningCatalogChapter[],
 ) {
   return portfolio.chapters.every((chapter) => catalog.some((candidate) => (
-    candidate.classLevel === portfolio.class_level
-    && candidate.subject === portfolio.subject
+    planningCatalogScopeMatches(candidate, portfolio.class_level, portfolio.subject)
     && planningCatalogChapterMatches(candidate, chapter.chapter_slug)
   )));
 }
@@ -121,12 +122,12 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     .sort((left, right) => left.label.localeCompare(right.label, undefined, { numeric: true })), [catalogChapters]);
   const subjectOptions = useMemo(() => Array.from(new Set(
     catalogChapters
-      .filter((chapter) => chapter.classLevel === draft.classLevel)
+      .filter((chapter) => planningCatalogScopeMatches(chapter, draft.classLevel, chapter.subject))
       .map((chapter) => chapter.subject),
   )).map((value) => ({ label: value, value }))
     .sort((left, right) => left.label.localeCompare(right.label)), [catalogChapters, draft.classLevel]);
   const chapters = useMemo(() => catalogChapters.filter((chapter) => (
-    chapter.classLevel === draft.classLevel && chapter.subject === draft.subject
+    planningCatalogScopeMatches(chapter, draft.classLevel, draft.subject)
   )).sort((left, right) => (
     (left.order ?? Number.MAX_SAFE_INTEGER) - (right.order ?? Number.MAX_SAFE_INTEGER)
     || left.label.localeCompare(right.label)
@@ -243,15 +244,17 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     setDraft((current) => {
       const availableClasses = Array.from(new Set(catalogChapters.map((chapter) => chapter.classLevel)));
       const normalizedProfileClass = profile?.classLevel?.trim() || "";
-      const classLevel = availableClasses.includes(current.classLevel)
-        ? current.classLevel
-        : availableClasses.includes(normalizedProfileClass)
-          ? normalizedProfileClass
+      const currentClass = availableClasses.find((value) => planningCatalogClassMatches(value, current.classLevel));
+      const profileClass = availableClasses.find((value) => planningCatalogClassMatches(value, normalizedProfileClass));
+      const classLevel = currentClass
+        ? currentClass
+        : profileClass
+          ? profileClass
           : availableClasses.length === 1
             ? availableClasses[0]
             : "";
       const availableSubjects = Array.from(new Set(
-        catalogChapters.filter((chapter) => chapter.classLevel === classLevel).map((chapter) => chapter.subject),
+        catalogChapters.filter((chapter) => planningCatalogScopeMatches(chapter, classLevel, chapter.subject)).map((chapter) => chapter.subject),
       ));
       const subject = availableSubjects.includes(current.subject)
         ? current.subject
@@ -259,14 +262,14 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
           ? availableSubjects[0]
           : "";
       const availableChapters = catalogChapters.filter((chapter) => (
-        chapter.classLevel === classLevel && chapter.subject === subject
+        planningCatalogScopeMatches(chapter, classLevel, subject)
       ));
       const chapterChoices = current.chapterChoices.flatMap((choice) => {
         const matched = availableChapters.find((chapter) => planningCatalogChapterMatches(chapter, choice.chapter))
           || (!current.classLevel && !current.subject
             ? catalogChapters.find((chapter) => planningCatalogChapterMatches(chapter, choice.chapter))
             : undefined);
-        if (!matched || matched.classLevel !== classLevel || matched.subject !== subject) return [];
+        if (!matched || !planningCatalogScopeMatches(matched, classLevel, subject)) return [];
         return [{ ...choice, chapter: matched.value }];
       }).filter((choice, index, all) => all.findIndex((item) => item.chapter === choice.chapter) === index);
       if (

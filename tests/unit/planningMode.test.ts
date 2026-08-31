@@ -26,6 +26,7 @@ import {
   generatePlanningPortfolio,
   generatePlanningRoadmap,
   isPlanningPlanSupported,
+  planningCatalogChapterMatches,
   type PlanningCatalogChapter,
 } from "@/features/planning/api";
 import {
@@ -366,6 +367,24 @@ describe("NCERT-ordered Planning roadmap", () => {
     ]);
   });
 
+  it("keeps all nine published Class 11 Chemistry chapters available for Planning", () => {
+    expect(BUILTIN_PLANNING_CHAPTERS.map((chapter) => chapter.value)).toEqual([
+      "some_basic_concepts_of_chemistry",
+      "structure_of_atom",
+      "classification_of_elements_and_periodicity_in_properties",
+      "chemical_bonding_and_molecular_structure",
+      "thermodynamics",
+      "equilibrium",
+      "redox_reactions",
+      "organic_chemistry_some_basic_principles_and_techniques",
+      "hydrocarbons",
+    ]);
+    expect(planningCatalogChapterMatches(
+      BUILTIN_PLANNING_CHAPTERS[8],
+      "ncert_class_11_chemistry_chapter_9_hydrocarbons",
+    )).toBe(true);
+  });
+
   it.each(PLANNING_PROFICIENCY_OPTIONS)("sends $label proficiency without removed setup fields", async ({ value }) => {
     const response = roadmap({ proficiency: value });
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(response), {
@@ -435,6 +454,23 @@ describe("NCERT-ordered Planning roadmap", () => {
 
     const [, request] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(JSON.parse(String(request.body))).toMatchObject({ study_time_today: value });
+  });
+
+  it("rejects a roadmap response that silently replaces the selected time", async () => {
+    const response = roadmap({ studyTimeToday: "60" });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(response), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })));
+
+    await expect(generatePlanningRoadmap({
+      backendURL: "https://planning.test",
+      getAuthHeaders: async () => ({}),
+      userId: "student-1",
+    }, { ...plan().scope, studyTimeToday: "15" })).rejects.toMatchObject({
+      code: "invalid_response",
+      message: expect.stringContaining("selected study time"),
+    });
   });
 
   it("omits study_time_today when the optional choice is untouched", async () => {
@@ -509,7 +545,7 @@ describe("NCERT-ordered Planning roadmap", () => {
     });
   });
 
-  it("loads only the independent Planning manifest and ignores shared Study/Exam chapters", async () => {
+  it("merges the Planning manifest with newly published chapters during rolling deployments", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
       source: "published",
       planning_chapters: [{
@@ -532,41 +568,34 @@ describe("NCERT-ordered Planning roadmap", () => {
         aliases: ["Atomic Structure"],
       }],
       subjects: [
-        { class_level: "Class 10", subject: "Science", chapters: [{ slug: "light", name: "Light", chapter_number: 10 }] },
-        { class_level: "Class 11", subject: "Chemistry", chapters: [{ slug: "matter", name: "Basic Concepts of Chemistry", chapter_number: 1 }] },
+        { class_level: "11", subject: "Chemistry", chapters: [
+          { slug: "some_basic_concepts_of_chemistry", name: "Some Basic Concepts of Chemistry", chapter_number: 1 },
+          { slug: "structure_of_atom", name: "Structure of Atom", chapter_number: 2 },
+          { slug: "classification_of_elements_and_periodicity_in_properties", name: "Classification of Elements and Periodicity in Properties", chapter_number: 3 },
+          { slug: "chemical_bonding_and_molecular_structure", name: "Chemical Bonding and Molecular Structure", chapter_number: 4 },
+          { slug: "thermodynamics", name: "Thermodynamics", chapter_number: 5 },
+          { slug: "equilibrium", name: "Equilibrium", chapter_number: 6 },
+          { slug: "redox_reactions", name: "Redox Reactions", chapter_number: 7 },
+          { slug: "organic_chemistry_some_basic_principles_and_techniques", name: "Organic Chemistry - Some Basic Principles and Techniques", chapter_number: 8 },
+          { slug: "hydrocarbons", name: "Hydrocarbons", chapter_number: 9 },
+        ] },
       ],
     }), { status: 200, headers: { "Content-Type": "application/json" } })));
-    await expect(fetchPlanningCatalog({
+    const catalog = await fetchPlanningCatalog({
       backendURL: "https://planning.test",
       getAuthHeaders: async () => ({}),
       userId: "student-1",
-    })).resolves.toEqual({ chapters: [
-      {
-        label: "Some Basic Concepts of Chemistry",
-        value: "some_basic_concepts_of_chemistry",
-        subject: "Chemistry",
-        classLevel: "Class 11",
-        order: 1,
-        aliases: ["matter"],
-        planningSupported: true,
-        roadmapVersion: "planning_roadmap_v2",
-      },
-      {
-        label: "Structure of Atom",
-        value: "structure_of_atom",
-        subject: "Chemistry",
-        classLevel: "Class 11",
-        order: 2,
-        aliases: ["Atomic Structure"],
-        planningSupported: true,
-        roadmapVersion: "planning_roadmap_v2",
-      },
-    ] });
+    });
+    expect(catalog.chapters).toHaveLength(9);
+    expect(catalog.chapters.map((chapter) => chapter.value)).toEqual(
+      BUILTIN_PLANNING_CHAPTERS.map((chapter) => chapter.value),
+    );
+    expect(new Set(catalog.chapters.map((chapter) => chapter.classLevel))).toEqual(new Set(["Class 11"]));
   });
 
-  it("uses only the known canonical fallback when an older catalog has no Planning capabilities", async () => {
+  it("uses only known canonical fallbacks when an older catalog has no Planning capabilities", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      source: "published",
+      source: "builtin",
       subjects: [
         { class_level: "Class 10", subject: "Science", chapters: [{ slug: "light", name: "Light" }] },
         { class_level: "Class 11", subject: "Chemistry", chapters: [
@@ -638,6 +667,30 @@ describe("NCERT-ordered Planning roadmap", () => {
     });
   });
 
+  it("rejects a portfolio response that does not honor the selected time", async () => {
+    const response = portfolio();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(response), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })));
+
+    await expect(generatePlanningPortfolio({
+      backendURL: "https://planning.test",
+      getAuthHeaders: async () => ({}),
+      userId: "student-1",
+    }, [{
+      chapter: "some_basic_concepts_of_chemistry",
+      chapterLabel: "Some Basic Concepts of Chemistry",
+      classLevel: "Class 11",
+      subject: "Chemistry",
+      chapterProficiency: "new_to_it",
+      studyTimeToday: "15",
+    }])).rejects.toMatchObject({
+      code: "invalid_response",
+      message: expect.stringContaining("selected study time"),
+    });
+  });
+
   it("rejects internally contradictory or cross-user portfolio responses", async () => {
     const invalidCounts = portfolio();
     invalidCounts.requested_chapter_count = 3;
@@ -681,6 +734,38 @@ describe("NCERT-ordered Planning roadmap", () => {
       chapterProficiency: "new_to_it",
       studyTimeToday: "30",
     }])).rejects.toMatchObject({ code: "invalid_response" });
+  });
+
+  it("accepts a multi-unit portfolio route in curriculum order", () => {
+    const value = structuredClone(portfolio());
+    const selectedChapter = value.chapters[0];
+    const laterUnit = selectedChapter.learning_units[1];
+    const baseItems = value.today_route.items;
+    value.study_time_today = "60";
+    value.today_route = {
+      ...value.today_route,
+      budget_minutes: 60,
+      estimated_minutes: { min: 50, max: 55 },
+      total_minutes: 55,
+      items: [
+        ...baseItems,
+        {
+          ...baseItems[0],
+          unit_id: laterUnit.id,
+          title: laterUnit.title,
+          minutes: 25,
+        },
+        {
+          ...baseItems[1],
+          unit_id: laterUnit.id,
+          title: laterUnit.title,
+          minutes: 5,
+        },
+      ],
+    };
+
+    expect(normalizePlanningPortfolio(value)).not.toBeNull();
+    expect(value.global_next_step.unit_id).toBe(selectedChapter.learning_units[0].id);
   });
 
   it("preserves the pre-existing shared Study and Exam topic taxonomy", () => {
@@ -782,7 +867,7 @@ describe("NCERT-ordered Planning roadmap", () => {
     expect(value.learning_units[7].exam_relevance).toBe("very_high");
   });
 
-  it("keeps dynamic Next Step timing consistent with the route without inflating the unit card", () => {
+  it("keeps unit-card timing independent from the selected route and next action", () => {
     const fifteenMinutePlan = roadmap({ studyTimeToday: "15" });
     expect(isPlanningRoadmap(fifteenMinutePlan)).toBe(true);
     expect(fifteenMinutePlan.next_step.estimated_minutes).toEqual({ min: 15, max: 15 });
@@ -794,23 +879,46 @@ describe("NCERT-ordered Planning roadmap", () => {
         ...fifteenMinutePlan.next_step,
         estimated_minutes: fifteenMinutePlan.learning_units[0].estimated_minutes,
       },
-    })).toBe(false);
+    })).toBe(true);
   });
 
-  it("rejects a route that pads today with a later learning unit", () => {
+  it("accepts a content-sized route across sequential units while keeping the first unit as Next Step", () => {
     const value = roadmap({ studyTimeToday: "60" });
     const laterUnit = value.learning_units[1];
-    expect(isPlanningRoadmap({
+    const multiUnitRoute = {
       ...value,
       daily_route: {
         ...value.daily_route,
-        items: value.daily_route.items.map((item, index) => (
-          index === value.daily_route.items.length - 1
-            ? { ...item, unit_id: laterUnit.id, title: laterUnit.title }
-            : item
-        )),
+        estimated_minutes: { min: 50, max: 55 },
+        total_minutes: 55,
+        items: [
+          ...value.daily_route.items,
+          {
+            ...value.daily_route.items[0],
+            unit_id: laterUnit.id,
+            title: laterUnit.title,
+            minutes: 25,
+          },
+          {
+            ...value.daily_route.items[1],
+            unit_id: laterUnit.id,
+            title: laterUnit.title,
+            minutes: 5,
+          },
+        ],
       },
-    })).toBe(false);
+    };
+    expect(isPlanningRoadmap(multiUnitRoute)).toBe(true);
+    expect(multiUnitRoute.next_step.unit_id).toBe(value.learning_units[0].id);
+
+    const reversed = structuredClone(multiUnitRoute);
+    reversed.daily_route.items.push({
+      ...reversed.daily_route.items[0],
+      minutes: 5,
+    });
+    reversed.daily_route.total_minutes += 5;
+    reversed.daily_route.estimated_minutes.max += 5;
+    expect(isPlanningRoadmap(reversed)).toBe(false);
   });
 
   it("keeps Recommended, Next Step, Today’s Route, and progress on one consistent source of truth", () => {
@@ -1171,6 +1279,9 @@ describe("NCERT-ordered Planning roadmap", () => {
     expect(active).toContain("One best next step, separate progress for every chapter");
     expect(active).toContain("showTodayRoute");
     expect(active).toContain("Start today’s route");
+    expect(active).toContain("min recommended");
+    expect(active).toContain("min available");
+    expect(active).toContain("no time ceiling");
     expect(active).toContain("item.reason");
     expect(active).toContain('item.role === "main_focus" ? "Main focus" : "Quick check"');
     expect(active).not.toContain('item.role === "main_focus" ? "Complete"');

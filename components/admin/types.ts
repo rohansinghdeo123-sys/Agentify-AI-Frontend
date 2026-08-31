@@ -211,6 +211,230 @@ export interface ContentReport {
   chapters: ReportChapter[];
 }
 
+export interface SemanticRetrievalReadiness {
+  status: string;
+  configured: boolean;
+  configured_model: string;
+  configured_endpoint_host: string;
+  stored_model: string;
+  stored_endpoint_host: string;
+  stored_dimensions: number;
+}
+
+export interface CurriculumReleaseReadiness {
+  status: string;
+  scope: string;
+  expected: Record<string, number>;
+  published: Record<string, number>;
+  release: {
+    provenance: string;
+    digest: string;
+    restored_at: string | null;
+  };
+}
+
+export interface PlatformReadiness {
+  status: string;
+  semantic_retrieval: SemanticRetrievalReadiness;
+  chemistry_release: CurriculumReleaseReadiness;
+}
+
+export interface EvidenceAgentSummary {
+  agent: string;
+  display_name: string;
+  role: string;
+  registered: boolean;
+  runs: number;
+  errors: number;
+  last_activity: string | null;
+  health: string;
+  activity_state: "active" | "stale" | "not_observed";
+  success_rate_percent: number | null;
+  average_latency_ms: number | null;
+  average_quality_score: number | null;
+}
+
+export interface AdminEvidenceOverview {
+  generated_at: string;
+  window_hours: number;
+  agents: EvidenceAgentSummary[];
+  content: {
+    subject_catalogs: number;
+    chapters: number;
+    published_chapters: number;
+    pages: number;
+    subtopics: number;
+    chunks: number;
+    embedded_chunks: number;
+    chapters_ready: number;
+    source_page_coverage_percent: number;
+    embedding_coverage_percent: number;
+  };
+  quality: {
+    turns: number;
+    successful_turns: number;
+    average_score: number | null;
+    quality_pass_rate_percent: number | null;
+    retrieval_turns: number;
+    grounded_turns: number;
+    grounded_rate_percent: number | null;
+    source_page_proof_rate_percent: number | null;
+  };
+  readiness: {
+    release: CurriculumReleaseReadiness;
+    semantic_retrieval: SemanticRetrievalReadiness;
+  };
+}
+
+export interface AdminContentEvidenceChapter {
+  chapter_id: number;
+  board: string;
+  class_level: string;
+  subject: string;
+  chapter_number: number | null;
+  chapter_name: string;
+  slug: string;
+  status: string;
+  version: string;
+  source_integrity: {
+    source_hash: string;
+    published_source_hash: string;
+    published_hash_matches: boolean;
+  };
+  published_at: string | null;
+  updated_at: string | null;
+  counts: { pages: number; subtopics: number; chunks: number; embedded_chunks: number };
+  quality: {
+    coverage_score: number;
+    extraction_quality: number;
+    validation_issue_count: number;
+    blocking_issues: string[];
+    blocking_issue_count: number;
+    ready: boolean;
+  };
+  evidence: {
+    subtopics_with_source_pages: number;
+    subtopics_with_verified_source_pages: number;
+    referenced_source_pages: number[];
+    verified_source_pages: number[];
+    missing_source_pages: number[];
+    source_page_coverage_percent: number;
+    embedding_coverage_percent: number;
+  };
+}
+
+export interface PaginationEvidence {
+  limit: number;
+  offset: number;
+  total: number;
+  has_more: boolean;
+}
+
+export interface AdminContentEvidence {
+  items: AdminContentEvidenceChapter[];
+  pagination: PaginationEvidence;
+  filters: Record<string, string>;
+}
+
+export interface AdminSubtopicEvidence {
+  id: number;
+  concept_id: string;
+  title: string;
+  difficulty_level: number;
+  importance_level: string;
+  exam_weightage: string;
+  blooms_taxonomy: string;
+  source_proof: {
+    page_numbers: number[];
+    referenced_page_numbers: number[];
+    verified_page_numbers: number[];
+    missing_page_numbers: number[];
+    reference_count: number;
+    verified_reference_count: number;
+    citation_count: number;
+    verified: boolean;
+  };
+  content_checks: {
+    has_definition: boolean;
+    has_explanation: boolean;
+    key_point_count: number;
+    example_count: number;
+    formula_count: number;
+    learning_objective_count: number;
+  };
+  validation: {
+    passed: boolean;
+    issues: Array<{ code: string; severity: string; message: string }>;
+  };
+}
+
+export interface AdminChapterEvidence {
+  chapter: {
+    chapter_id: number;
+    board: string;
+    class_level: string;
+    subject: string;
+    chapter_number: number | null;
+    chapter_name: string;
+    status: string;
+    version: string;
+    source_integrity: {
+      source_hash: string;
+      published_source_hash: string;
+      published_hash_matches: boolean;
+    };
+    coverage_score: number;
+    extraction_quality: number;
+    blocking_issues: string[];
+    blocking_issue_count: number;
+  };
+  retrieval_evidence: {
+    chunk_count: number;
+    embedded_chunk_count: number;
+    embedding_coverage_percent: number;
+    stored_embedding_dimensions: number[];
+    source_page_ranges: Array<{ page_start: number; page_end: number }>;
+    source_page_ranges_truncated: boolean;
+  };
+  subtopics: AdminSubtopicEvidence[];
+  pagination: PaginationEvidence;
+}
+
+export interface AdminActivityEvidenceItem {
+  trace_id: number;
+  created_at: string | null;
+  agent: string;
+  status: string;
+  latency_ms: number;
+  estimated_tokens: number;
+  quality: {
+    score: number | null;
+    passed: boolean | null;
+    grounding_score: number | null;
+    hallucination_risk: number | null;
+    issues: string[];
+  };
+  grounding: {
+    policy: string;
+    status: string;
+    source: string;
+    section_id: string;
+    paragraphs_found: number;
+    source_pages: number[];
+    citation_count: number;
+    supported: boolean;
+  };
+  fallback_count: number;
+}
+
+export interface AdminActivityEvidence {
+  items: AdminActivityEvidenceItem[];
+  pagination: PaginationEvidence;
+  window_hours: number;
+  sample_cap: number;
+  filters: Record<string, string>;
+}
+
 export interface AdminConsolePayload {
   generated_at: string;
   environment: string;
