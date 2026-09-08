@@ -4578,7 +4578,7 @@ body {
 
 .auth-field::placeholder {
   color: var(--agentify-muted-text);
-  opacity: 0.7;
+  opacity: 1;
 }
 
 .auth-field:focus {
@@ -4594,6 +4594,8 @@ body {
 
 [data-theme="dark"] .auth-field:focus {
   border-color: #5EEAD4;
+  background: #101d30;
+  box-shadow: 0 0 0 3px rgba(94,234,212,0.18);
 }
 
 .auth-otp-group {
@@ -4630,6 +4632,17 @@ body {
 
 [data-theme="dark"] .auth-otp-box:focus {
   border-color: #5EEAD4;
+  background: #101d30;
+}
+
+.auth-field[aria-invalid="true"],
+.auth-otp-box[aria-invalid="true"] {
+  border-color: var(--ds-danger);
+}
+
+.auth-field:disabled,
+.auth-otp-box:disabled {
+  cursor: wait;
 }
 
 .auth-google {
@@ -4778,7 +4791,7 @@ body {
 
 .auth-primary {
   border: 1px solid rgba(255,255,255,0.20);
-  background: linear-gradient(135deg, #0F172A 0%, #0E7490 52%, #14B8A6 100%);
+  background: linear-gradient(135deg, #0F172A 0%, #0E6878 52%, #0F766E 100%);
   color: #FFFFFF;
   box-shadow: 0 14px 34px rgba(14,116,144,0.26);
   line-height: 1;
@@ -4790,6 +4803,7 @@ body {
 .auth-primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
 
 .auth-ghost {
+  min-height: 2.75rem;
   color: var(--agentify-muted-text);
   transition: color 140ms ease, background 140ms ease;
   border-radius: 0.9rem;
@@ -4812,7 +4826,7 @@ body {
 .auth-ghost:focus-visible,
 .auth-field:focus-visible,
 .auth-otp-box:focus-visible {
-  outline: 3px solid rgba(20,184,166,0.42);
+  outline: 2px solid var(--ds-accent-teal);
   outline-offset: 3px;
 }
 
@@ -5394,7 +5408,7 @@ body {
   }
 
   .auth-brand-tagline {
-    font-size: 0.62rem !important;
+    font-size: 0.75rem !important;
   }
 
   .auth-scene-final .theme-toggle-button {
@@ -5442,8 +5456,8 @@ body {
 
   .auth-proof-item > span:last-child > span:first-child {
     overflow: visible;
-    font-size: 0.63rem !important;
-    line-height: 0.8rem;
+    font-size: 0.75rem !important;
+    line-height: 1.1rem;
     text-overflow: clip;
     white-space: normal;
   }
@@ -5474,7 +5488,7 @@ body {
 
   .auth-legal {
     margin-top: 0.65rem !important;
-    font-size: 0.62rem !important;
+    font-size: 0.75rem !important;
   }
 
   .auth-footer-final {

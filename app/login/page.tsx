@@ -104,12 +104,13 @@ function OtpBoxes({
 }) {
   const LENGTH = 6;
   const refs = useRef<Array<HTMLInputElement | null>>([]);
-  const chars = Array.from({ length: LENGTH }, (_, index) => value[index] ?? "");
+  const chars = Array.from({ length: LENGTH }, (_, index) => value[index]?.trim() ?? "");
 
   const emit = (nextChars: string[]) => {
-    const joined = nextChars.join("").replace(/\D/g, "").slice(0, LENGTH);
+    // Keep an edited slot in place so later digits do not shift and submit a different code.
+    const joined = nextChars.map((digit) => digit || " ").join("").slice(0, LENGTH).trimEnd();
     onChange(joined);
-    if (joined.length === LENGTH) onComplete(joined);
+    if (/^\d{6}$/.test(joined)) onComplete(joined);
     return joined;
   };
 
@@ -165,7 +166,7 @@ function OtpBoxes({
           type="text"
           inputMode="numeric"
           pattern="[0-9]*"
-          maxLength={1}
+          maxLength={index === 0 ? LENGTH : 1}
           autoComplete={index === 0 ? "one-time-code" : "off"}
           disabled={disabled}
           value={char}
@@ -302,7 +303,7 @@ export default function LoginPage() {
   const handleVerifyOtp = async (codeOverride?: string) => {
     setAuthError("");
     const code = (codeOverride ?? otp).trim();
-    if (code.length < 6) {
+    if (!/^\d{6}$/.test(code)) {
       setAuthError("Enter the 6-digit code from the SMS.");
       return;
     }
@@ -510,7 +511,7 @@ export default function LoginPage() {
                           type="tel"
                           inputMode="tel"
                           autoComplete="tel"
-                          disabled={signInBlocked}
+                          disabled={sendingOtp || signInBlocked}
                           value={phoneNumber}
                           onChange={(event) => setPhoneNumber(event.target.value)}
                           placeholder="+91 98765 43210"
@@ -548,15 +549,15 @@ export default function LoginPage() {
                     </button>
 
                     <div className="flex items-center justify-between">
-                      <button type="button" onClick={handleBack} className="auth-ghost px-3 py-2 text-xs font-semibold">
+                      <button type="button" onClick={handleBack} disabled={sendingOtp || verifyingOtp} className="auth-ghost px-3 py-2 text-sm font-semibold">
                         {otpSent ? "Change number" : "Back"}
                       </button>
                       {otpSent ? (
                         <button
                           type="button"
                           onClick={handleSendOtp}
-                          disabled={resendIn > 0 || sendingOtp || signInBlocked}
-                          className="auth-ghost px-3 py-2 text-xs font-semibold"
+                          disabled={resendIn > 0 || sendingOtp || verifyingOtp || signInBlocked}
+                          className="auth-ghost px-3 py-2 text-sm font-semibold"
                         >
                           {resendIn > 0 ? `Resend in ${resendIn}s` : sendingOtp ? "Sending..." : "Resend code"}
                         </button>
