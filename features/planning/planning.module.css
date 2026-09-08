@@ -509,9 +509,18 @@
     background var(--ds-duration-fast) var(--ds-ease-standard);
 }
 
-.chapterOption:hover {
+.chapterOption:not(:has(input:disabled)):hover {
   border-color: var(--plan-teal);
   transform: translateY(-1px);
+}
+
+.chapterOption:has(input:disabled) {
+  cursor: not-allowed;
+  background: var(--ds-bg-subtle);
+}
+
+.chapterOption:has(input:disabled) .chapterCheck {
+  color: var(--plan-disabled);
 }
 
 .chapterOption:focus-within {
@@ -545,7 +554,7 @@
   border: 1px solid var(--plan-line);
   border-radius: 0.72rem;
   background: var(--ds-bg-subtle);
-  color: var(--plan-muted);
+  color: var(--plan-secondary);
   font-size: 0.75rem;
   font-weight: 850;
 }
@@ -569,12 +578,11 @@
 }
 
 .chapterOption strong {
-  overflow: hidden;
   color: var(--plan-ink);
   font-size: 0.875rem;
   font-weight: 790;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .chapterOption small {

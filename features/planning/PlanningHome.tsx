@@ -189,7 +189,7 @@ export default function PlanningHome() {
                 <span className={styles.proficiencyNumber} aria-hidden="true">03</span>
                 <span>
                   <strong>Which chapters do you want to plan?</strong>
-                  <small>Choose one or more. Their NCERT roadmaps remain separate.</small>
+                  <small>Choose up to six chapters. Their NCERT roadmaps remain separate.</small>
                 </span>
                 {selectedChapters.length ? <em>{selectedChapters.length} selected</em> : null}
               </legend>
@@ -201,6 +201,7 @@ export default function PlanningHome() {
                       <input
                         type="checkbox"
                         checked={selected}
+                        disabled={!selected && selectedChapters.length >= 6}
                         onChange={(event) => {
                           clearError();
                           setChapterSelected(chapter.value, event.target.checked);
@@ -209,7 +210,7 @@ export default function PlanningHome() {
                       <span className={styles.chapterOrder}>{String(chapter.order ?? index + 1).padStart(2, "0")}</span>
                       <span>
                         <strong>{chapter.label}</strong>
-                        <small>{selected ? "Included in this roadmap" : "Add this chapter"}</small>
+                        <small>{selected ? "Included in this roadmap" : selectedChapters.length >= 6 ? "Remove a chapter to add this one" : "Add this chapter"}</small>
                       </span>
                       <span className={styles.chapterCheck} aria-hidden="true"><AppIcon name={selected ? "check" : "plus"} /></span>
                     </label>
