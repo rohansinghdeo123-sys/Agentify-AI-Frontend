@@ -295,13 +295,25 @@
 .learning-recent-row:focus-visible,
 .learning-recent-heading a:focus-visible,
 .learning-workspace-notice button:focus-visible {
-  outline: 3px solid rgba(20, 184, 166, 0.4);
+  outline: 2px solid var(--market-teal);
   outline-offset: 3px;
 }
 
 .market-user-menu {
   position: relative;
   pointer-events: auto;
+}
+
+.market-user-error {
+  padding: 0.5rem;
+  color: var(--ds-danger);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.market-user-action:disabled {
+  cursor: wait;
+  opacity: 0.7;
 }
 
 .market-user-menu > summary {

@@ -3,7 +3,7 @@
 import BackendStatus from "@/components/BackendStatus";
 import { AppIcon } from "@/components/ui/Polished";
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 function getInitials(name: string) {
   return name
@@ -29,10 +29,25 @@ export default function UserMenu({
   onLogout: () => Promise<void>;
 }) {
   const detailsRef = useRef<HTMLDetailsElement>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    setLogoutError("");
+    try {
+      await onLogout();
+    } catch {
+      setLogoutError("Could not log out. Please try again.");
+    } finally {
+      setLoggingOut(false);
+    }
+  };
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && detailsRef.current?.open) {
         detailsRef.current?.removeAttribute("open");
         detailsRef.current?.querySelector("summary")?.focus();
       }
@@ -93,11 +108,14 @@ export default function UserMenu({
         <button
           type="button"
           className="market-user-action market-user-logout"
-          onClick={() => void onLogout()}
+          disabled={loggingOut}
+          aria-busy={loggingOut}
+          onClick={() => void handleLogout()}
         >
           <AppIcon name="arrowRight" />
-          <span>Log out</span>
+          <span>{loggingOut ? "Logging out…" : "Log out"}</span>
         </button>
+        {logoutError ? <p role="alert" className="market-user-error">{logoutError}</p> : null}
       </div>
     </details>
   );

@@ -77,7 +77,7 @@
 .routePanel {
   position: relative;
   z-index: 1;
-  height: clamp(40rem, 46vw, 42rem);
+  min-height: clamp(40rem, 46vw, 42rem);
   margin-top: clamp(1.45rem, 3vw, 2.25rem);
   overflow: hidden;
   border: 1px solid var(--market-border);
@@ -130,9 +130,9 @@
   position: relative;
   z-index: 2;
   display: grid;
-  height: calc(100% - 1.9rem);
+  min-height: 36rem;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-template-rows: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(17rem, auto));
   gap: 0 clamp(0.75rem, 1.6vw, 1.25rem);
   margin: 0.85rem 0 0;
   padding: 0;
@@ -344,6 +344,7 @@
   position: relative;
   z-index: 2;
   display: flex;
+  flex-wrap: wrap;
   min-height: 1.85rem;
   align-items: flex-start;
   justify-content: space-between;
@@ -369,7 +370,7 @@
   background: rgba(var(--station-rgb), 0.08);
   padding: 0.34rem 0.52rem;
   color: var(--station-accent);
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 820;
   letter-spacing: 0.07em;
   line-height: 1.15;
@@ -406,13 +407,11 @@
 }
 
 .stationCopy > span {
-  display: -webkit-box;
-  overflow: hidden;
+  display: block;
   color: var(--market-muted);
-  font-size: clamp(0.8rem, 0.9vw, 0.88rem);
+  font-size: 0.875rem;
   line-height: 1.5;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  overflow-wrap: anywhere;
 }
 
 .stationOutcome {
@@ -423,6 +422,7 @@
   justify-content: space-between;
   gap: 0.65rem;
   margin-top: auto;
+  gap: 0.75rem;
   border-top: 1px solid var(--market-border);
   padding-top: 0.7rem;
 }
@@ -443,20 +443,17 @@
 }
 
 .stationOutcome strong {
-  display: -webkit-box;
-  overflow: hidden;
+  display: block;
   color: var(--market-text);
-  font-size: 0.78rem;
+  font-size: 0.875rem;
   font-weight: 700;
   line-height: 1.36;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 
 .station[data-recommended="true"] .stationOutcome strong {
-  font-size: 0.75rem;
-  line-height: 1.3;
-  -webkit-line-clamp: 4;
+  font-size: 0.875rem;
+  line-height: 1.5;
 }
 
 .openIndicator {
@@ -480,7 +477,7 @@
 
 .stationLink:focus-visible {
   border-color: var(--station-accent);
-  outline: 3px solid color-mix(in srgb, var(--station-accent) 68%, transparent);
+  outline: 2px solid var(--station-accent);
   outline-offset: 4px;
   box-shadow:
     0 0 0 7px rgba(var(--station-rgb), 0.1),
@@ -664,6 +661,7 @@
   .route {
     display: grid;
     height: auto;
+    min-height: 0;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: none;
     gap: 0.85rem;
@@ -743,12 +741,11 @@
   }
 
   .stationCopy > span {
-    font-size: 0.86rem;
-    -webkit-line-clamp: 2;
+    font-size: 0.875rem;
   }
 
   .stationOutcome strong {
-    font-size: 0.8rem;
+    font-size: 0.875rem;
   }
 }
 
@@ -803,7 +800,7 @@
 
   .phase {
     max-width: 17ch;
-    font-size: 0.65rem;
+    font-size: 0.75rem;
   }
 }
 
