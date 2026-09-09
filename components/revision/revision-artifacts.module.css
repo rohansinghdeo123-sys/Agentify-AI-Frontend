@@ -4,6 +4,7 @@
   align-items: start;
   grid-template-columns: 16rem minmax(0, 1fr);
   gap: 0.85rem;
+  overflow-wrap: anywhere;
 }
 
 .brief,
@@ -87,7 +88,7 @@
 .brief > span:not(.briefIcon) {
   margin-top: 0.48rem;
   color: var(--ds-text-muted);
-  font-size: 0.69rem;
+  font-size: 0.82rem;
   line-height: 1.55;
 }
 
@@ -104,7 +105,7 @@
   align-items: flex-start;
   gap: 0.38rem;
   color: var(--ds-text-muted);
-  font-size: 0.61rem;
+  font-size: 0.75rem;
   line-height: 1.45;
 }
 
@@ -133,7 +134,7 @@
 .tab {
   display: inline-flex;
   min-width: 0;
-  min-height: 2.7rem;
+  min-height: 2.75rem;
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
@@ -143,7 +144,7 @@
   padding: 0.46rem 0.58rem;
   color: var(--ds-text-muted);
   font: inherit;
-  font-size: 0.66rem;
+  font-size: 0.8rem;
   font-weight: 750;
   transition:
     border-color var(--ds-duration-fast) var(--ds-ease-standard),
@@ -173,14 +174,14 @@
 }
 
 .tab svg {
+  flex: 0 0 auto;
   width: 0.84rem;
   height: 0.84rem;
 }
 
 .tab span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.4;
+  text-wrap: balance;
 }
 
 .stage {
@@ -221,7 +222,7 @@
   display: block;
   margin-top: 0.26rem;
   color: var(--ds-text-muted);
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   line-height: 1.45;
 }
 
@@ -285,7 +286,7 @@
   z-index: 1;
   margin: 0.38rem 0 0;
   color: var(--ds-text-muted);
-  font-size: 0.71rem;
+  font-size: 0.85rem;
   line-height: 1.55;
 }
 
@@ -333,7 +334,7 @@
   background: var(--ds-surface);
   padding: 0.28rem 0.5rem;
   color: var(--ds-text-muted);
-  font-size: 0.6rem;
+  font-size: 0.75rem;
   font-weight: 680;
 }
 
@@ -349,7 +350,7 @@
 
 .toolProgress strong {
   color: var(--ds-text-secondary);
-  font-size: 0.66rem;
+  font-size: 0.78rem;
 }
 
 .toolProgressTrack {
@@ -409,7 +410,7 @@
 
 .cardAnswer span {
   color: var(--ds-text-muted);
-  font-size: 0.59rem;
+  font-size: 0.72rem;
   font-weight: 780;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -418,7 +419,7 @@
 .cardAnswer p {
   margin: 0.3rem 0 0;
   color: var(--ds-text-secondary);
-  font-size: 0.76rem;
+  font-size: 0.85rem;
   line-height: 1.55;
 }
 
@@ -428,7 +429,7 @@
 .correctionPrompt button,
 .correction button {
   display: inline-flex;
-  min-height: 2.55rem;
+  min-height: 2.75rem;
   align-items: center;
   justify-content: center;
   gap: 0.38rem;
@@ -438,7 +439,7 @@
   padding: 0.5rem 0.78rem;
   color: var(--ds-text-secondary);
   font: inherit;
-  font-size: 0.68rem;
+  font-size: 0.8rem;
   font-weight: 760;
 }
 
@@ -520,7 +521,7 @@
   max-width: 46ch;
   margin: 0.52rem 0 0;
   color: var(--ds-text-muted);
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   line-height: 1.55;
 }
 
@@ -566,7 +567,7 @@
   border-top: 1px solid var(--ds-border-subtle);
   padding-top: 0.65rem;
   color: var(--ds-text-muted);
-  font-size: 0.66rem;
+  font-size: 0.8rem;
   line-height: 1.5;
 }
 
@@ -585,6 +586,8 @@
 
 .mistakeCounter > div {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 0.25rem;
 }
 
@@ -623,7 +626,7 @@
 
 .correctionPrompt span {
   color: var(--ds-text-muted);
-  font-size: 0.69rem;
+  font-size: 0.8rem;
   line-height: 1.45;
 }
 
@@ -655,7 +658,7 @@
   width: 100%;
   margin: 0;
   color: var(--ds-text-secondary);
-  font-size: 0.76rem;
+  font-size: 0.85rem;
   line-height: 1.55;
 }
 
@@ -744,10 +747,6 @@
 
   .signalList {
     grid-template-columns: 1fr;
-  }
-
-  .tab span {
-    font-size: 0.62rem;
   }
 
   .correctionPrompt,

@@ -163,14 +163,14 @@
 
 .chapterSelect select {
   width: 100%;
-  min-height: 2.55rem;
+  min-height: 2.75rem;
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-lg);
   background: var(--ds-surface);
   padding: 0 0.7rem;
   color: var(--ds-text-primary);
   font: inherit;
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   font-weight: 690;
 }
 
@@ -229,20 +229,19 @@
 
 .topicCopy strong,
 .topicCopy small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
 }
 
 .topicCopy strong {
   color: inherit;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 710;
 }
 
 .topicCopy small {
   color: var(--ds-text-muted);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
 }
 
 .topicLink[data-status="reviewed"] .topicCopy small,
@@ -438,7 +437,7 @@
 .emptyLesson button,
 .compareButton {
   display: inline-flex;
-  min-height: 2.7rem;
+  min-height: 2.75rem;
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
@@ -449,7 +448,7 @@
   padding: 0.56rem 0.9rem;
   color: #fff;
   font: inherit;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 780;
   box-shadow: 0 0.6rem 1.4rem rgba(15, 118, 110, 0.18);
 }
@@ -507,14 +506,13 @@
 }
 
 .documentHeader h2 {
-  overflow: hidden;
   margin: 0.2rem 0 0;
   color: var(--ds-text-primary);
   font-size: 1.16rem;
   font-weight: 770;
   letter-spacing: -0.03em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
 }
 
 .documentHeader div span:not(.documentIcon) {
@@ -526,7 +524,7 @@
 
 .refreshButton {
   display: inline-flex;
-  min-height: 2.45rem;
+  min-height: 2.75rem;
   flex: 0 0 auto;
   align-items: center;
   gap: 0.38rem;
@@ -536,7 +534,7 @@
   padding: 0.48rem 0.72rem;
   color: var(--ds-text-secondary);
   font: inherit;
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   font-weight: 750;
 }
 
@@ -758,8 +756,8 @@
 }
 
 .memoryPrompt label > span {
-  color: var(--ds-text-muted);
-  font-size: 0.7rem;
+  color: var(--ds-text-secondary);
+  font-size: 0.875rem;
   font-weight: 760;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -816,7 +814,7 @@
 .selfReview button,
 .checkResult button {
   display: inline-flex;
-  min-height: 2.55rem;
+  min-height: 2.75rem;
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
@@ -826,7 +824,7 @@
   padding: 0.5rem 0.76rem;
   color: var(--ds-text-secondary);
   font: inherit;
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   font-weight: 750;
 }
 
@@ -924,13 +922,13 @@
 .previousLink,
 .nextLink {
   display: inline-flex;
-  min-height: 2.5rem;
+  min-height: 2.75rem;
   align-items: center;
   gap: 0.4rem;
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-full);
   padding: 0.48rem 0.74rem;
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   font-weight: 760;
   text-decoration: none;
 }
@@ -986,14 +984,14 @@
 
   .mobileOutline summary {
     display: flex;
-    min-height: 2.35rem;
+    min-height: 2.75rem;
     cursor: pointer;
     align-items: center;
     justify-content: space-between;
     gap: 0.8rem;
     border-radius: var(--ds-radius-lg);
     color: var(--ds-text-secondary);
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     font-weight: 750;
     list-style: none;
   }
@@ -1042,8 +1040,7 @@
   }
 
   .refreshButton {
-    align-self: flex-end;
-    margin-top: -2.55rem;
+    align-self: flex-start;
   }
 
   .documentFooter {

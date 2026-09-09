@@ -82,6 +82,7 @@
 }
 
 .heroCopy {
+  min-width: 0;
   max-width: 53rem;
 }
 
@@ -105,6 +106,15 @@
   letter-spacing: -0.058em;
   line-height: 0.98;
   text-wrap: balance;
+}
+
+.hero h1:focus {
+  outline: none;
+}
+
+.hero h1:focus-visible {
+  border-radius: 0.25rem;
+  box-shadow: var(--ds-shadow-focus);
 }
 
 .intro {
@@ -193,6 +203,7 @@
 }
 
 .todayPanel {
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
@@ -209,6 +220,7 @@
 
 .panelHeading {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
@@ -244,9 +256,10 @@
 }
 
 .continueCard {
-  display: flex;
+  display: grid;
   min-width: 0;
-  align-items: center;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
   gap: 0.78rem;
   border: 1px solid color-mix(in srgb, var(--ds-accent-teal) 25%, var(--ds-border));
   border-radius: var(--ds-radius-xl);
@@ -278,34 +291,29 @@
 }
 
 .continueCopy strong {
-  overflow: hidden;
   color: var(--ds-text-primary);
-  font-size: 0.9rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 1rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .continueCopy span {
-  overflow: hidden;
   color: var(--ds-text-muted);
-  font-size: 0.72rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .continueCopy p {
-  display: -webkit-box;
-  overflow: hidden;
   margin: 0.28rem 0 0;
   color: var(--ds-text-secondary);
-  font-size: 0.75rem;
-  line-height: 1.46;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  font-size: 0.82rem;
+  line-height: 1.6;
 }
 
 .continueAction {
   display: inline-flex;
+  grid-column: 1 / -1;
   min-height: 2.75rem;
   flex: 0 0 auto;
   align-items: center;
@@ -316,7 +324,7 @@
   background: #0f766e;
   padding: 0.58rem 0.78rem;
   color: #fff;
-  font-size: 0.75rem;
+  font-size: 0.82rem;
   font-weight: 780;
   text-decoration: none;
   transition:
@@ -336,6 +344,7 @@
 
 .handoffRow {
   display: flex;
+  flex-wrap: wrap;
   min-width: 0;
   align-items: center;
   gap: 0.45rem;
@@ -387,6 +396,7 @@
 
 .queueHeading {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: 0.8rem;
@@ -451,19 +461,18 @@ a.queueRow:hover {
 
 .queueCopy strong,
 .queueCopy small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
 }
 
 .queueCopy strong {
   color: var(--ds-text-primary);
-  font-size: 0.74rem;
+  font-size: 0.82rem;
 }
 
 .queueCopy small {
   color: var(--ds-text-muted);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
 }
 
 .bucket {
@@ -518,6 +527,7 @@ a.queueRow:hover {
 }
 
 .queueEmpty svg {
+  flex: 0 0 auto;
   width: 1.1rem;
   height: 1.1rem;
 }
@@ -534,8 +544,8 @@ a.queueRow:hover {
 
 .queueEmpty span {
   color: var(--ds-text-muted);
-  font-size: 0.7rem;
-  line-height: 1.45;
+  font-size: 0.78rem;
+  line-height: 1.55;
 }
 
 .queueEmpty[data-tone="error"] {
@@ -631,11 +641,10 @@ a.queueRow:hover {
 }
 
 .topicName {
-  overflow: hidden;
-  font-size: 0.73rem;
+  font-size: 0.85rem;
   font-weight: 690;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .topicStatus {
@@ -664,6 +673,7 @@ a.queueRow:hover {
 
 .selectionFooter {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
@@ -678,11 +688,10 @@ a.queueRow:hover {
 }
 
 .selectionFooter strong {
-  overflow: hidden;
   color: var(--ds-text-primary);
-  font-size: 0.82rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .selectionFooter > div:first-child > span {
@@ -692,7 +701,8 @@ a.queueRow:hover {
 
 .primaryActions {
   display: flex;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  max-width: 100%;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.55rem;
@@ -708,7 +718,7 @@ a.queueRow:hover {
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-full);
   padding: 0.55rem 0.86rem;
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   font-weight: 780;
   text-decoration: none;
   transition:
@@ -748,7 +758,8 @@ a.queueRow:hover {
 .disclosure {
   margin: -0.35rem 0 0;
   color: var(--ds-text-muted);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
+  line-height: 1.55;
   text-align: center;
 }
 
@@ -765,6 +776,17 @@ a.queueRow:hover {
 
 @keyframes shimmer {
   to { background-position: -200% 0; }
+}
+
+@container (max-width: 26rem) {
+  .queueRow {
+    grid-template-columns: 1.4rem minmax(0, 1fr);
+  }
+
+  .bucket {
+    grid-column: 2;
+    justify-self: start;
+  }
 }
 
 @media (max-width: 62rem) {
@@ -803,15 +825,6 @@ a.queueRow:hover {
   .selectionFooter {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .continueCard {
-    align-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  .continueCopy {
-    flex-basis: calc(100% - 3.5rem);
   }
 
   .continueCopy strong,

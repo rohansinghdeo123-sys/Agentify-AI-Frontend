@@ -7,7 +7,7 @@
 .readyPill,
 .lessonLink {
   display: inline-flex;
-  min-height: 2.55rem;
+  min-height: 2.75rem;
   align-items: center;
   gap: 0.42rem;
   border: 1px solid var(--ds-border);
@@ -16,7 +16,7 @@
   padding: 0.5rem 0.78rem;
   box-shadow: var(--ds-shadow-sm);
   color: var(--ds-text-secondary);
-  font-size: 0.69rem;
+  font-size: 0.8rem;
   font-weight: 760;
 }
 
@@ -107,7 +107,7 @@
 .scopeIdentity small,
 .selectors label > span {
   color: var(--ds-text-muted);
-  font-size: 0.58rem;
+  font-size: 0.72rem;
   font-weight: 770;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -115,19 +115,18 @@
 
 .scopeIdentity strong,
 .scopeIdentity div > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
 }
 
 .scopeIdentity strong {
   color: var(--ds-text-primary);
-  font-size: 0.78rem;
+  font-size: 0.88rem;
 }
 
 .scopeIdentity div > span {
   color: var(--ds-text-muted);
-  font-size: 0.64rem;
+  font-size: 0.78rem;
 }
 
 .selectors {
@@ -145,21 +144,21 @@
 
 .selectors select {
   width: 100%;
-  min-height: 2.45rem;
+  min-height: 2.75rem;
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-lg);
   background: var(--ds-surface);
   padding: 0 0.68rem;
   color: var(--ds-text-primary);
   font: inherit;
-  font-size: 0.68rem;
+  font-size: 0.8rem;
   font-weight: 680;
 }
 
 .refreshButton,
 .emptyTools button {
   display: inline-flex;
-  min-height: 2.6rem;
+  min-height: 2.75rem;
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
@@ -169,7 +168,7 @@
   padding: 0.52rem 0.78rem;
   color: #fff;
   font: inherit;
-  font-size: 0.68rem;
+  font-size: 0.8rem;
   font-weight: 770;
   white-space: nowrap;
   box-shadow: 0 0.5rem 1.2rem rgba(15, 118, 110, 0.17);
@@ -251,7 +250,8 @@
 
 .toolsSkeleton small {
   color: var(--ds-text-muted);
-  font-size: 0.66rem;
+  font-size: 0.78rem;
+  line-height: 1.55;
 }
 
 .skeletonTabs {
@@ -346,8 +346,8 @@
 .disclosure {
   margin: 0.05rem 0 0;
   color: var(--ds-text-muted);
-  font-size: 0.62rem;
-  line-height: 1.45;
+  font-size: 0.75rem;
+  line-height: 1.55;
   text-align: center;
 }
 

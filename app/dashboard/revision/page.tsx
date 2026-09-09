@@ -1,6 +1,7 @@
 "use client";
 
 import { AppIcon } from "@/components/ui/Polished";
+import { useRouteHeadingFocus } from "@/components/exam/useRouteHeadingFocus";
 import { useAuth } from "@/context/AuthContext";
 import {
   getRevisionScopeLabels,
@@ -74,6 +75,7 @@ export default function RevisionHomePage() {
   const [progress, setProgress] = useState<RevisionProgress | null>(null);
   const [queue, setQueue] = useState<QueueState>({ status: "loading", data: null });
   const [queueRequest, setQueueRequest] = useState(0);
+  const headingRef = useRouteHeadingFocus();
   const recommendationHeadingRef = useRef<HTMLHeadingElement>(null);
   const recommendationRetryRef = useRef<HTMLButtonElement>(null);
   const restoreRecommendationFocusRef = useRef(false);
@@ -184,7 +186,7 @@ export default function RevisionHomePage() {
     : null;
 
   return (
-    <section className={styles.hub}>
+    <section className={styles.hub} aria-labelledby="revision-home-title">
       <div className={styles.ambient} aria-hidden="true">
         <span />
         <span />
@@ -194,7 +196,7 @@ export default function RevisionHomePage() {
         <header className={styles.hero}>
           <div className={styles.heroCopy}>
             <p className={styles.eyebrow}>AgentifyAI / Revision Lab</p>
-            <h1>Strengthen what matters next.</h1>
+            <h1 id="revision-home-title" ref={headingRef} tabIndex={-1}>Strengthen what matters next.</h1>
             <p className={styles.intro}>
               Continue a topic or choose one from the chapter library. Each revision combines a clear explanation, concise notes, and one honest memory check.
             </p>

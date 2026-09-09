@@ -102,7 +102,7 @@
   padding: 0.48rem 0.78rem;
   color: var(--ds-text-secondary);
   box-shadow: var(--ds-shadow-sm);
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 760;
   text-decoration: none;
   backdrop-filter: blur(16px);
@@ -148,6 +148,7 @@
   letter-spacing: -0.047em;
   line-height: 1.03;
   text-wrap: balance;
+  overflow-wrap: anywhere;
 }
 
 .headingBlock h1:focus {

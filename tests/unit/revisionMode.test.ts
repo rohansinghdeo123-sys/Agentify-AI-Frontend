@@ -117,6 +117,32 @@ describe("focused Revision Lab architecture", () => {
     expect(screenCss).toMatch(/\.backLink\s*\{[^}]*min-height:\s*2\.75rem/);
     expect(screenCss).toMatch(/\.actions :where\(a, button\)\s*\{[^}]*min-height:\s*2\.75rem/);
   });
+
+  it("preserves full topic labels and gives the sidebar action its own row", () => {
+    const hub = source(routes[0]);
+    const hubCss = source("app/dashboard/revision/hub.module.css");
+    const sessionCss = source("app/dashboard/revision/[chapterSlug]/session.module.css");
+
+    expect(hub).toContain('id="revision-home-title" ref={headingRef} tabIndex={-1}');
+    expect(hub).toContain("useRouteHeadingFocus()");
+    expect(hubCss).toMatch(/\.continueCard\s*\{[^}]*display:\s*grid/);
+    expect(hubCss).toMatch(/\.continueAction\s*\{[^}]*grid-column:\s*1 \/ -1/);
+    expect(hubCss).toMatch(/\.topicName\s*\{[^}]*overflow-wrap:\s*anywhere/);
+    expect(hubCss).toContain("@container (max-width: 26rem)");
+    expect(sessionCss).toMatch(/\.documentHeader h2\s*\{[^}]*overflow-wrap:\s*anywhere/);
+    expect(sessionCss).not.toContain("margin-top: -2.55rem");
+  });
+
+  it("keeps study tool controls readable without shrinking their mobile labels", () => {
+    const toolCss = source("app/dashboard/revision/[chapterSlug]/tools/tools.module.css");
+    const artifactCss = source("components/revision/revision-artifacts.module.css");
+
+    expect(toolCss).toMatch(/\.selectors select\s*\{[^}]*min-height:\s*2\.75rem/);
+    expect(toolCss).toMatch(/\.selectors select\s*\{[^}]*font-size:\s*0\.8rem/);
+    expect(artifactCss).toMatch(/\.tab\s*\{[^}]*min-height:\s*2\.75rem/);
+    expect(artifactCss).toMatch(/\.tab\s*\{[^}]*font-size:\s*0\.8rem/);
+    expect(artifactCss).not.toContain("font-size: 0.62rem;\n  }");
+  });
 });
 
 describe("Revision note extraction", () => {
