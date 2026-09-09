@@ -38,7 +38,7 @@ export default function StudyHomePage() {
   const searchParams = useSearchParams();
   const { profile } = useAuth();
   const { chapters, source, settled } = useCatalog();
-  const { conversations, syncState } = useStudyConversations();
+  const { conversations, syncState, reload } = useStudyConversations();
   const legacyHandoff = legacyStudyHandoff(searchParams);
   const requestedChapter = searchParams.get("chapter") || "";
   const requestedTopic = searchParams.get("topic") || "";
@@ -194,6 +194,13 @@ export default function StudyHomePage() {
                   <time dateTime={conversation.updatedAt}>{relativeTime(conversation.updatedAt)}</time>
                 </Link>
               ))}
+            </div>
+          ) : syncState !== "synced" ? (
+            <div className={styles.emptyRecent} role="status">
+              <AppIcon name="history" />
+              <strong>{syncState === "loading" ? "Finding your conversations…" : "Your history could not sync"}</strong>
+              <span>{syncState === "loading" ? "You can choose a study route while we check." : "Your conversations have not been erased. Try syncing again, or start a new question."}</span>
+              {syncState === "offline" ? <button type="button" className={styles.retryHistory} onClick={reload}>Retry sync</button> : null}
             </div>
           ) : (
             <div className={styles.emptyRecent}>

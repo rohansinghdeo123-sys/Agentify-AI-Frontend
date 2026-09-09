@@ -8,7 +8,7 @@
   --dashboard-faint: var(--market-faint, #7a8494);
   --study-screen-accent: var(--market-teal, #0f766e);
   --study-screen-accent-bright: var(--market-teal-bright, #14b8a6);
-  --study-screen-gold: var(--market-gold, #b7791f);
+  --study-screen-gold: var(--ds-accent-gold-strong);
   position: relative;
   width: 100%;
   height: 100%;

@@ -1,3 +1,6 @@
+"use client";
+
+import { useRouteHeadingFocus } from "@/components/exam/useRouteHeadingFocus";
 import { AppIcon } from "@/components/ui/Polished";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -22,6 +25,8 @@ export function StudyScreen({
   children: ReactNode;
   className?: string;
 }) {
+  const headingRef = useRouteHeadingFocus();
+
   return (
     <section className={[styles.screen, className].filter(Boolean).join(" ")}>
       <div className={styles.ambient} aria-hidden="true"><span /><span /></div>
@@ -35,7 +40,7 @@ export function StudyScreen({
               </Link>
             ) : null}
             <p className={styles.eyebrow}>{eyebrow}</p>
-            <h1>{title}</h1>
+            <h1 ref={headingRef} tabIndex={-1}>{title}</h1>
             <p className={styles.description}>{description}</p>
           </div>
           {aside ? <div className={styles.aside}>{aside}</div> : null}

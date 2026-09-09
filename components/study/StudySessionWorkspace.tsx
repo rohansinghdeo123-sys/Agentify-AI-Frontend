@@ -462,32 +462,37 @@ function StudyComposer({
                 className="sr-only"
                 aria-label="Attach photos, documents, or notes"
               />
-              <div ref={menuRef} className={styles.menuWrap}>
+              <div
+                ref={menuRef}
+                className={styles.menuWrap}
+                onBlur={(event) => {
+                  if (menuOpen && event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) onToggleMenu();
+                }}
+              >
                 <button
                   ref={menuTriggerRef}
                   type="button"
                   onClick={onToggleMenu}
                   disabled={loading}
                   aria-label="Open tutor tools"
-                  aria-haspopup="menu"
+                  aria-controls={menuOpen ? "study-tutor-tools" : undefined}
                   aria-expanded={menuOpen}
                   className={styles.iconButton}
                 ><AppIcon name={menuOpen ? "x" : "plus"} /></button>
                 {menuOpen ? (
-                  <div className={styles.composerMenu} role="menu" aria-label="Tutor tools">
-                    <button ref={firstMenuActionRef} type="button" role="menuitem" onClick={() => attachmentInputRef.current?.click()}>
+                  <div id="study-tutor-tools" className={styles.composerMenu} role="group" aria-label="Tutor tools">
+                    <button ref={firstMenuActionRef} type="button" onClick={() => attachmentInputRef.current?.click()}>
                       <AppIcon name="plus" />
                       <span><strong>Add photos & files</strong><small>Images, PDFs, or text notes</small></span>
                     </button>
-                    <button type="button" role="menuitemcheckbox" aria-checked={socraticMode} onClick={onToggleSocratic}>
+                    <button type="button" aria-pressed={socraticMode} onClick={onToggleSocratic}>
                       <AppIcon name="study" />
                       <span><strong>Guide me step by step</strong><small>Use hints before the final answer</small></span>
                       <i data-on={socraticMode} />
                     </button>
                     <button
                       type="button"
-                      role="menuitemcheckbox"
-                      aria-checked={strictAttachmentGrounding}
+                      aria-pressed={strictAttachmentGrounding}
                       disabled={!attachments.length}
                       onClick={onToggleStrictGrounding}
                     >

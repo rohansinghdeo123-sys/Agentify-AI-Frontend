@@ -251,8 +251,9 @@
 .scopeControls select:focus-visible,
 .scopeControls button:focus-visible,
 .recentRow:focus-visible,
-.panelHeading > a:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--study-screen-accent-bright, #14b8a6) 42%, transparent);
+.panelHeading > a:focus-visible,
+.retryHistory:focus-visible {
+  outline: 3px solid var(--study-screen-accent, #0f766e);
   outline-offset: 3px;
 }
 
@@ -298,6 +299,18 @@
 .emptyRecent > svg { width: 1.2rem; color: var(--study-screen-accent, #0f766e); }
 .emptyRecent strong { font-size: 0.86rem; }
 .emptyRecent span { color: var(--dashboard-muted, #64748b); font-size: 0.75rem; line-height: 1.55; }
+
+.retryHistory {
+  min-height: 2.75rem;
+  border: 1px solid var(--study-screen-accent, #0f766e);
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.85rem;
+  color: var(--study-screen-accent, #0f766e);
+  background: var(--dashboard-surface, #fff);
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+}
 
 .promise {
   display: grid;
