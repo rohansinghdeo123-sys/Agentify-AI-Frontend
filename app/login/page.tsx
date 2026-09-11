@@ -9,6 +9,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import ChatThinkingLogo from "@/components/brand/ChatThinkingLogo";
 import { AlertState, AppIcon, LoadingState } from "@/components/ui/Polished";
 import { primeBackend } from "@/lib/apiClient";
+import { readOtpInputDigits } from "@/lib/otpInput";
 
 const displayFont = Fraunces({
   subsets: ["latin"],
@@ -114,8 +115,9 @@ function OtpBoxes({
     return joined;
   };
 
-  const handleChange = (index: number, raw: string) => {
-    const digits = raw.replace(/\D/g, "");
+  const handleChange = (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = readOtpInputDigits(event.target.value, event.nativeEvent as InputEvent);
+    if (digits === null) return;
     const next = chars.slice();
     if (!digits) {
       next[index] = "";
@@ -173,7 +175,8 @@ function OtpBoxes({
           aria-label={`Digit ${index + 1}`}
           aria-invalid={invalid || undefined}
           aria-describedby={invalid ? "login-auth-error" : undefined}
-          onChange={(event) => handleChange(index, event.target.value)}
+          onChange={(event) => handleChange(index, event)}
+          onFocus={(event) => event.currentTarget.select()}
           onKeyDown={(event) => handleKeyDown(index, event)}
           onPaste={handlePaste}
           className="auth-otp-box"
