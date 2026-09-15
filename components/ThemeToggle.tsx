@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 type ThemeMode = "dark" | "light";
 const THEME_CHANGE_EVENT = "agentify-theme-change";
@@ -27,6 +27,12 @@ function subscribeToTheme(onStoreChange: () => void) {
 export default function ThemeToggle({ compact = false }: { compact?: boolean }) {
   const theme = useSyncExternalStore(subscribeToTheme, getStoredTheme, () => "light");
   const nextTheme = theme === "dark" ? "light" : "dark";
+
+  useEffect(() => {
+    // Reconcile after a mount/recovery and changes from another tab. Read the
+    // live store so the initial server snapshot cannot overwrite a saved theme.
+    document.documentElement.setAttribute("data-theme", getStoredTheme());
+  }, [theme]);
 
   const toggleTheme = () => {
     applyTheme(nextTheme);
