@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const port = Number(process.env.PLAYWRIGHT_PORT || 3100);
 const baseURL = `http://127.0.0.1:${port}`;
+const production = process.env.PLAYWRIGHT_PRODUCTION === "1";
 
 const testPublicEnv = {
   NEXT_TELEMETRY_DISABLED: "1",
@@ -35,10 +36,12 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   webServer: {
-    command: `npm run dev -- --port ${port}`,
+    command: production
+      ? `npm run build && npm run start -- --port ${port}`
+      : `npm run dev -- --port ${port}`,
     url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    reuseExistingServer: !process.env.CI && !production,
+    timeout: production ? 300_000 : 120_000,
     env: testPublicEnv,
   },
   projects: [

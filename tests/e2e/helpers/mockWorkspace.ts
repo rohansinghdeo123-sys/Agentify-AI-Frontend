@@ -91,6 +91,8 @@ const conversation: StudyConversation = {
 export type WorkspaceMockOptions = {
   /** Both states have a published catalog; empty means no previous learner work. */
   state?: "ready" | "empty";
+  /** Synthetic founder claims and backend verification; never real admin access. */
+  founder?: boolean;
 };
 
 /**
@@ -121,6 +123,7 @@ export async function installWorkspaceMocks(
     exp: issuedAt + 3600,
     email: profile.email,
     email_verified: true,
+    ...(options.founder ? { admin: true, founder: true, role: "admin" } : {}),
     firebase: { identities: { email: [profile.email] }, sign_in_provider: "google.com" },
   })}.synthetic-test-signature`;
 
@@ -179,7 +182,11 @@ export async function installWorkspaceMocks(
     if (request.method() === "GET") {
       if (pathname === "/health" || pathname === "/health/live") return json(route, { status: "ok", service: "agentifyai-test", artifacts_ready: true });
       if (pathname === "/profile/me") return json(route, profile);
-      if (pathname === "/admin/me") return json(route, { detail: "Learner account has no admin access." }, 404);
+      if (pathname === "/admin/me") {
+        return options.founder
+          ? json(route, { role: "admin", founder: true, verified: true })
+          : json(route, { detail: "Learner account has no admin access." }, 404);
+      }
       if (pathname === "/catalog") return json(route, WORKSPACE_TEST_CATALOG);
       if (pathname === `/sessions/${WORKSPACE_TEST_USER_ID}`) return json(route, { sessions: state === "ready" ? [recentSession] : [] });
       if (pathname === `/coach/conversations/${WORKSPACE_TEST_USER_ID}`) return json(route, { conversations: state === "ready" ? [conversation] : [] });
