@@ -1,0 +1,18 @@
+.console {
+  /* Nested evidence panels need a stable surface: stacking translucent hover
+     fills changes contrast every time a chapter or activity panel expands. */
+  --agentify-card-bg: var(--ds-surface-elevated);
+  --agentify-hover-bg: var(--ds-bg-secondary);
+  --agentify-muted-text: var(--ds-text-secondary);
+}
+
+:global([data-theme="light"]) .console {
+  --ds-success: #08665d;
+}
+
+@media (max-width: 639px) {
+  .console summary {
+    flex-wrap: wrap;
+    overflow-wrap: anywhere;
+  }
+}

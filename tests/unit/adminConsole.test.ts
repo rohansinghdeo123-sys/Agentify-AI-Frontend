@@ -62,6 +62,22 @@ describe("founder admin console", () => {
     expect(report).not.toContain("<table");
   });
 
+  it("uses semantic actions, announces loading, and gives narrow headers room to wrap", () => {
+    const page = source("app/dashboard/internal/admin/page.tsx");
+
+    expect(page).toContain('primary ? "ds-button-primary"');
+    expect(page).not.toContain("--ds-accent-cyan");
+    expect(page).not.toContain("text-[#041b25]");
+    expect(page).toContain("disabled={disabled || busy}");
+    expect(page).toContain("aria-busy={busy || undefined}");
+    expect(page).toContain("<ConsoleButton busy={refreshing}");
+    expect(page).toContain("<ConsoleButton primary disabled={!overview}");
+    expect(page).toContain('role="status" aria-live="polite" aria-atomic="true"');
+    expect(page).toContain("xl:sticky xl:top-3 xl:flex-row");
+    expect(page).toContain("scroll-mt-6 xl:scroll-mt-28");
+    expect(page).toContain("[overflow-wrap:anywhere]");
+  });
+
   it("lets signed-in internal routes render before student profile and onboarding gates", () => {
     const layout = source("app/dashboard/layout.tsx");
     const internalGate = layout.indexOf("if (isAdminRoute) {");
@@ -72,5 +88,15 @@ describe("founder admin console", () => {
     expect(internalGate).toBeLessThan(profileGate);
     expect(internalGate).toBeLessThan(onboardingGate);
     expect(layout).toContain("Internal pages own their backend-verified role checks");
+  });
+
+  it("keeps expanded evidence surfaces stable and their labels readable without changing other pages", () => {
+    const page = source("app/dashboard/internal/admin/page.tsx");
+    const css = source("app/dashboard/internal/admin/admin.module.css");
+    expect(page).toContain("cn(styles.console,");
+    expect(css).toContain("--agentify-hover-bg: var(--ds-bg-secondary)");
+    expect(css).toContain("--agentify-muted-text: var(--ds-text-secondary)");
+    expect(css).toContain("--agentify-card-bg: var(--ds-surface-elevated)");
+    expect(css).toContain(".console summary");
   });
 });
