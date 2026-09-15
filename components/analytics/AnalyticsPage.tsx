@@ -367,7 +367,7 @@ function GlassCard({ label, value, tone = "neutral", active = false }: { label: 
   return (
     <div
       className={cn(
-        "progress-glass-card group relative overflow-hidden rounded-xl border border-cyan-100/10 bg-[linear-gradient(135deg,rgba(8,18,31,0.86),rgba(9,15,27,0.80))] p-4 shadow-[0_10px_32px_rgba(0,0,0,0.16)] backdrop-blur-2xl transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-200/20 hover:bg-white/[0.055]",
+        "progress-glass-card group relative min-w-0 overflow-hidden rounded-xl border border-cyan-100/10 bg-[linear-gradient(135deg,rgba(8,18,31,0.86),rgba(9,15,27,0.80))] p-4 shadow-[0_10px_32px_rgba(0,0,0,0.16)] backdrop-blur-2xl transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-200/20 hover:bg-white/[0.055]",
         active && "border-[#14B8A6]/36 bg-[linear-gradient(135deg,rgba(8,47,73,0.58),rgba(8,29,43,0.78))]",
       )}
     >
@@ -387,10 +387,10 @@ function GlassCard({ label, value, tone = "neutral", active = false }: { label: 
 function GlassPanel({ title, tag, right, className, children }: { title: string; tag?: string; right?: React.ReactNode; className?: string; children: React.ReactNode }) {
   const titleId = useId();
   return (
-    <section aria-labelledby={titleId} className={cn("progress-glass-panel overflow-hidden rounded-[1.25rem] border border-cyan-100/10 bg-[linear-gradient(135deg,rgba(8,18,31,0.88),rgba(10,14,24,0.82))] shadow-[0_14px_44px_rgba(0,0,0,0.18)] backdrop-blur-2xl", className)}>
-      <div className="progress-panel-header flex items-center justify-between border-b border-cyan-100/10 bg-white/[0.025] px-5 py-4">
-        <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-[#14B8A6] shadow-[0_0_18px_rgba(20,184,166,0.8)]" />
+    <section aria-labelledby={titleId} className={cn("progress-glass-panel min-w-0 overflow-hidden rounded-[1.25rem] border border-cyan-100/10 bg-[linear-gradient(135deg,rgba(8,18,31,0.88),rgba(10,14,24,0.82))] shadow-[0_14px_44px_rgba(0,0,0,0.18)] backdrop-blur-2xl", className)}>
+      <div className="progress-panel-header flex flex-wrap items-center justify-between gap-3 border-b border-cyan-100/10 bg-white/[0.025] px-5 py-4">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-[#14B8A6] shadow-[0_0_18px_rgba(20,184,166,0.8)]" />
           <h2 id={titleId} className="text-sm font-semibold tracking-[-0.01em] text-slate-100">{title.replace(/_/g, " ")}</h2>
           {tag && <span className={cn("rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-1 font-bold uppercase tracking-[0.16em]", styles.microType, styles.toneWarning)}>{tag}</span>}
         </div>
@@ -410,7 +410,7 @@ function TonePill({ children, tone = "neutral" }: { children: React.ReactNode; t
 }
 
 function Rail({ value, tone = "neutral", label = "Progress" }: { value: number; tone?: Tone; label?: string }) {
-  const width = Math.max(0, Math.min(100, value));
+  const width = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
   const bg = tone === "green" ? "bg-emerald-400" : tone === "blue" ? "bg-[#14B8A6]" : tone === "amber" ? "bg-amber-400" : tone === "red" ? "bg-red-400" : "bg-gray-400";
   return (
     <div
@@ -524,13 +524,13 @@ function LineChart({
   const summary = `${velocitySeries.label} ranges from ${minValue}${valueSuffix} to ${maxValue}${valueSuffix} across ${labels.length} periods.`;
 
   return (
-    <div className="progress-chart-frame relative min-h-[430px] overflow-hidden rounded-[1.6rem] border border-[#1A2C3C] bg-[#050A0D] px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035),0_18px_56px_rgba(0,0,0,0.24)]">
+    <div className={cn("progress-chart-frame relative min-h-[430px] overflow-hidden rounded-[1.6rem] border border-[#1A2C3C] bg-[#050A0D] px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035),0_18px_56px_rgba(0,0,0,0.24)]", styles.chartPalette)}>
       <div className="progress-chart-grid pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(20,184,166,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(20,184,166,0.03)_1px,transparent_1px)] bg-[size:64px_64px] opacity-45" />
       <div className="progress-chart-wash pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_58%_36%,rgba(255,170,10,0.045),transparent_26%),linear-gradient(180deg,rgba(5,10,13,0)_0%,rgba(5,10,13,0.84)_100%)]" />
 
-      <div className="relative mb-7 flex items-center justify-between gap-4">
+      <div className="relative mb-7 flex flex-wrap items-center justify-between gap-4">
         <div className={cn("flex items-center gap-3 uppercase tracking-[0.28em] text-slate-400", styles.microType)}>
-          <span className="h-px w-8 bg-[#FFAA0A]" />
+          <span className="h-px w-8 bg-[var(--analytics-chart-line)]" />
           <span>XP Velocity</span>
         </div>
         <div className={cn("rounded-full border border-emerald-400/20 bg-emerald-400/7 px-2.5 py-1 font-bold uppercase tracking-[0.14em]", styles.microType, styles.tonePositive)}>
@@ -538,9 +538,10 @@ function LineChart({
         </div>
       </div>
 
+      <div role="region" aria-label="XP velocity chart" tabIndex={0} className={cn("relative overflow-x-auto", styles.scrollRegion)}>
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        className="relative h-[335px] w-full overflow-visible"
+        className="relative h-[335px] w-full min-w-[440px] overflow-visible"
         role="img"
         aria-labelledby={`${chartTitleId} ${chartDescriptionId}`}
       >
@@ -548,9 +549,9 @@ function LineChart({
         <desc id={chartDescriptionId}>{summary}</desc>
         <defs>
           <linearGradient id="analyticsXpArea" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="#FFAA0A" stopOpacity="0.46" />
-            <stop offset="48%" stopColor="#FFAA0A" stopOpacity="0.18" />
-            <stop offset="100%" stopColor="#FFAA0A" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--analytics-chart-line)" stopOpacity="0.46" />
+            <stop offset="48%" stopColor="var(--analytics-chart-line)" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="var(--analytics-chart-line)" stopOpacity="0" />
           </linearGradient>
           <filter id="analyticsLineGlow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="1.45" result="coloredBlur" />
@@ -570,7 +571,7 @@ function LineChart({
                 y1={yPos}
                 x2={width - padding.right}
                 y2={yPos}
-                stroke={tick === 0 ? "#1A2C3C" : "#5A3F13"}
+                stroke={tick === 0 ? "var(--analytics-chart-baseline)" : "var(--analytics-chart-grid)"}
                 strokeDasharray={tick === 0 ? "0" : "1.5 2.4"}
                 strokeOpacity={tick === 0 ? 0.72 : 0.58}
                 strokeWidth={tick === 0 ? 0.42 : 0.32}
@@ -578,7 +579,7 @@ function LineChart({
               <text
                 x={padding.left - 6.4}
                 y={yPos - 1}
-                fill="#8190A6"
+                fill="var(--analytics-chart-label)"
                 fontSize="2.9"
                 fontFamily="inherit"
                 fontWeight="600"
@@ -595,7 +596,7 @@ function LineChart({
         <path
           d={path}
           fill="none"
-          stroke="#FFAA0A"
+          stroke="var(--analytics-chart-line)"
           strokeLinecap="round"
           strokeLinejoin="round"
           strokeWidth="0.92"
@@ -605,7 +606,7 @@ function LineChart({
         <path
           d={path}
           fill="none"
-          stroke="#FFAA0A"
+          stroke="var(--analytics-chart-line)"
           strokeLinecap="round"
           strokeLinejoin="round"
           strokeWidth="0.95"
@@ -617,7 +618,7 @@ function LineChart({
             key={i}
             x={x(i)}
             y={height - 2}
-            fill="#718096"
+            fill="var(--analytics-chart-label)"
             fontSize="3"
             fontFamily="inherit"
             fontWeight="600"
@@ -627,6 +628,7 @@ function LineChart({
           </text>
         ))}
       </svg>
+      </div>
     </div>
   );
 }
@@ -793,7 +795,8 @@ export default function AnalyticsPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto min-h-full w-full max-w-[1880px] space-y-5 py-5">
+      <div role="status" aria-live="polite" aria-label="Loading analytics" className="mx-auto min-h-full w-full max-w-[1880px] space-y-5 py-5">
+        <span className="sr-only">Loading your learning analytics.</span>
         <LoadingSkeleton className="h-28 rounded-[2rem] border border-white/10 bg-slate-900/70 p-6" />
         <section className="grid gap-5 lg:grid-cols-2">
           <LoadingSkeleton className="h-64 rounded-[2rem] border border-white/10 bg-slate-900/70 p-6" />
@@ -805,14 +808,14 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="progress-analytics-shell relative min-h-full w-full overflow-hidden rounded-[1.5rem] border border-cyan-100/10 bg-[radial-gradient(circle_at_12%_0%,rgba(20,184,166,0.10),transparent_30%),radial-gradient(circle_at_88%_4%,rgba(242,184,75,0.09),transparent_28%),linear-gradient(135deg,#06111D_0%,#080D16_50%,#0D1420_100%)] p-4 text-slate-200 shadow-[0_20px_64px_rgba(0,0,0,0.24)] sm:p-6">
+    <div className="progress-analytics-shell relative min-h-full w-full overflow-hidden rounded-[1.5rem] border border-cyan-100/10 bg-[radial-gradient(circle_at_12%_0%,rgba(20,184,166,0.10),transparent_30%),radial-gradient(circle_at_88%_4%,rgba(242,184,75,0.09),transparent_28%),linear-gradient(135deg,#06111D_0%,#080D16_50%,#0D1420_100%)] p-4 text-slate-200 shadow-[0_20px_64px_rgba(0,0,0,0.24)] [overflow-wrap:anywhere] sm:p-6">
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(148,163,184,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.035)_1px,transparent_1px)] bg-[size:64px_64px] opacity-45" />
       <div className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/40 to-transparent" />
 
       <div className="relative space-y-6">
         <section className="progress-hero-panel overflow-hidden rounded-[1.25rem] border border-cyan-100/12 bg-[linear-gradient(135deg,rgba(8,20,34,0.92),rgba(7,12,22,0.82))] shadow-[0_18px_56px_rgba(0,0,0,0.22)] backdrop-blur-2xl">
-          <div className="grid gap-0 xl:grid-cols-[minmax(0,1.25fr)_420px]">
-            <div className="p-6 sm:p-8">
+          <div className="grid gap-0 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.8fr)]">
+            <div className="min-w-0 p-5 sm:p-8">
               <div className="flex flex-wrap items-center gap-2">
                 <TonePill tone="blue">Analytics</TonePill>
                 <TonePill tone={error ? "amber" : "green"}>{error ? "Degraded" : "Live sync"}</TonePill>
@@ -825,7 +828,7 @@ export default function AnalyticsPage() {
                   </span>
                 ) : null}
               </div>
-              <h1 className="mt-6 max-w-4xl text-4xl font-semibold tracking-tight text-white sm:text-5xl">
+              <h1 className="mt-6 max-w-4xl text-3xl font-semibold tracking-tight text-white sm:text-5xl">
                 Learning intelligence
               </h1>
               <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-400 sm:text-base">
@@ -833,7 +836,7 @@ export default function AnalyticsPage() {
                 habits are building over time.
               </p>
               {error ? (
-                <div className="mt-4 flex flex-wrap items-center gap-3">
+                <div role="status" className="mt-4 flex flex-wrap items-center gap-3">
                   <p className={cn("text-xs font-semibold uppercase tracking-[0.16em]", styles.toneWarning)}>{error}</p>
                   <button
                     type="button"
@@ -845,7 +848,7 @@ export default function AnalyticsPage() {
                 </div>
               ) : null}
 
-              <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="mt-8 grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
                 <div className="progress-mini-card rounded-2xl border border-white/10 bg-white/[0.035] p-4">
                   <p className={cn("font-bold uppercase tracking-[0.16em]", styles.metaLabel)}>Priority action</p>
                   <p className="mt-2 text-sm font-semibold text-white">{priorityCommand}</p>
@@ -872,7 +875,7 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
-            <div className="progress-readiness-pane border-t border-cyan-100/10 bg-white/[0.025] p-6 xl:border-l xl:border-t-0">
+            <div className="progress-readiness-pane min-w-0 border-t border-cyan-100/10 bg-white/[0.025] p-4 sm:p-6 xl:border-l xl:border-t-0">
               <div className="progress-readiness-card rounded-[2rem] border border-cyan-100/12 bg-black/20 p-5">
                 <div className="flex items-center justify-between">
                   <p className={cn("text-xs font-bold uppercase tracking-[0.16em]", styles.metaLabel)}>Readiness score</p>
@@ -911,7 +914,7 @@ export default function AnalyticsPage() {
         <section
           className="progress-action-plan rounded-[2rem] border border-cyan-100/12 bg-[linear-gradient(135deg,rgba(20,184,166,0.10),rgba(255,170,10,0.07))] p-5 shadow-[0_24px_72px_rgba(0,0,0,0.18)]"
         >
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_440px]">
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <TonePill tone={primaryWeakTopic ? "amber" : "green"}>Next move</TonePill>
@@ -980,7 +983,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Personal progress trends and learning signals */}
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.8fr)_540px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)]">
         <GlassPanel
           title="XP progress over time"
           right={
@@ -999,7 +1002,7 @@ export default function AnalyticsPage() {
           />
         </GlassPanel>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           {/* Predictive Insights */}
           <GlassPanel title="What your data suggests" tag="AI">
             <div className="space-y-3 max-h-[400px] overflow-y-auto">
@@ -1051,10 +1054,10 @@ export default function AnalyticsPage() {
               <span className="text-gray-400">Total XP</span>
               <span className="text-2xl font-bold text-white">{totalXp}</span>
             </div>
-            <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+            <div role="progressbar" aria-label="Progress to next level" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(levelProgress)} aria-valuetext={`${xpToNext} XP to next level`} className="h-2 bg-white/5 rounded-full overflow-hidden">
               <div className="h-full bg-gradient-to-r from-amber-400 to-orange-500" style={{ width: `${levelProgress}%` }} />
             </div>
-            <div className={cn("flex justify-between uppercase", styles.metaLabel)}>
+            <div className={cn("flex flex-wrap justify-between gap-2 uppercase", styles.metaLabel)}>
               <span>LVL {progress.level || 1}</span>
               <span>{xpToNext} XP to next</span>
               <span>LVL {(progress.level || 1) + 1}</span>
@@ -1073,13 +1076,13 @@ export default function AnalyticsPage() {
               return (
                 <div key={entry.topic} className={cn("rounded-lg border p-4 flex flex-col justify-between", tones.card)}>
                   <div>
-                    <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                       <h4 className={cn("text-sm font-bold uppercase truncate", tones.text)}>{entry.topic.replace(/_/g, " ")}</h4>
                       <span className={cn("shrink-0 rounded-full border px-2 py-0.5 font-bold", styles.microType, tones.chip)}>
                         {BUCKET_LABELS[entry.bucket]} · {entry.suggested_minutes}m
                       </span>
                     </div>
-                    <div className="flex items-baseline gap-2">
+                    <div className="flex flex-wrap items-baseline gap-2">
                       <span className={cn("text-xl font-bold", tones.text)}>{Math.round(entry.retention_estimate * 100)}%</span>
                       <span className="text-xs text-gray-400">est. retention</span>
                       <span className="text-xs text-gray-400">· {entry.accuracy}% acc</span>
@@ -1107,11 +1110,11 @@ export default function AnalyticsPage() {
             {weakTopics.map((topic) => (
               <div key={`${topic.subject}-${topic.topic}`} className="bg-red-500/5 border border-red-500/20 rounded-lg p-4 flex flex-col justify-between">
                 <div>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                     <h4 className={cn("text-sm font-bold uppercase", styles.toneDanger)}>{topic.topic}</h4>
                     <span className={styles.metaLabel}>{topic.subject}</span>
                   </div>
-                  <div className="flex items-baseline gap-2">
+                  <div className="flex flex-wrap items-baseline gap-2">
                     <span className={cn("text-xl font-bold", styles.toneDanger)}>{topic.accuracy}%</span>
                     <span className="text-xs text-gray-400">{topic.sessions} sessions</span>
                     {topic.trend !== 0 && (
@@ -1137,7 +1140,7 @@ export default function AnalyticsPage() {
 
       {/* Detailed personal study history */}
       <div className="space-y-6">
-          <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <GlassPanel title="Weekly study time" tag="TIME">
               {weeklyLabels.length ? (
                 <div className="space-y-4">
@@ -1145,10 +1148,10 @@ export default function AnalyticsPage() {
                     const maxDuration = Math.max(...weeklyDurations);
                     const percent = maxDuration > 0 ? Math.round((weeklyDurations[i] / maxDuration) * 100) : 0;
                     return (
-                      <div key={label} className="grid grid-cols-[90px_1fr_80px] items-center gap-4">
-                        <span className="text-xs text-gray-400 text-right">{label}</span>
+                      <div key={label} className={styles.weeklyRow}>
+                        <span className="text-xs text-gray-400">{label}</span>
                         <Rail value={percent} tone="amber" label={`Relative study time for ${label}`} />
-                        <span className="text-xs text-white font-mono">{formatMinutes(weeklyDurations[i])}</span>
+                        <span className="text-right text-xs text-white font-mono">{formatMinutes(weeklyDurations[i])}</span>
                       </div>
                     );
                   })}
@@ -1162,12 +1165,12 @@ export default function AnalyticsPage() {
               {subjects.length ? (
                 <div className="space-y-4">
                   {subjects.map((subj) => (
-                    <div key={subj.subject} className="flex items-center justify-between border-b border-white/5 pb-3 last:border-0">
-                      <div>
+                    <div key={subj.subject} className="flex items-center justify-between gap-3 border-b border-white/5 pb-3 last:border-0">
+                      <div className="min-w-0">
                         <div className="text-sm font-bold text-white uppercase">{subj.subject}</div>
                         <div className={styles.metaLabel}>{subj.sessions} sessions / {formatMinutes(subj.duration)}</div>
                       </div>
-                      <div className="text-right">
+                      <div className="shrink-0 text-right">
                         <div className={cn("text-lg font-bold", toneText(getScoreTone(subj.accuracy)))}>{subj.accuracy}%</div>
                         <div className={styles.metaLabel}>focus {subj.focus}</div>
                       </div>
@@ -1181,7 +1184,7 @@ export default function AnalyticsPage() {
           </div>
 
           {/* Row 5: Heatmap + Topic Matrix */}
-          <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)]">
             <GlassPanel title="Activity heatmap" tag="35D" right={<TonePill tone="amber">{heatmap.reduce((a, b) => a + b.value, 0)} sessions</TonePill>}>
               {heatmap.length ? (
                 <div className="space-y-2" role="list" aria-label="Study sessions during the last 35 days">
@@ -1210,32 +1213,37 @@ export default function AnalyticsPage() {
 
             <GlassPanel title="Topic matrix" tag="LOG">
               {topics.length ? (
-                <div className="overflow-auto">
-                  <div className="min-w-[700px]">
-                    <div className={cn("grid grid-cols-[1.6fr_0.9fr_0.8fr_0.8fr_0.8fr_0.5fr] border-b border-white/10 bg-white/[0.02] px-4 py-3 font-mono uppercase tracking-[0.2em]", styles.metaLabel)}>
-                      <div>Topic</div>
-                      <div>Subject</div>
-                      <div className="text-right">Acc</div>
-                      <div className="text-right">Sessions</div>
-                      <div className="text-right">Time</div>
-                      <div className="text-right">Trend</div>
-                    </div>
+                <div role="region" aria-label="Topic matrix, scroll to see all columns" tabIndex={0} className={cn("overflow-auto", styles.scrollRegion)}>
+                  <table className={styles.matrixTable}>
+                    <caption className="sr-only">Topic performance, study time, and recent accuracy trends</caption>
+                    <thead>
+                      <tr className={cn("border-b border-white/10 bg-white/[0.02] font-mono uppercase tracking-[0.2em]", styles.metaLabel)}>
+                        <th scope="col">Topic</th>
+                        <th scope="col">Subject</th>
+                        <th scope="col" className="text-right"><abbr title="Accuracy">Acc</abbr></th>
+                        <th scope="col" className="text-right">Sessions</th>
+                        <th scope="col" className="text-right">Time</th>
+                        <th scope="col" className="text-right">Trend</th>
+                      </tr>
+                    </thead>
+                    <tbody>
                     {topics.map((topic) => {
                       const trend = getTopicTrend(sessions, topic.topic, topic.subject);
                       return (
-                        <div key={`${topic.subject}-${topic.topic}`} className="grid grid-cols-[1.6fr_0.9fr_0.8fr_0.8fr_0.8fr_0.5fr] border-b border-white/5 px-4 py-3 text-xs hover:bg-white/[0.02]">
-                          <div className="truncate pr-4 text-white font-mono uppercase">{topic.topic}</div>
-                          <div className="text-gray-400">{topic.subject}</div>
-                          <div className={cn("text-right font-bold", toneText(getScoreTone(topic.accuracy)))}>{topic.accuracy}%</div>
-                          <div className="text-right text-gray-300">{topic.sessions}</div>
-                          <div className="text-right text-gray-300">{formatMinutes(topic.duration)}</div>
-                          <div className="text-right text-gray-400">
+                        <tr key={`${topic.subject}-${topic.topic}`} className="border-b border-white/5 text-xs hover:bg-white/[0.02]">
+                          <th scope="row" className="text-white font-mono font-normal uppercase">{topic.topic}</th>
+                          <td className="text-gray-400">{topic.subject}</td>
+                          <td className={cn("text-right font-bold", toneText(getScoreTone(topic.accuracy)))}>{topic.accuracy}%</td>
+                          <td className="text-right text-gray-300">{topic.sessions}</td>
+                          <td className="text-right text-gray-300">{formatMinutes(topic.duration)}</td>
+                          <td className="text-right text-gray-400">
                             {trend === 1 ? "up" : trend === -1 ? "down" : "flat"}
-                          </div>
-                        </div>
+                          </td>
+                        </tr>
                       );
                     })}
-                  </div>
+                    </tbody>
+                  </table>
                 </div>
               ) : (
                 <EmptyState title="No topic data" detail="Complete sessions to populate topic breakdown." />

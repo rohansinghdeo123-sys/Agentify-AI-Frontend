@@ -38,6 +38,74 @@
   color: #9eacbd;
 }
 
+.chartPalette {
+  --analytics-chart-label: #aebed0;
+  --analytics-chart-line: #ffaa0a;
+  --analytics-chart-baseline: #53677b;
+  --analytics-chart-grid: #967340;
+}
+
+.scrollRegion:focus-visible {
+  outline: 2px solid var(--ds-accent-teal);
+  outline-offset: -2px;
+  border-radius: 0.4rem;
+}
+
+.weeklyRow {
+  display: grid;
+  grid-template-columns: 5.625rem minmax(0, 1fr) 5rem;
+  align-items: center;
+  gap: 1rem;
+}
+
+.matrixTable {
+  width: 100%;
+  min-width: 43.75rem;
+  border-collapse: collapse;
+  table-layout: fixed;
+  text-align: left;
+}
+
+.matrixTable th,
+.matrixTable td {
+  padding: 0.75rem 0.65rem;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.matrixTable th:first-child {
+  width: 29.6%;
+  padding-left: 1rem;
+}
+
+.matrixTable th:nth-child(2) {
+  width: 16.7%;
+}
+
+.matrixTable th:last-child,
+.matrixTable td:last-child {
+  padding-right: 1rem;
+}
+
+@media (max-width: 639px) {
+  .weeklyRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.5rem 1rem;
+  }
+
+  .weeklyRow > [role="progressbar"] {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+:global([data-theme="light"]) .chartPalette {
+  --analytics-chart-label: #475569;
+  --analytics-chart-line: #9a5700;
+  --analytics-chart-baseline: #7b8c9c;
+  --analytics-chart-grid: #a77c35;
+}
+
 .emptyTitle {
   color: #a5f3fc;
   font-size: 0.6875rem;
