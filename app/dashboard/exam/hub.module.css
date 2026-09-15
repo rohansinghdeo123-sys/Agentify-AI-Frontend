@@ -18,10 +18,12 @@
     var(--ds-bg-app);
   background-size: 3.25rem 3.25rem, 3.25rem 3.25rem, auto, auto, auto;
   color: var(--ds-text-primary);
+  color-scheme: light;
   scrollbar-gutter: stable;
 }
 
 :global([data-theme="dark"]) .hub {
+  color-scheme: dark;
   --exam-violet-ink: #c4b5fd;
   --exam-violet-wash: rgba(167, 139, 250, 0.16);
   --exam-blue-ink: #93c5fd;
@@ -81,6 +83,7 @@
 }
 
 .heroCopy {
+  min-width: 0;
   max-width: 48rem;
 }
 
@@ -109,6 +112,11 @@
   outline: none;
 }
 
+.hero h1:focus-visible {
+  border-radius: 0.25rem;
+  box-shadow: var(--ds-shadow-focus);
+}
+
 .intro {
   max-width: 66ch;
   margin: 0.9rem 0 0;
@@ -120,7 +128,8 @@
 .scope {
   display: grid;
   min-width: 12.5rem;
-  flex: 0 0 auto;
+  max-width: 25rem;
+  flex: 0 1 auto;
   gap: 0.16rem;
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-xl);
@@ -139,21 +148,19 @@
 }
 
 .scope strong {
-  overflow: hidden;
   color: var(--ds-text-primary);
   font-size: 0.87rem;
   font-weight: 760;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
 }
 
 .scope small {
-  overflow: hidden;
   color: var(--ds-accent-teal);
   font-size: 0.75rem;
   font-weight: 680;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
 }
 
 .recommendation {

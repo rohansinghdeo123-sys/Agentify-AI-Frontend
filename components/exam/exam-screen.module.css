@@ -14,7 +14,12 @@
     var(--ds-bg-app);
   background-size: 3rem 3rem, 3rem 3rem, auto, auto, auto;
   color: var(--ds-text-primary);
+  color-scheme: light;
   scrollbar-gutter: stable;
+}
+
+:global([data-theme="dark"]) .screen {
+  color-scheme: dark;
 }
 
 .ambient {
@@ -56,6 +61,7 @@
 }
 
 .headingBlock {
+  min-width: 0;
   max-width: 48rem;
 }
 
@@ -71,7 +77,7 @@
   padding: 0.48rem 0.78rem;
   color: var(--ds-text-secondary);
   box-shadow: var(--ds-shadow-sm);
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 760;
   text-decoration: none;
   backdrop-filter: blur(16px);
@@ -117,10 +123,16 @@
   letter-spacing: -0.045em;
   line-height: 1.04;
   text-wrap: balance;
+  overflow-wrap: anywhere;
 }
 
 .headingBlock h1:focus {
   outline: none;
+}
+
+.headingBlock h1:focus-visible {
+  border-radius: 0.25rem;
+  box-shadow: var(--ds-shadow-focus);
 }
 
 .description {
@@ -129,11 +141,13 @@
   color: var(--ds-text-muted);
   font-size: clamp(0.86rem, 1.2vw, 0.98rem);
   line-height: 1.68;
+  overflow-wrap: anywhere;
 }
 
 .actions {
   display: flex;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
@@ -157,6 +171,7 @@
   color: var(--exam-status-ink);
   font-size: 0.82rem;
   line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 
 .statusDot {

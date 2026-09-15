@@ -161,6 +161,12 @@
   margin-top: 22px;
 }
 
+.uploadForm :where(input, select):disabled,
+.fileDrop:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .scopeField,
 .field {
   display: grid;
@@ -175,8 +181,8 @@
 }
 
 .field > span small {
-  color: var(--color-text-disabled);
-  font-size: 0.67rem;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
   font-weight: 600;
   margin-left: 4px;
 }
@@ -1041,12 +1047,30 @@
   }
 
   .paperRow {
+    grid-template-areas: "glyph identity arrow" ". status .";
     grid-template-columns: 40px minmax(0, 1fr) 18px;
+    row-gap: 8px;
   }
 
-  .paperMeasure,
-  .statusPill {
+  .paperGlyph {
+    grid-area: glyph;
+  }
+
+  .paperIdentity {
+    grid-area: identity;
+  }
+
+  .paperMeasure {
     display: none;
+  }
+
+  .paperRow .statusPill {
+    grid-area: status;
+    justify-self: start;
+  }
+
+  .rowArrow {
+    grid-area: arrow;
   }
 
   .detailHero {

@@ -148,6 +148,57 @@ describe("focused Exam Lab architecture", () => {
     expect(mcq).toContain('"beforeunload"');
   });
 
+  it("announces MCQ progress and restores a reading position between attempt stages", () => {
+    const mcq = source("app/dashboard/exam/mcq/page.tsx");
+    const css = source("app/dashboard/exam/mcq/mcq.module.css");
+
+    expect(mcq).toContain('role="progressbar"');
+    expect(mcq).toContain("aria-valuemax={questions.length}");
+    expect(mcq).toContain("aria-valuenow={answeredCount}");
+    expect(mcq).toContain("ref={questionHeadingRef} tabIndex={-1}");
+    expect(mcq).toContain("ref={resultHeadingRef} tabIndex={-1}");
+    expect(mcq).toContain("ref={reviewHeadingRef} tabIndex={-1}");
+    expect(mcq).toContain("ref={configureHeadingRef} tabIndex={-1}");
+    expect(mcq).toContain("[currentIndex, loading, reviewIndex, stage]");
+    expect(mcq).toContain('disabled={saveState === "saving"}');
+    expect(mcq).toContain("Your review is ready while history updates");
+    expect(css).toContain('h2, h3)[tabindex="-1"]:focus-visible');
+  });
+
+  it("holds written settings and answers steady while requests are pending", () => {
+    const workspace = source("app/dashboard/exam/workspace/page.tsx");
+    const css = source("app/dashboard/exam/workspace/workspace.module.css");
+
+    expect(workspace).toContain('aria-pressed={mode === "generated"}');
+    expect(workspace).toContain('aria-pressed={mode === "custom"}');
+    expect(workspace).toContain('role="group" aria-label="Practice path"');
+    expect(workspace).toContain('onClick={resetWorkspace} disabled={busy}');
+    expect(workspace).toContain('disabled={busy || Boolean(planningScope)}');
+    expect(workspace).toMatch(/value=\{marksFocus\}\s+disabled=\{busy\}/);
+    expect(workspace).toMatch(/value=\{questionType\}\s+disabled=\{busy\}/);
+    expect(workspace).toMatch(/<textarea value=\{customQuestion\} disabled=\{busy\}/);
+    expect(workspace).toMatch(/value=\{mode === "generated" \? answer : customAnswer\}\s+disabled=\{busy\}/);
+    expect(workspace).toContain('className={styles.writingCanvas} aria-busy={busy}');
+    expect(workspace).toContain('aria-current={stage === "feedback" ? "step" : undefined}');
+    expect(css).toContain("color-scheme: light");
+    expect(css).toContain("color-scheme: dark");
+    expect(css).toContain(".answerEditor textarea:disabled");
+  });
+
+  it("holds paper and probable-question source controls during requests", () => {
+    const probable = source("app/dashboard/exam/probable/page.tsx");
+    const papers = source("app/dashboard/exam/papers/page.tsx");
+
+    expect(probable).toContain("disabled={generating || !scopeChapters.length || Boolean(planningScope)}");
+    expect(probable).toContain("value={source} disabled={generating}");
+    expect(probable).toContain("value={generationMode} disabled={generating}");
+    expect(probable).toContain("value={questionCount} disabled={generating}");
+    expect(papers).toContain("onSubmit={uploadPaper} aria-busy={uploading}");
+    expect(papers).toContain("disabled={uploading || !scopeChapters.length || Boolean(planningScope)}");
+    expect(papers).toMatch(/type="file"\s+disabled=\{uploading\}/);
+    expect(papers).toContain("value={examType} disabled={uploading}");
+  });
+
   it("keeps the completed MCQ draft recoverable until history saving succeeds", () => {
     const mcq = source("app/dashboard/exam/mcq/page.tsx");
     const saveBlock = mcq.slice(mcq.indexOf("const persistResult"), mcq.indexOf("const submitAttempt"));

@@ -198,6 +198,12 @@ export default function AnswerWorkspacePage() {
     return () => window.removeEventListener("beforeunload", warnBeforeLeave);
   }, [hasUnsavedDraft]);
 
+  useEffect(() => {
+    if (stage !== "feedback") return;
+    const frame = window.requestAnimationFrame(() => headingRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [headingRef, stage]);
+
   const updateRouteScope = (nextChapter: string, nextTopic: string) => {
     if (planningScope) return;
     setChapter(nextChapter);
@@ -277,6 +283,7 @@ export default function AnswerWorkspacePage() {
   };
 
   const resetWorkspace = () => {
+    if (busy) return;
     if (hasUnsavedDraft && !window.confirm("Discard this unfinished answer and start again?")) return;
     setMode(null);
     setStage("setup");
@@ -318,7 +325,7 @@ export default function AnswerWorkspacePage() {
               <AppIcon name="history" />
               History & insights
             </Link>
-            {stage !== "setup" ? <button type="button" className={styles.quietButton} onClick={resetWorkspace}>Start over</button> : null}
+            {stage !== "setup" ? <button type="button" className={styles.quietButton} onClick={resetWorkspace} disabled={busy}>Start over</button> : null}
           </div>
         </header>
 
@@ -329,17 +336,23 @@ export default function AnswerWorkspacePage() {
             <p>{stage === "feedback" ? "Review what earned marks and what will lift your next response." : "One question, one answer, one clear path to improvement."}</p>
           </div>
           <ol className={styles.steps} aria-label="Workspace progress">
-            <li data-active={stage === "setup"} data-complete={stage !== "setup"}>1 <span>Setup</span></li>
-            <li data-active={stage === "write"} data-complete={stage === "feedback"}>2 <span>Write</span></li>
-            <li data-active={stage === "feedback"}>3 <span>Feedback</span></li>
+            <li aria-current={stage === "setup" ? "step" : undefined} data-active={stage === "setup"} data-complete={stage !== "setup"}>1 <span>Setup</span></li>
+            <li aria-current={stage === "write" ? "step" : undefined} data-active={stage === "write"} data-complete={stage === "feedback"}>2 <span>Write</span></li>
+            <li aria-current={stage === "feedback" ? "step" : undefined} data-active={stage === "feedback"}>3 <span>Feedback</span></li>
           </ol>
         </section>
 
         {notice ? <div className={styles.notice} role="status"><AppIcon name="check" />{notice}</div> : null}
         {error ? <div className={styles.error} role="alert"><AppIcon name="x" />{error}</div> : null}
+        {busy ? (
+          <div className={styles.notice} role="status" aria-live="polite">
+            <span className={styles.spinner} aria-hidden="true" />
+            {stage === "setup" ? "Preparing your question. Your selected settings are held while it loads." : "Evaluating your answer. Your submitted response is held while feedback is prepared."}
+          </div>
+        ) : null}
 
         {loading ? (
-          <section className={styles.statePanel} aria-busy="true">
+          <section className={styles.statePanel} aria-busy="true" role="status" aria-label="Preparing your workspace">
             <span className={styles.spinner} />
             <h2>Preparing your workspace</h2>
             <p>Restoring your course context and secure session.</p>
@@ -347,18 +360,18 @@ export default function AnswerWorkspacePage() {
         ) : null}
 
         {!loading && stage === "setup" ? (
-          <section className={styles.setupGrid}>
+          <section className={styles.setupGrid} aria-busy={busy}>
             <div className={styles.modePanel}>
               <p className={styles.eyebrow}>Choose a practice path</p>
               <h2>How would you like to practise?</h2>
-              <div className={styles.modeChoices}>
-                <button type="button" data-selected={mode === "generated"} onClick={() => setMode("generated")}>
+              <div className={styles.modeChoices} role="group" aria-label="Practice path">
+                <button type="button" aria-pressed={mode === "generated"} data-selected={mode === "generated"} disabled={busy} onClick={() => setMode("generated")}>
                   <span><AppIcon name="spark" /></span>
                   <strong>Generated question</strong>
                   <p>Get a syllabus-grounded question without seeing the marking points first.</p>
                   <small>Best for exam simulation</small>
                 </button>
-                <button type="button" data-selected={mode === "custom"} onClick={() => setMode("custom")}>
+                <button type="button" aria-pressed={mode === "custom"} data-selected={mode === "custom"} disabled={busy} onClick={() => setMode("custom")}>
                   <span><AppIcon name="book" /></span>
                   <strong>My own question</strong>
                   <p>Paste a question from class, homework, or a paper and receive teacher-style feedback.</p>
@@ -375,6 +388,7 @@ export default function AnswerWorkspacePage() {
               {mode ? (
                 <form onSubmit={(event) => {
                   event.preventDefault();
+                  if (busy) return;
                   if (mode === "generated") void prepareGeneratedQuestion();
                   else setStage("write");
                 }}>
@@ -384,23 +398,23 @@ export default function AnswerWorkspacePage() {
                       <select value={selectedChapter?.value || chapter} onChange={(event) => {
                         const nextChapter = scopeChapters.find((item) => item.value === event.target.value) || scopeChapters[0];
                         updateRouteScope(nextChapter.value, nextChapter.topics[0]?.value || "");
-                      }} disabled={Boolean(planningScope)}>
+                      }} disabled={busy || Boolean(planningScope)}>
                         {scopeChapters.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                       </select>
                     </label>
                     <label>
                       <span>Topic</span>
-                      <select value={selectedTopic?.value || topic} onChange={(event) => updateRouteScope(selectedChapter.value, event.target.value)} disabled={Boolean(planningScope)}>
+                      <select value={selectedTopic?.value || topic} onChange={(event) => updateRouteScope(selectedChapter.value, event.target.value)} disabled={busy || Boolean(planningScope)}>
                         {(selectedChapter?.topics || []).map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                       </select>
                     </label>
                     <label>
                       <span>Marks</span>
-                      <input type="number" min="1" max="30" value={marksFocus} onChange={(event) => setMarksFocus(event.target.value)} />
+                      <input type="number" min="1" max="30" value={marksFocus} disabled={busy} onChange={(event) => setMarksFocus(event.target.value)} />
                     </label>
                     <label>
                       <span>Question style</span>
-                      <select value={questionType} onChange={(event) => setQuestionType(event.target.value)}>
+                      <select value={questionType} disabled={busy} onChange={(event) => setQuestionType(event.target.value)}>
                         {QUESTION_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                       </select>
                     </label>
@@ -427,7 +441,7 @@ export default function AnswerWorkspacePage() {
         ) : null}
 
         {!loading && stage === "write" && mode ? (
-          <section className={styles.writingCanvas}>
+          <section className={styles.writingCanvas} aria-busy={busy}>
             <div className={styles.questionColumn}>
               <div className={styles.questionMeta}>
                 <span>{formatLabel(questionType)}</span>
@@ -443,7 +457,7 @@ export default function AnswerWorkspacePage() {
               ) : (
                 <label className={styles.questionInput}>
                   <span>Your question</span>
-                  <textarea value={customQuestion} onChange={(event) => setCustomQuestion(event.target.value)} rows={5} placeholder="Paste the exact question you want evaluated." autoFocus />
+                  <textarea value={customQuestion} disabled={busy} onChange={(event) => setCustomQuestion(event.target.value)} rows={5} placeholder="Paste the exact question you want evaluated." autoFocus />
                 </label>
               )}
               <div className={styles.integrityNote}>
@@ -464,6 +478,7 @@ export default function AnswerWorkspacePage() {
                 <span className="sr-only">Answer</span>
                 <textarea
                   value={mode === "generated" ? answer : customAnswer}
+                  disabled={busy}
                   onChange={(event) => mode === "generated" ? setAnswer(event.target.value) : setCustomAnswer(event.target.value)}
                   rows={14}
                   placeholder="Build your answer clearly. Use key terms, explain each step, and finish the argument."

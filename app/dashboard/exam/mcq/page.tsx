@@ -137,6 +137,27 @@ export default function McqExamPage() {
   const generationAbortRef = useRef<AbortController | null>(null);
   const liveConfigureScopeRef = useRef("");
   const savingResultRef = useRef(false);
+  const configureHeadingRef = useRef<HTMLHeadingElement>(null);
+  const questionHeadingRef = useRef<HTMLHeadingElement>(null);
+  const resultHeadingRef = useRef<HTMLHeadingElement>(null);
+  const reviewHeadingRef = useRef<HTMLHeadingElement>(null);
+  const previousStageRef = useRef<McqStage>("configure");
+
+  useEffect(() => {
+    const previousStage = previousStageRef.current;
+    previousStageRef.current = stage;
+    if (loading || (stage === "configure" && previousStage === "configure")) return;
+    const frame = window.requestAnimationFrame(() => {
+      const target = stage === "configure"
+        ? configureHeadingRef.current
+        : stage === "attempt"
+          ? questionHeadingRef.current
+          : previousStage === "results" ? reviewHeadingRef.current : resultHeadingRef.current;
+      target?.focus({ preventScroll: true });
+      target?.scrollIntoView({ block: "nearest", behavior: "instant" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [currentIndex, loading, reviewIndex, stage]);
 
   const classLevel = planningScope?.classLevel || profile?.classLevel || DEFAULT_CLASS_LEVEL;
   const activeSubject = planningScope?.subject || SUBJECT;
@@ -647,7 +668,7 @@ export default function McqExamPage() {
                 <AppIcon name="mission" />
               </span>
               <p className={styles.kicker}>Source-locked assessment</p>
-              <h2 id="mcq-configure-title">One clear test. No competing tools.</h2>
+              <h2 id="mcq-configure-title" ref={configureHeadingRef} tabIndex={-1}>One clear test. No competing tools.</h2>
               <p>
                 Questions, options, explanations, and source traces are generated only from your selected study material.
               </p>
@@ -743,7 +764,15 @@ export default function McqExamPage() {
 
         {stage === "attempt" && questions.length ? (
           <section className={styles.attempt} aria-label="MCQ attempt">
-            <div className={styles.progressTrack} aria-label={`${completion}% complete`}>
+            <div
+              className={styles.progressTrack}
+              role="progressbar"
+              aria-label="Questions answered"
+              aria-valuemin={0}
+              aria-valuemax={questions.length}
+              aria-valuenow={answeredCount}
+              aria-valuetext={`${answeredCount} of ${questions.length} questions answered`}
+            >
               <span style={{ width: `${completion}%` }} />
             </div>
 
@@ -786,7 +815,7 @@ export default function McqExamPage() {
                       <span>Question {currentIndex + 1} of {questions.length}</span>
                       <span>{difficulty === "advanced" ? "Challenge" : difficulty === "easy" ? "Foundation" : "Standard"}</span>
                     </div>
-                    <h2>{question.question}</h2>
+                    <h2 ref={questionHeadingRef} tabIndex={-1} aria-label={`Question ${currentIndex + 1} of ${questions.length}: ${question.question}`}>{question.question}</h2>
                     {question.source ? <p className={styles.sourceLine}>Source · {question.source}</p> : null}
 
                     <fieldset className={styles.options}>
@@ -851,7 +880,7 @@ export default function McqExamPage() {
               </div>
               <div className={styles.resultCopy}>
                 <p className={styles.kicker}>Attempt complete</p>
-                <h2 id="mcq-result-title">
+                <h2 id="mcq-result-title" ref={resultHeadingRef} tabIndex={-1}>
                   {accuracy >= 80
                     ? "Strong work — your understanding is exam-ready."
                     : accuracy >= 50
@@ -864,7 +893,7 @@ export default function McqExamPage() {
                 {saveState === "saving" ? <span className={styles.buttonSpinner} aria-hidden="true" /> : <AppIcon name={saveState === "saved" ? "check" : "history"} />}
                 <span className={styles.saveStatusCopy}>
                   <strong>{saveState === "saving" ? "Saving result" : saveState === "saved" ? "Saved to history" : "Result not saved"}</strong>
-                  <small>{saveState === "failed" ? "Review remains available; retry only if history is missing" : "Your learning record is up to date"}</small>
+                  <small>{saveState === "saving" ? "Your review is ready while history updates" : saveState === "saved" ? "Your learning record is up to date" : "Review remains available; retry only if history is missing"}</small>
                 </span>
                 {saveState === "failed" && pendingSubmission ? (
                   <button className={styles.retrySaveButton} type="button" onClick={() => {
@@ -914,7 +943,7 @@ export default function McqExamPage() {
                       <span><AppIcon name={correct ? "check" : "x"} /> {correct ? "Correct" : "Review this answer"}</span>
                       <span>Question {reviewIndex + 1} of {questions.length}</span>
                     </div>
-                    <h3>{question.question}</h3>
+                    <h3 ref={reviewHeadingRef} tabIndex={-1} aria-label={`Review question ${reviewIndex + 1} of ${questions.length}: ${question.question}`}>{question.question}</h3>
                     <div className={styles.answerComparison}>
                       <div data-tone={correct ? "correct" : "incorrect"}>
                         <span>Your answer</span>
@@ -938,7 +967,7 @@ export default function McqExamPage() {
             </div>
 
             <div className={styles.resultActions}>
-              <button className={styles.primaryButton} type="button" onClick={resetAttempt}>
+              <button className={styles.primaryButton} type="button" onClick={resetAttempt} disabled={saveState === "saving"}>
                 <AppIcon name="plus" /> New MCQ test
               </button>
               <Link className={styles.secondaryButton} href={revisionHref}>Revise this topic</Link>

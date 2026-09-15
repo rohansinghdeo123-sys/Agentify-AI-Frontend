@@ -227,13 +227,13 @@ export default function QuestionPaperLabPage() {
             </div>
           </div>
 
-          <form className={styles.uploadForm} onSubmit={uploadPaper}>
+          <form className={styles.uploadForm} onSubmit={uploadPaper} aria-busy={uploading}>
             <label className={styles.scopeField}>
               <span>Chapter</span>
               <select
                 value={selectedChapter?.value || ""}
                 onChange={(event) => updateScope(event.target.value)}
-                disabled={!scopeChapters.length || Boolean(planningScope)}
+                disabled={uploading || !scopeChapters.length || Boolean(planningScope)}
               >
                 {scopeChapters.map((chapter) => (
                   <option key={chapter.value} value={chapter.value}>{chapter.label}</option>
@@ -246,7 +246,7 @@ export default function QuestionPaperLabPage() {
               <select
                 value={selectedTopic?.value || ""}
                 onChange={(event) => updateScope(selectedChapter?.value || "", event.target.value)}
-                disabled={!selectedChapter?.topics.length || Boolean(planningScope)}
+                disabled={uploading || !selectedChapter?.topics.length || Boolean(planningScope)}
               >
                 {(selectedChapter?.topics || []).map((topic) => (
                   <option key={topic.value} value={topic.value}>{topic.label}</option>
@@ -258,6 +258,7 @@ export default function QuestionPaperLabPage() {
               <input
                 ref={fileInputRef}
                 type="file"
+                disabled={uploading}
                 accept=".pdf,.txt,.png,.jpg,.jpeg"
                 onChange={onFileChange}
               />
@@ -270,6 +271,7 @@ export default function QuestionPaperLabPage() {
               <span>Paper title <small>Optional</small></span>
               <input
                 value={paperTitle}
+                disabled={uploading}
                 onChange={(event) => setPaperTitle(event.target.value)}
                 placeholder="e.g. Mid-term 2025"
                 maxLength={120}
@@ -278,7 +280,7 @@ export default function QuestionPaperLabPage() {
 
             <label className={styles.field}>
               <span>Exam type</span>
-              <select value={examType} onChange={(event) => setExamType(event.target.value)}>
+              <select value={examType} disabled={uploading} onChange={(event) => setExamType(event.target.value)}>
                 {EXAM_TYPES.map((item) => (
                   <option key={item.value} value={item.value}>{item.label}</option>
                 ))}

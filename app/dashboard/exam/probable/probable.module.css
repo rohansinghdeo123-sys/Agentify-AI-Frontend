@@ -45,6 +45,17 @@
   grid-template-columns: minmax(300px, 0.75fr) minmax(0, 1.75fr);
   min-height: 100%;
   width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.workspace :where(button, a, select):focus-visible {
+  outline: 2px solid var(--exam-functional-teal-ink);
+  outline-offset: 3px;
+}
+
+.builder :where(button, select):disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 :global([data-theme="dark"]) .workspace {
@@ -229,7 +240,7 @@
 }
 
 .noSource p {
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   font-size: 0.65rem;
   line-height: 1.45;
   margin: 4px 0 0;
@@ -402,7 +413,7 @@
 }
 
 .listCopy small {
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   font-size: 0.61rem;
   margin-top: 5px;
 }
@@ -648,7 +659,7 @@
 }
 
 .disclaimer p {
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   font-size: 0.65rem;
   line-height: 1.55;
   margin: 3px 0 0;

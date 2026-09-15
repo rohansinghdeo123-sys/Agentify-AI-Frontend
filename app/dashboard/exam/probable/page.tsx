@@ -305,13 +305,13 @@ export default function ProbableQuestionsPage() {
       actions={<Link href={`/dashboard/exam/papers${scopeQuery ? `?${scopeQuery}` : ""}`} className={styles.headerLink}>Question Paper Lab <AppIcon name="arrowRight" /></Link>}
     >
       <div className={styles.workspace}>
-        <aside className={styles.builder} aria-label="Probable question setup">
+        <aside className={styles.builder} aria-label="Probable question setup" aria-busy={generating}>
           <div className={styles.modeSwitch} aria-label="Question source">
-            <button type="button" aria-pressed={mode === "paper_pattern"} data-active={mode === "paper_pattern" ? "true" : "false"} onClick={() => updateQuery({ mode: "paper_pattern" })}>
+            <button type="button" aria-pressed={mode === "paper_pattern"} data-active={mode === "paper_pattern" ? "true" : "false"} disabled={generating} onClick={() => updateQuery({ mode: "paper_pattern" })}>
               <AppIcon name="analytics" />
               <span><strong>Paper pattern</strong><small>Use uploaded evidence</small></span>
             </button>
-            <button type="button" aria-pressed={mode === "syllabus"} data-active={mode === "syllabus" ? "true" : "false"} onClick={() => updateQuery({ mode: "syllabus" })}>
+            <button type="button" aria-pressed={mode === "syllabus"} data-active={mode === "syllabus" ? "true" : "false"} disabled={generating} onClick={() => updateQuery({ mode: "syllabus" })}>
               <AppIcon name="book" />
               <span><strong>Syllabus</strong><small>Use selected material</small></span>
             </button>
@@ -325,13 +325,13 @@ export default function ProbableQuestionsPage() {
 
             <label className={styles.field}>
               <span>Chapter</span>
-              <select value={selectedChapter?.value || ""} onChange={(event) => updateScope(event.target.value)} disabled={!scopeChapters.length || Boolean(planningScope)}>
+              <select value={selectedChapter?.value || ""} onChange={(event) => updateScope(event.target.value)} disabled={generating || !scopeChapters.length || Boolean(planningScope)}>
                 {scopeChapters.map((chapter) => <option key={chapter.value} value={chapter.value}>{chapter.label}</option>)}
               </select>
             </label>
             <label className={styles.field}>
               <span>Topic</span>
-              <select value={selectedTopic?.value || ""} onChange={(event) => updateScope(selectedChapter?.value || "", event.target.value)} disabled={!selectedChapter?.topics.length || Boolean(planningScope)}>
+              <select value={selectedTopic?.value || ""} onChange={(event) => updateScope(selectedChapter?.value || "", event.target.value)} disabled={generating || !selectedChapter?.topics.length || Boolean(planningScope)}>
                 {(selectedChapter?.topics || []).map((topic) => <option key={topic.value} value={topic.value}>{topic.label}</option>)}
               </select>
             </label>
@@ -348,7 +348,7 @@ export default function ProbableQuestionsPage() {
                 {scopedAnalyses.length || scopedPapers.length ? (
                   <label className={styles.field}>
                     <span>Pattern source</span>
-                    <select value={source} onChange={(event) => setSource(event.target.value)}>
+                    <select value={source} disabled={generating} onChange={(event) => setSource(event.target.value)}>
                       {scopedAnalyses.map((analysis) => (
                         <option key={`analysis-${analysis.id}`} value={`analysis:${analysis.id}`}>
                           Saved analysis · {analysis.source_paper_ids.length} paper{analysis.source_paper_ids.length === 1 ? "" : "s"} · {formatExamDateTime(analysis.created_at)}
@@ -367,13 +367,13 @@ export default function ProbableQuestionsPage() {
                 )}
                 <label className={styles.field}>
                   <span>Question mix</span>
-                  <select value={generationMode} onChange={(event) => setGenerationMode(event.target.value as GenerationMode)}>
+                  <select value={generationMode} disabled={generating} onChange={(event) => setGenerationMode(event.target.value as GenerationMode)}>
                     {GENERATION_MODES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                   </select>
                 </label>
                 <label className={styles.field}>
                   <span>Questions</span>
-                  <select value={questionCount} onChange={(event) => setQuestionCount(Number(event.target.value))}>
+                  <select value={questionCount} disabled={generating} onChange={(event) => setQuestionCount(Number(event.target.value))}>
                     {[5, 8, 10, 12].map((count) => <option key={count} value={count}>{count} questions</option>)}
                   </select>
                 </label>
@@ -382,7 +382,7 @@ export default function ProbableQuestionsPage() {
               <>
                 <label className={styles.field}>
                   <span>Difficulty</span>
-                  <select value={difficulty} onChange={(event) => setDifficulty(event.target.value)}>
+                  <select value={difficulty} disabled={generating} onChange={(event) => setDifficulty(event.target.value)}>
                     <option value="easy">Foundation</option>
                     <option value="medium">Standard</option>
                     <option value="hard">Challenge</option>
@@ -408,6 +408,7 @@ export default function ProbableQuestionsPage() {
               <span>Previous sets</span>
               <select
                 value={activePatternSet?.id || ""}
+                disabled={generating}
                 onChange={(event) => {
                   const next = scopedSets.find((set) => set.id === Number(event.target.value)) || null;
                   setPatternSet(next);
