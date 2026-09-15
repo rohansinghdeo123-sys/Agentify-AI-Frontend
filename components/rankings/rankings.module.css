@@ -8,14 +8,14 @@
   --league-border: rgba(15, 58, 57, 0.12);
   --league-border-strong: rgba(15, 118, 110, 0.28);
   --league-text: #102c2c;
-  --league-muted: #617775;
+  --league-muted: #526865;
   --league-faint: #586d6a;
   --league-teal: #0f766e;
   --league-teal-bright: #14b8a6;
   --league-teal-soft: rgba(20, 184, 166, 0.11);
   --league-gold: #8f5b0d;
   --league-gold-soft: rgba(225, 166, 64, 0.14);
-  --league-coral: #c45d3e;
+  --league-coral: #9f442b;
   --league-coral-soft: rgba(196, 93, 62, 0.12);
   --league-division-explorer: #425f5c;
   --league-division-scholar: #0f766e;
@@ -541,8 +541,17 @@
 
 .leaderboardRow[data-podium] .rankCrest {
   clip-path: polygon(50% 0, 91% 24%, 91% 76%, 50% 100%, 9% 76%, 9% 24%);
-  color: #fff8e8;
+  color: #172220;
   filter: drop-shadow(0 5px 9px rgba(83, 55, 13, 0.16));
+}
+
+.leaderboardRow[data-podium] .rankCrest strong {
+  display: grid;
+  min-width: 1.2rem;
+  min-height: 1.2rem;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 248, 232, 0.92);
 }
 
 .leaderboardRow[data-podium="1"] .rankCrest {
