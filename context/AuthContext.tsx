@@ -37,6 +37,10 @@ import {
   primeBackend,
 } from "@/lib/apiClient";
 import {
+  AUTH_BOOTSTRAP_TIMEOUT_MESSAGE,
+  AUTH_BOOTSTRAP_TIMEOUT_MS,
+} from "@/lib/authBootstrap";
+import {
   type BackendUserProfile,
   type ProfileUpdate,
   resolveDisplayName,
@@ -79,6 +83,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isFounderAdmin: boolean;
   authError: string;
+  authStartupMessage: string;
   authLoading: boolean;
   loading: boolean;
   sessionExpired: boolean;
@@ -105,6 +110,7 @@ const AuthContext = createContext<AuthContextType>({
   isAdmin: false,
   isFounderAdmin: false,
   authError: "",
+  authStartupMessage: "",
   authLoading: true,
   loading: true,
   sessionExpired: false,
@@ -276,6 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState("");
+  const [authStartupMessage, setAuthStartupMessage] = useState("");
   const [sessionExpired, setSessionExpired] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
   const [accountProfile, setAccountProfile] = useState<BackendUserProfile | null>(null);
@@ -290,6 +297,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const confirmationResultRef = useRef<ConfirmationResult | null>(null);
   const hasAuthenticatedRef = useRef(false);
   const manualSignOutRef = useRef(false);
+  const authStateResolvedRef = useRef(false);
   const backendURL = getPublicBackendUrl();
 
   const requireAuthClient = useCallback(() => {
@@ -551,11 +559,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let authClient: Auth;
+    authStateResolvedRef.current = false;
 
     try {
       authClient = getFirebaseAuth();
       authRef.current = authClient;
       setAuthError("");
+      setAuthStartupMessage("");
     } catch (error) {
       const message =
         error instanceof Error
@@ -573,7 +583,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     getRedirectResult(authClient).catch(() => undefined);
 
+    const authStateTimeout = setTimeout(() => {
+      if (authStateResolvedRef.current) return;
+      // Keep the observer active: a late callback can still restore an
+      // existing session. This only releases the UI from an endless loader.
+      setAuthLoading(false);
+      setAuthStartupMessage(AUTH_BOOTSTRAP_TIMEOUT_MESSAGE);
+    }, AUTH_BOOTSTRAP_TIMEOUT_MS);
+
     const unsubscribe = onAuthStateChanged(authClient, async (currentUser) => {
+      authStateResolvedRef.current = true;
+      clearTimeout(authStateTimeout);
+      setAuthStartupMessage("");
       setUser(currentUser);
       setAuthLoading(false);
 
@@ -603,6 +624,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => {
+      clearTimeout(authStateTimeout);
       unsubscribe();
     };
   }, [loadAdminAccess, loadProfile, refreshClaims]);
@@ -641,6 +663,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin,
       isFounderAdmin,
       authError,
+      authStartupMessage,
       authLoading,
       loading,
       sessionExpired,
@@ -665,6 +688,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin,
       isFounderAdmin,
       authError,
+      authStartupMessage,
       authLoading,
       loading,
       sessionExpired,

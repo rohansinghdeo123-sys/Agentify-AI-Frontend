@@ -192,6 +192,7 @@ export default function LoginPage() {
     user,
     accountProfile,
     authError: authSetupError,
+    authStartupMessage,
     profileError,
     loginWithGoogle,
     sendPhoneOtp,
@@ -220,6 +221,7 @@ export default function LoginPage() {
   const signInBlocked = Boolean(authSetupError);
   const visibleAuthError =
     authSetupError ||
+    authStartupMessage ||
     authError ||
     (sessionExpired ? "Your session expired. Sign in again to continue studying." : "");
 
