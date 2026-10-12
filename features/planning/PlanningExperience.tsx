@@ -20,6 +20,7 @@ import {
   planningCatalogScopeMatches,
   planningErrorMessage,
   PlanningApiError,
+  startStudyRoute,
   type PlanningCatalogChapter,
 } from "./api";
 import {
@@ -398,6 +399,40 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
       setPortfolioState(state);
       lastRefreshAtRef.current = Date.now();
       setStaleNotice("");
+
+      // Persist today's route for Study Lab. Fire-and-forget: the roadmap is
+      // already saved locally and on screen, so a failure here must never
+      // block or alarm the student. The next explicit plan creation retries
+      // naturally, and the Study Lab page falls back to its empty state if
+      // no route exists yet.
+      const [firstScope] = scopes;
+      if (firstScope) {
+        const sessionDuration = firstScope.sessionDurationMinutes;
+        const hasSessionDuration = Number.isInteger(sessionDuration)
+          && Number(sessionDuration) >= 15
+          && Number(sessionDuration) <= 120;
+        void startStudyRoute(
+          { userId, getAuthHeaders },
+          {
+            class_level: firstScope.classLevel,
+            subject: firstScope.subject,
+            chapters: scopes.map((scope) => ({
+              chapter_ref: scope.chapter,
+              chapter_proficiency: scope.chapterProficiency,
+            })),
+            ...(firstScope.studyTimeToday
+              ? { study_time_today: firstScope.studyTimeToday }
+              : {}),
+            ...(hasSessionDuration
+              ? { session_duration_minutes: sessionDuration }
+              : {}),
+          },
+        ).catch(() => {
+          // Non-blocking. Route persistence will be retried on the next
+          // explicit plan creation or on Study Lab entry.
+        });
+      }
+
       return nextPortfolio;
     } catch (requestError) {
       if (signal?.aborted || generationId !== generationRef.current || requestInput !== currentInputRef.current) return null;
