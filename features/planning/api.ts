@@ -2,11 +2,19 @@ import { ApiRequestError, apiJson } from "@/lib/apiClient";
 import {
   normalizePlanningPortfolio,
   normalizePlanningRoadmap,
+  normalizeStudyRouteAdvanceResult,
+  normalizeStudyRouteState,
   type PlanningPlan,
   type PlanningPortfolio,
   type PlanningRoadmap,
   type PlanningScope,
   type PlanningStudyTime,
+  type StudyRouteAdvanceRequest,
+  type StudyRouteAdvanceResult,
+  type StudyRouteBranchRequest,
+  type StudyRouteHeartbeatRequest,
+  type StudyRouteStartRequest,
+  type StudyRouteState,
 } from "./contracts";
 
 export type PlanningRequestContext = {
@@ -543,4 +551,216 @@ export async function generatePlanningPortfolio(
 
 export function planningErrorMessage(error: unknown) {
   return normalizePlanningError(error, "The planning request could not be completed.").message;
+}
+
+
+// =============================================================
+// PLANNING ↔ STUDY LAB — SHARED ROUTE API
+// =============================================================
+// Additive functions for the /planning/route/* endpoints. They reuse the
+// existing PlanningRequestContext, getBackendURL, jsonHeaders, and
+// normalizePlanningError so behavior, auth, and error messages stay consistent
+// with the rest of the Planning API. None of them modify an existing function.
+
+/**
+ * Persist today's selections and hand Study Lab the current route.
+ *
+ * Called immediately after generatePlanningPortfolio succeeds so the route
+ * exists on the server before the student clicks "Start Learning".
+ */
+export async function startStudyRoute(
+  context: PlanningRequestContext,
+  payload: StudyRouteStartRequest,
+  signal?: AbortSignal,
+): Promise<StudyRouteState> {
+  try {
+    const response = await apiJson<unknown>(
+      `${getBackendURL(context.backendURL)}/planning/route/start/${encodeURIComponent(context.userId)}`,
+      {
+        method: "POST",
+        headers: await jsonHeaders(context.getAuthHeaders),
+        body: JSON.stringify(payload),
+        retries: 0,
+        timeoutMs: 45000,
+        forceFresh: true,
+        signal,
+      },
+    );
+    const normalized = normalizeStudyRouteState(response);
+    if (!normalized) {
+      throw new PlanningApiError(
+        "The shared route could not be saved. Please try again.",
+        "invalid_response",
+      );
+    }
+    return normalized;
+  } catch (error) {
+    throw normalizePlanningError(error, "Your learning route could not be started.");
+  }
+}
+
+/**
+ * Read today's persisted route. Returns null when no route exists yet, so
+ * callers can fall back to the portfolio-only view without treating it as
+ * an error.
+ */
+export async function getCurrentStudyRoute(
+  context: PlanningRequestContext,
+  signal?: AbortSignal,
+): Promise<StudyRouteState | null> {
+  try {
+    const response = await apiJson<unknown>(
+      `${getBackendURL(context.backendURL)}/planning/route/current/${encodeURIComponent(context.userId)}`,
+      {
+        headers: await context.getAuthHeaders(),
+        retries: 1,
+        timeoutMs: 10000,
+        forceFresh: true,
+        signal,
+      },
+    );
+    return normalizeStudyRouteState(response);
+  } catch (error) {
+    if (error instanceof ApiRequestError && error.status === 404) {
+      return null;
+    }
+    throw normalizePlanningError(error, "Your learning route could not be read.");
+  }
+}
+
+/**
+ * Record Study Lab completion for the current unit and return the next action.
+ *
+ * Planning and Study Lab remain consistent because the backend writes scored
+ * evidence through the same tables Planning reads from, then recomputes the
+ * roadmap engine's next step.
+ */
+export async function advanceStudyRoute(
+  context: PlanningRequestContext,
+  payload: StudyRouteAdvanceRequest,
+  signal?: AbortSignal,
+): Promise<StudyRouteAdvanceResult> {
+  try {
+    const response = await apiJson<unknown>(
+      `${getBackendURL(context.backendURL)}/planning/route/advance/${encodeURIComponent(context.userId)}`,
+      {
+        method: "POST",
+        headers: await jsonHeaders(context.getAuthHeaders),
+        body: JSON.stringify(payload),
+        retries: 0,
+        timeoutMs: 30000,
+        forceFresh: true,
+        signal,
+      },
+    );
+    const normalized = normalizeStudyRouteAdvanceResult(response);
+    if (!normalized) {
+      throw new PlanningApiError(
+        "The completed step could not be saved. Please try again.",
+        "invalid_response",
+      );
+    }
+    return normalized;
+  } catch (error) {
+    throw normalizePlanningError(error, "Your completed step could not be saved.");
+  }
+}
+
+/**
+ * Temporarily branch Study Lab to a prerequisite or revision unit.
+ * The backend rejects any reason other than the two permitted values.
+ */
+export async function branchStudyRoute(
+  context: PlanningRequestContext,
+  payload: StudyRouteBranchRequest,
+  signal?: AbortSignal,
+): Promise<StudyRouteState> {
+  try {
+    const response = await apiJson<unknown>(
+      `${getBackendURL(context.backendURL)}/planning/route/branch/${encodeURIComponent(context.userId)}`,
+      {
+        method: "POST",
+        headers: await jsonHeaders(context.getAuthHeaders),
+        body: JSON.stringify(payload),
+        retries: 0,
+        timeoutMs: 15000,
+        forceFresh: true,
+        signal,
+      },
+    );
+    const normalized = normalizeStudyRouteState(response);
+    if (!normalized) {
+      throw new PlanningApiError(
+        "The branch could not be applied. Please try again.",
+        "invalid_response",
+      );
+    }
+    return normalized;
+  } catch (error) {
+    throw normalizePlanningError(error, "The revision branch could not be applied.");
+  }
+}
+
+/**
+ * Mark today's route as completed for the student ("Done for Today").
+ */
+export async function completeStudyRouteToday(
+  context: PlanningRequestContext,
+  signal?: AbortSignal,
+): Promise<StudyRouteState> {
+  try {
+    const response = await apiJson<unknown>(
+      `${getBackendURL(context.backendURL)}/planning/route/complete-today/${encodeURIComponent(context.userId)}`,
+      {
+        method: "POST",
+        headers: await jsonHeaders(context.getAuthHeaders),
+        retries: 0,
+        timeoutMs: 12000,
+        forceFresh: true,
+        signal,
+      },
+    );
+    const normalized = normalizeStudyRouteState(response);
+    if (!normalized) {
+      throw new PlanningApiError(
+        "Today's route could not be marked complete.",
+        "invalid_response",
+      );
+    }
+    return normalized;
+  } catch (error) {
+    throw normalizePlanningError(error, "Today's route could not be closed.");
+  }
+}
+
+/**
+ * Persist a lightweight mid-step position marker for "Continue Learning".
+ * Called on page navigation, refresh, and background save. Best-effort:
+ * callers may ignore failures because the next real advance will still land.
+ */
+export async function recordStudyRouteHeartbeat(
+  context: PlanningRequestContext,
+  payload: StudyRouteHeartbeatRequest,
+  signal?: AbortSignal,
+): Promise<StudyRouteState | null> {
+  try {
+    const response = await apiJson<unknown>(
+      `${getBackendURL(context.backendURL)}/planning/route/heartbeat/${encodeURIComponent(context.userId)}`,
+      {
+        method: "POST",
+        headers: await jsonHeaders(context.getAuthHeaders),
+        body: JSON.stringify(payload),
+        retries: 0,
+        timeoutMs: 8000,
+        forceFresh: true,
+        signal,
+      },
+    );
+    return normalizeStudyRouteState(response);
+  } catch (error) {
+    if (error instanceof ApiRequestError && error.status === 404) {
+      return null;
+    }
+    throw normalizePlanningError(error, "The route position could not be saved.");
+  }
 }

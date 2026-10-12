@@ -1,5 +1,11 @@
 import { ApiRequestError, apiFetch, apiJson } from "@/lib/apiClient";
 import { normalizeServerConversation } from "@/features/study/conversationUtils";
+import {
+  normalizeStudyLabContext,
+  normalizeStudyRouteAdvanceResult,
+  type StudyLabContext,
+  type StudyRouteAdvanceResult,
+} from "@/features/planning/contracts";
 import type {
   AdaptiveAnswerBlock,
   AgentStagePayload,
@@ -494,4 +500,147 @@ export async function recordPlanningStudyEvidence(
 
 export function studyErrorMessage(error: unknown) {
   return normalizeError(error).message;
+}
+
+
+// =============================================================
+// PLANNING ↔ STUDY LAB — COACH-SIDE CONTEXT + COMPLETION
+// =============================================================
+// Additive functions for the /coach/study-lab/* endpoints. They reuse the
+// existing StudyApiContext, apiBase, normalizeError, and apiJson so behavior,
+// auth, and error messages remain consistent with the rest of the Study API.
+// No existing function above is modified.
+
+export type StudyLabCompleteUnitPayload = {
+  userId: string;
+  completedUnitId: string;
+  interactionId: string;
+  correctAnswers: number;
+  totalQuestions: number;
+  timeSpentSeconds?: number;
+  confidenceAfter?: number;
+  xpEarned?: number;
+  lastPosition?: Record<string, unknown>;
+};
+
+/**
+ * Fetch the current Study Lab context for today's Planning route.
+ *
+ * Returns the exact payload the Study Lab UI needs to render:
+ *   - current topic
+ *   - Step X of Y
+ *   - why this topic is being studied now
+ *   - recommended approach + depth
+ *   - prerequisites
+ *   - progress through the current step
+ *
+ * Returns null when no active route exists for today, so the UI can fall
+ * back to its normal "no route yet" view without treating it as an error.
+ */
+export async function getStudyLabContext(
+  context: StudyApiContext,
+  userId: string,
+  signal?: AbortSignal,
+): Promise<StudyLabContext | null> {
+  try {
+    const payload = await apiJson<unknown>(
+      `${apiBase(context.backendURL)}/coach/study-lab/context/${encodeURIComponent(userId)}`,
+      {
+        headers: context.headers,
+        forceFresh: true,
+        retries: 1,
+        timeoutMs: 12000,
+        signal,
+      },
+    );
+    return normalizeStudyLabContext(payload);
+  } catch (error) {
+    const normalized = normalizeError(error);
+    if (normalized.code === "material_missing") {
+      // No active route for today — the caller should render the empty state.
+      return null;
+    }
+    throw normalized;
+  }
+}
+
+/**
+ * Complete a Study Lab unit and receive the next recommended action.
+ *
+ * The backend writes scored evidence through the same tables Planning reads
+ * from and then recomputes the roadmap engine's next step, so the returned
+ * `next_action` reflects the engine's deterministic decision — never a
+ * client-cached one.
+ */
+export async function completeStudyLabUnit(
+  context: StudyApiContext,
+  payload: StudyLabCompleteUnitPayload,
+  signal?: AbortSignal,
+): Promise<StudyRouteAdvanceResult> {
+  const receipt = payload.interactionId.trim();
+  if (!receipt || receipt.length > 240) {
+    throw new StudyApiError("The learning receipt could not be verified.", "invalid_response");
+  }
+  try {
+    const response = await apiJson<unknown>(
+      `${apiBase(context.backendURL)}/coach/study-lab/complete-unit/${encodeURIComponent(payload.userId)}`,
+      {
+        method: "POST",
+        headers: context.headers,
+        body: JSON.stringify({
+          completed_unit_id: payload.completedUnitId,
+          interaction_id: receipt,
+          correct_answers: payload.correctAnswers,
+          total_questions: payload.totalQuestions,
+          ...(payload.timeSpentSeconds !== undefined ? { time_spent_seconds: payload.timeSpentSeconds } : {}),
+          ...(payload.confidenceAfter !== undefined ? { confidence_after: payload.confidenceAfter } : {}),
+          ...(payload.xpEarned !== undefined ? { xp_earned: payload.xpEarned } : {}),
+          ...(payload.lastPosition !== undefined ? { last_position: payload.lastPosition } : {}),
+        }),
+        forceFresh: true,
+        retries: 0,
+        timeoutMs: 20000,
+        signal,
+      },
+    );
+    const normalized = normalizeStudyRouteAdvanceResult(response);
+    if (!normalized) {
+      throw new StudyApiError("The completed step could not be saved. Please try again.", "invalid_response");
+    }
+    return normalized;
+  } catch (error) {
+    throw normalizeError(error);
+  }
+}
+
+
+/**
+ * Persist a lightweight mid-step position marker for "Continue Learning".
+ *
+ * Study-side wrapper over the Planning heartbeat endpoint. Best-effort: a
+ * failure here never blocks navigation or the study session, because the next
+ * real advance or route read will still land on the server.
+ */
+export async function recordStudyRouteHeartbeat(
+  context: StudyApiContext,
+  userId: string,
+  lastPosition: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<void> {
+  try {
+    await apiJson<unknown>(
+      `${apiBase(context.backendURL)}/planning/route/heartbeat/${encodeURIComponent(userId)}`,
+      {
+        method: "POST",
+        headers: context.headers,
+        body: JSON.stringify({ last_position: lastPosition }),
+        forceFresh: true,
+        retries: 0,
+        timeoutMs: 6000,
+        signal,
+      },
+    );
+  } catch {
+    // Silent best-effort. Navigation must not wait on this.
+  }
 }

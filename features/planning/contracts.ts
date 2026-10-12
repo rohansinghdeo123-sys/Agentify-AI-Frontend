@@ -1128,3 +1128,387 @@ export function isRetiredPlanningSnapshot(value: unknown) {
   if (isRecord(value.roadmap) && value.roadmap.roadmap_version !== "planning_roadmap_v2") return true;
   return false;
 }
+
+
+// =============================================================
+// PLANNING ↔ STUDY LAB — SHARED ROUTE CONTRACTS
+// =============================================================
+// Additive only. Every type below describes a response from the
+// /planning/route/* and /coach/study-lab/* endpoints. Existing types are
+// untouched so cached roadmaps and the whole Planning UI keep working
+// unchanged. Every nested block reuses existing types (PlanningPortfolioChapter,
+// PlanningPortfolioNextStep, PlanningPortfolioTodayRoute, PlanningSelectionFactor,
+// PlanningPortfolioProgress) so consumers can feed the same components.
+
+export type StudyRouteStatus = "not_started" | "in_progress" | "paused" | "completed";
+
+export type StudyRouteOverrideReason = "" | "prerequisite_gap" | "revision_required";
+
+export interface StudyRouteOverride {
+  active: boolean;
+  reason: StudyRouteOverrideReason;
+  reason_label: string;
+  until_unit_id: string;
+}
+
+export interface StudyRouteCurrentStep {
+  step_index: number;
+  step_total: number;
+  step_label: string;
+  current_unit_id: string;
+  current_unit_title: string;
+  current_unit_role: string;
+  current_unit_activity: string;
+  current_unit_minutes: number;
+  current_unit_scope: string;
+  recommended_approach: string[];
+  why_now: string;
+  outcome: string;
+  learning_types: string[];
+  unit_depth: string;
+  unit_difficulty: string;
+  unit_importance: string;
+  prerequisites: string[];
+  unit_status: string;
+  last_position: Record<string, unknown>;
+}
+
+export interface StudyRouteEffectiveProficiency {
+  self_reported: string;
+  demonstrated_accuracy: number;
+  evidence_count: number;
+  last_updated: string;
+}
+
+export interface StudyRouteNextAction {
+  title: string;
+  reason: string;
+  estimated_minutes: PlanningTimeRange;
+  approach: string[];
+  outcome: string;
+  done_for_today: boolean;
+}
+
+export interface StudyRouteState {
+  user_id: string;
+  route_date: string;
+  class_level: string;
+  subject: string;
+  status: StudyRouteStatus;
+  study_time_today: PlanningStudyTime | null;
+  session_duration_minutes: number | null;
+  goal: Record<string, unknown>;
+  portfolio_version: string | null;
+  chapters: PlanningPortfolioChapter[];
+  global_next_step: PlanningPortfolioNextStep | null;
+  today_route: PlanningPortfolioTodayRoute | null;
+  selection_factors: PlanningSelectionFactor[];
+  aggregate_progress: PlanningPortfolioProgress | null;
+  current_step: StudyRouteCurrentStep;
+  override: StudyRouteOverride;
+  effective_proficiency: Record<string, StudyRouteEffectiveProficiency>;
+  needs_review_concept_ids: string[];
+  started_at: string | null;
+  last_active_at: string | null;
+  completed_at: string | null;
+}
+
+export interface StudyRouteAdvanceResult {
+  completion: Record<string, unknown>;
+  next_action: StudyRouteNextAction;
+  route: StudyRouteState;
+}
+
+export interface StudyLabContext {
+  user_id: string;
+  route_date: string;
+  status: StudyRouteStatus;
+  current_topic: string;
+  step_label: string;
+  step_index: number;
+  step_total: number;
+  why_now: string;
+  recommended_approach: string[];
+  recommended_depth: string;
+  learning_types: string[];
+  prerequisites: string[];
+  current_unit_id: string;
+  current_unit_status: string;
+  progress: PlanningPortfolioProgress | null;
+  goal: Record<string, unknown>;
+  override: StudyRouteOverride;
+  effective_proficiency: Record<string, StudyRouteEffectiveProficiency>;
+  needs_review_concept_ids: string[];
+  last_position: Record<string, unknown>;
+  next_step: PlanningPortfolioNextStep | null;
+  today_route: PlanningPortfolioTodayRoute | null;
+  chapters: PlanningPortfolioChapter[];
+}
+
+// ---------------------------------------------------------------------------
+// Request payloads (client → backend). These mirror the backend's Pydantic
+// request models, so any change here would be caught at the API boundary.
+// ---------------------------------------------------------------------------
+
+export interface StudyRouteChapterSelection {
+  chapter_ref: string;
+  chapter_proficiency: PlanningChapterProficiency;
+}
+
+export interface StudyRouteStartRequest {
+  class_level: string;
+  subject: string;
+  chapters: StudyRouteChapterSelection[];
+  study_time_today?: PlanningStudyTime;
+  session_duration_minutes?: number;
+}
+
+export interface StudyRouteAdvanceRequest {
+  completed_unit_id: string;
+  interaction_id: string;
+  correct_answers: number;
+  total_questions: number;
+  time_spent_seconds?: number;
+  confidence_after?: number;
+  xp_earned?: number;
+  last_position?: Record<string, unknown>;
+}
+
+export interface StudyRouteBranchRequest {
+  reason: "prerequisite_gap" | "revision_required";
+  target_unit_id: string;
+}
+
+export interface StudyRouteHeartbeatRequest {
+  last_position: Record<string, unknown>;
+}
+
+// ---------------------------------------------------------------------------
+// Shallow type guards. Deliberately permissive: the backend is authoritative
+// and response shapes are stable, so a mismatched field should degrade to a
+// safe null rather than crash the Planning or Study Lab page.
+// ---------------------------------------------------------------------------
+
+function isStudyRouteStatus(value: unknown): value is StudyRouteStatus {
+  return (
+    value === "not_started"
+    || value === "in_progress"
+    || value === "paused"
+    || value === "completed"
+  );
+}
+
+function isStudyRouteOverrideReason(value: unknown): value is StudyRouteOverrideReason {
+  return value === "" || value === "prerequisite_gap" || value === "revision_required";
+}
+
+function isStudyRouteOverride(value: unknown): value is StudyRouteOverride {
+  return Boolean(
+    isRecord(value)
+    && typeof value.active === "boolean"
+    && isStudyRouteOverrideReason(value.reason)
+    && typeof value.reason_label === "string"
+    && typeof value.until_unit_id === "string",
+  );
+}
+
+function isStudyRouteEffectiveProficiency(value: unknown): value is StudyRouteEffectiveProficiency {
+  return Boolean(
+    isRecord(value)
+    && typeof value.self_reported === "string"
+    && typeof value.demonstrated_accuracy === "number"
+    && typeof value.evidence_count === "number"
+    && typeof value.last_updated === "string",
+  );
+}
+
+function isStudyRouteCurrentStep(value: unknown): value is StudyRouteCurrentStep {
+  return Boolean(
+    isRecord(value)
+    && isIntegerInRange(value.step_index, 0)
+    && isIntegerInRange(value.step_total, 1)
+    && nonEmptyString(value.step_label)
+    && typeof value.current_unit_id === "string"
+    && typeof value.current_unit_title === "string"
+    && typeof value.current_unit_role === "string"
+    && typeof value.current_unit_activity === "string"
+    && typeof value.current_unit_minutes === "number"
+    && typeof value.current_unit_scope === "string"
+    && Array.isArray(value.recommended_approach)
+    && value.recommended_approach.every(nonEmptyString)
+    && typeof value.why_now === "string"
+    && typeof value.outcome === "string"
+    && Array.isArray(value.learning_types)
+    && typeof value.unit_depth === "string"
+    && typeof value.unit_difficulty === "string"
+    && typeof value.unit_importance === "string"
+    && Array.isArray(value.prerequisites)
+    && typeof value.unit_status === "string"
+    && isRecord(value.last_position),
+  );
+}
+
+function isStudyRouteNextAction(value: unknown): value is StudyRouteNextAction {
+  return Boolean(
+    isRecord(value)
+    && typeof value.title === "string"
+    && typeof value.reason === "string"
+    && isPlanningTimeRange(value.estimated_minutes)
+    && Array.isArray(value.approach)
+    && typeof value.outcome === "string"
+    && typeof value.done_for_today === "boolean",
+  );
+}
+
+/**
+ * Normalize a /planning/route/* response. Returns null if the payload is
+ * missing mandatory fields (e.g., a proxy error body). Never throws.
+ */
+export function normalizeStudyRouteState(value: unknown): StudyRouteState | null {
+  if (!isRecord(value)) return null;
+  if (typeof value.user_id !== "string") return null;
+  if (typeof value.route_date !== "string") return null;
+  if (typeof value.class_level !== "string") return null;
+  if (typeof value.subject !== "string") return null;
+  if (!isStudyRouteStatus(value.status)) return null;
+  if (!isStudyRouteCurrentStep(value.current_step)) return null;
+  if (!isStudyRouteOverride(value.override)) return null;
+
+  const chapters = Array.isArray(value.chapters)
+    ? (value.chapters.filter(isPlanningPortfolioChapter) as PlanningPortfolioChapter[])
+    : [];
+
+  const globalNextStep = isPlanningPortfolioNextStep(value.global_next_step)
+    ? (value.global_next_step as PlanningPortfolioNextStep)
+    : null;
+
+  const todayRoute = isPlanningPortfolioTodayRoute(value.today_route)
+    ? (value.today_route as PlanningPortfolioTodayRoute)
+    : null;
+
+  const selectionFactors = Array.isArray(value.selection_factors)
+    ? (value.selection_factors.filter(isPlanningSelectionFactor) as PlanningSelectionFactor[])
+    : [];
+
+  const aggregateProgress = isPlanningPortfolioProgress(value.aggregate_progress)
+    ? (value.aggregate_progress as PlanningPortfolioProgress)
+    : null;
+
+  const effectiveProficiency: Record<string, StudyRouteEffectiveProficiency> = {};
+  if (isRecord(value.effective_proficiency)) {
+    for (const [key, entry] of Object.entries(value.effective_proficiency)) {
+      if (isStudyRouteEffectiveProficiency(entry)) {
+        effectiveProficiency[key] = entry;
+      }
+    }
+  }
+
+  const needsReviewConceptIds = Array.isArray(value.needs_review_concept_ids)
+    ? value.needs_review_concept_ids.filter(nonEmptyString)
+    : [];
+
+  return {
+    user_id: value.user_id,
+    route_date: value.route_date,
+    class_level: value.class_level,
+    subject: value.subject,
+    status: value.status,
+    study_time_today: value.study_time_today === null
+      ? null
+      : isPlanningStudyTime(value.study_time_today)
+        ? value.study_time_today
+        : null,
+    session_duration_minutes: isIntegerInRange(value.session_duration_minutes, 15, 120)
+      ? Number(value.session_duration_minutes)
+      : null,
+    goal: isRecord(value.goal) ? value.goal : {},
+    portfolio_version: typeof value.portfolio_version === "string" ? value.portfolio_version : null,
+    chapters,
+    global_next_step: globalNextStep,
+    today_route: todayRoute,
+    selection_factors: selectionFactors,
+    aggregate_progress: aggregateProgress,
+    current_step: value.current_step,
+    override: value.override,
+    effective_proficiency: effectiveProficiency,
+    needs_review_concept_ids: needsReviewConceptIds,
+    started_at: typeof value.started_at === "string" ? value.started_at : null,
+    last_active_at: typeof value.last_active_at === "string" ? value.last_active_at : null,
+    completed_at: typeof value.completed_at === "string" ? value.completed_at : null,
+  };
+}
+
+export function normalizeStudyLabContext(value: unknown): StudyLabContext | null {
+  if (!isRecord(value)) return null;
+  if (typeof value.user_id !== "string") return null;
+  if (typeof value.route_date !== "string") return null;
+  if (!isStudyRouteStatus(value.status)) return null;
+  if (typeof value.current_topic !== "string") return null;
+  if (typeof value.step_label !== "string") return null;
+  if (!isIntegerInRange(value.step_index, 0)) return null;
+  if (!isIntegerInRange(value.step_total, 1)) return null;
+  if (!isStudyRouteOverride(value.override)) return null;
+
+  const effectiveProficiency: Record<string, StudyRouteEffectiveProficiency> = {};
+  if (isRecord(value.effective_proficiency)) {
+    for (const [key, entry] of Object.entries(value.effective_proficiency)) {
+      if (isStudyRouteEffectiveProficiency(entry)) {
+        effectiveProficiency[key] = entry;
+      }
+    }
+  }
+
+  return {
+    user_id: value.user_id,
+    route_date: value.route_date,
+    status: value.status,
+    current_topic: value.current_topic,
+    step_label: value.step_label,
+    step_index: Number(value.step_index),
+    step_total: Number(value.step_total),
+    why_now: typeof value.why_now === "string" ? value.why_now : "",
+    recommended_approach: Array.isArray(value.recommended_approach)
+      ? value.recommended_approach.filter(nonEmptyString)
+      : [],
+    recommended_depth: typeof value.recommended_depth === "string" ? value.recommended_depth : "",
+    learning_types: Array.isArray(value.learning_types)
+      ? value.learning_types.filter(nonEmptyString)
+      : [],
+    prerequisites: Array.isArray(value.prerequisites)
+      ? value.prerequisites.filter(nonEmptyString)
+      : [],
+    current_unit_id: typeof value.current_unit_id === "string" ? value.current_unit_id : "",
+    current_unit_status: typeof value.current_unit_status === "string" ? value.current_unit_status : "",
+    progress: isPlanningPortfolioProgress(value.progress)
+      ? (value.progress as PlanningPortfolioProgress)
+      : null,
+    goal: isRecord(value.goal) ? value.goal : {},
+    override: value.override,
+    effective_proficiency: effectiveProficiency,
+    needs_review_concept_ids: Array.isArray(value.needs_review_concept_ids)
+      ? value.needs_review_concept_ids.filter(nonEmptyString)
+      : [],
+    last_position: isRecord(value.last_position) ? value.last_position : {},
+    next_step: isPlanningPortfolioNextStep(value.next_step)
+      ? (value.next_step as PlanningPortfolioNextStep)
+      : null,
+    today_route: isPlanningPortfolioTodayRoute(value.today_route)
+      ? (value.today_route as PlanningPortfolioTodayRoute)
+      : null,
+    chapters: Array.isArray(value.chapters)
+      ? (value.chapters.filter(isPlanningPortfolioChapter) as PlanningPortfolioChapter[])
+      : [],
+  };
+}
+
+export function normalizeStudyRouteAdvanceResult(value: unknown): StudyRouteAdvanceResult | null {
+  if (!isRecord(value)) return null;
+  if (!isStudyRouteNextAction(value.next_action)) return null;
+  const route = normalizeStudyRouteState(value.route);
+  if (!route) return null;
+  return {
+    completion: isRecord(value.completion) ? value.completion : {},
+    next_action: value.next_action,
+    route,
+  };
+}
