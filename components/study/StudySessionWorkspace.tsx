@@ -5,12 +5,17 @@ import RichMarkdown from "@/components/RichMarkdown";
 import { AppIcon, LoadingState } from "@/components/ui/Polished";
 import { useAuth } from "@/context/AuthContext";
 import {
+  completeStudyLabUnit,
   getStudyCoachName,
+  getStudyLabContext,
   recordPlanningStudyEvidence,
+  recordStudyRouteHeartbeat,
   streamCoachTurn,
   studyErrorMessage,
 } from "@/features/study/api";
-import { titleFromMessages } from "@/features/study/conversationUtils";
+import { completeStudyRouteToday } from "@/features/planning/api";
+import type { StudyLabContext, StudyRouteAdvanceResult } from "@/features/planning/contracts";
+import { createConversationId, titleFromMessages } from "@/features/study/conversationUtils";
 import { useStudyConversations } from "@/features/study/hooks/useStudyConversations";
 import { useStudyDraftPersistence } from "@/features/study/hooks/useStudyDraftPersistence";
 import {
@@ -47,6 +52,7 @@ import type {
   PendingAttachment,
   SpeechRecognitionConstructor,
   SpeechRecognitionLike,
+  StudyScope,
 } from "@/features/study/types";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -566,6 +572,10 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
   const [speechSupported, setSpeechSupported] = useState(false);
   const [listening, setListening] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [studyLabContext, setStudyLabContext] = useState<StudyLabContext | null>(null);
+  const [lastInteractionId, setLastInteractionId] = useState("");
+  const [completionResult, setCompletionResult] = useState<StudyRouteAdvanceResult | null>(null);
+  const [studyLabCompleting, setStudyLabCompleting] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const lastRequestRef = useRef<StudyTutorRequestSnapshot | null>(null);
   const activityRef = useRef(false);
@@ -603,6 +613,46 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
     })();
     return () => { active = false; };
   }, [authBusy, getAuthHeaders, userId]);
+
+  // Read the student's current Planning route so this session can offer the
+  // completion handoff. Only runs for planning-grounded sessions — an open
+  // tutor session has no route to complete.
+  useEffect(() => {
+    if (!userId || authBusy) return;
+    if (!["planning_manifest", "published"].includes(scope.catalogSource || "")) {
+      setStudyLabContext(null);
+      return;
+    }
+    let active = true;
+    void (async () => {
+      try {
+        const context = await getStudyLabContext(
+          { backendURL: process.env.NEXT_PUBLIC_BACKEND_URL, headers: await getAuthHeaders() },
+          userId,
+        );
+        if (active) setStudyLabContext(context);
+      } catch {
+        if (active) setStudyLabContext(null);
+      }
+    })();
+    return () => { active = false; };
+  }, [authBusy, getAuthHeaders, scope.catalogSource, userId]);
+
+  // Persist a mid-step position marker when the student leaves the session.
+  // Best-effort: failures never block navigation.
+  useEffect(() => {
+    return () => {
+      if (!userId) return;
+      if (!["planning_manifest", "published"].includes(scope.catalogSource || "")) return;
+      void getAuthHeaders()
+        .then((headers) => recordStudyRouteHeartbeat(
+          { backendURL: process.env.NEXT_PUBLIC_BACKEND_URL, headers },
+          userId,
+          { page: "session_exit", conversation_id: conversationId },
+        ))
+        .catch(() => undefined);
+    };
+  }, [conversationId, getAuthHeaders, scope.catalogSource, userId]);
 
   useEffect(() => {
     const supported = Boolean(getSpeechRecognitionCtor()) && Boolean(window.speechSynthesis);
@@ -797,6 +847,7 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
         socratic: result.socratic,
       });
       setStages((current) => current.map((stage) => ({ ...stage, status: "done" })));
+      if (result.interactionId) setLastInteractionId(result.interactionId);
       if (
         ["planning_manifest", "published"].includes(scope.catalogSource || "")
         && result.interactionId
@@ -834,6 +885,70 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
   const startNewConversation = () => {
     abortRef.current?.abort();
     router.push(studySessionHref(`study-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`, scope, { fresh: true }));
+  };
+
+  // Persist Study Lab completion through the shared Planning route. The backend
+  // writes scored evidence via the same tables Planning reads from, advances
+  // the step, and returns the next recommended action.
+  const completeStudyUnit = async () => {
+    if (!studyLabContext || !userId || studyLabCompleting) return;
+    const interactionId = lastInteractionId.trim();
+    if (!interactionId) return;
+    setStudyLabCompleting(true);
+    setError("");
+    try {
+      const result = await completeStudyLabUnit(
+        { backendURL: process.env.NEXT_PUBLIC_BACKEND_URL, headers: await getAuthHeaders() },
+        {
+          userId,
+          completedUnitId: studyLabContext.current_unit_id,
+          interactionId,
+          correctAnswers: 1,
+          totalQuestions: 1,
+          lastPosition: { page: "session_complete", conversation_id: conversationId },
+        },
+      );
+      setCompletionResult(result);
+    } catch (completionError) {
+      setError(studyErrorMessage(completionError));
+    } finally {
+      setStudyLabCompleting(false);
+    }
+  };
+
+  const completeStudyToday = async () => {
+    if (!userId) return;
+    try {
+      await completeStudyRouteToday({
+        backendURL: process.env.NEXT_PUBLIC_BACKEND_URL,
+        getAuthHeaders,
+        userId,
+      });
+    } catch {
+      // Best-effort: even if this fails, returning home is the right move.
+    }
+    router.push("/dashboard/study");
+  };
+
+  const continueToNextUnit = () => {
+    if (!completionResult) return;
+    const route = completionResult.route;
+    const chapter = route.chapters.find((candidate) => (
+      candidate.learning_units.some((unit) => unit.id === route.current_step.current_unit_id)
+    )) || route.chapters[0];
+    if (!chapter) return;
+    const nextScope: StudyScope = {
+      source: "syllabus",
+      catalogSource: "planning_manifest",
+      classLevel: route.class_level || "",
+      subject: route.subject || "",
+      chapterId: chapter.chapter_slug,
+      chapterLabel: chapter.chapter,
+      topicId: route.current_step.current_unit_id,
+      topicLabel: route.current_step.current_unit_title,
+    };
+    const destination = studySessionHref(createConversationId(), nextScope, { fresh: true });
+    router.push(`${destination}&entry=learn`);
   };
 
   const fillPrompt = (prompt: string) => {
@@ -967,6 +1082,19 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
       : `Ask naturally, ${profile?.name?.split(" ")[0] || "Student"}. Add a screenshot or note whenever the question needs it.`;
   const canRetry = Boolean(failedRequest);
 
+  // The completion handoff is offered only when the current session is on
+  // today's planned unit. A recent-conversations entry into a different
+  // chapter must not advertise a "Mark studied" action for the wrong unit.
+  const routeMatchesThisSession = Boolean(
+    studyLabContext
+    && studyLabContext.current_unit_id
+    && studyLabContext.current_unit_id === scope.topicId,
+  );
+  const canOfferCompletion = routeMatchesThisSession
+    && Boolean(lastInteractionId)
+    && !completionResult
+    && !loadingAnswer;
+
   return (
     <section className={styles.session} data-source={scope.source}>
       <div className={styles.ambient} aria-hidden="true"><span /><span /></div>
@@ -1063,6 +1191,69 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
             </span>
           </div>
         ) : null}
+
+        {canOfferCompletion ? (
+          <div className={styles.stepCompleteBar} role="status">
+            <span className={styles.stepCompleteCopy}>
+              <strong>Finished this step?</strong>
+              <small>Save your progress and let Study Lab line up the next unit.</small>
+            </span>
+            <button
+              type="button"
+              className={styles.stepCompleteButton}
+              disabled={studyLabCompleting}
+              onClick={() => { void completeStudyUnit(); }}
+            >
+              {studyLabCompleting ? "Saving…" : "Mark studied"} <AppIcon name="arrowRight" />
+            </button>
+          </div>
+        ) : null}
+
+        {completionResult ? (
+          <div className={styles.stepHandoff} role="status">
+            <div className={styles.stepHandoffHead}>
+              <span className={styles.stepHandoffTick}><AppIcon name="check" /></span>
+              <strong>{studyLabContext?.current_topic || "Unit"} complete</strong>
+            </div>
+            {completionResult.next_action.done_for_today ? (
+              <p className={styles.stepHandoffNote}>
+                That&apos;s today&apos;s route finished. Come back tomorrow for the next step.
+              </p>
+            ) : (
+              <>
+                <div className={styles.stepHandoffNext}>
+                  <small>Next</small>
+                  <strong>{completionResult.next_action.title}</strong>
+                  <span>
+                    ~{completionResult.next_action.estimated_minutes.min}–{completionResult.next_action.estimated_minutes.max} min
+                  </span>
+                </div>
+                {completionResult.next_action.reason ? (
+                  <p className={styles.stepHandoffNote}>{completionResult.next_action.reason}</p>
+                ) : null}
+              </>
+            )}
+            <div className={styles.stepHandoffActions}>
+              {!completionResult.next_action.done_for_today ? (
+                <button
+                  type="button"
+                  className={styles.stepHandoffPrimary}
+                  onClick={continueToNextUnit}
+                >
+                  Continue <AppIcon name="arrowRight" />
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className={styles.stepHandoffSecondary}
+                onClick={() => { void completeStudyToday(); }}
+              >
+                Done for today
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <StudyComposer
           value={input}
           coachName={coachName}

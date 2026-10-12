@@ -993,3 +993,121 @@
   .sendButton:hover:not(:disabled),
   .starters button:hover { transform: none; }
 }
+/* ─── Planning ↔ Study Lab completion handoff ─── */
+.stepCompleteBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 16px;
+  margin-bottom: 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(45, 212, 191, 0.28);
+  background: linear-gradient(180deg, rgba(45, 212, 191, 0.1), rgba(15, 23, 42, 0));
+}
+
+.stepCompleteCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.stepCompleteCopy strong { font-size: 14px; }
+.stepCompleteCopy small { opacity: 0.72; font-size: 12px; }
+
+.stepCompleteButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  color: #061018;
+  background: linear-gradient(180deg, #2dd4bf, #22d3ee);
+  white-space: nowrap;
+}
+.stepCompleteButton:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.stepHandoff {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  margin-bottom: 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(34, 197, 94, 0.28);
+  background: linear-gradient(180deg, rgba(34, 197, 94, 0.1), rgba(15, 23, 42, 0));
+}
+
+.stepHandoffHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+}
+.stepHandoffTick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.25);
+  color: #22c55e;
+}
+
+.stepHandoffNext {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 34px;
+}
+.stepHandoffNext small {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 11px;
+  opacity: 0.66;
+}
+.stepHandoffNext strong { font-size: 15px; }
+.stepHandoffNext span { font-size: 12px; opacity: 0.78; }
+
+.stepHandoffNote {
+  margin: 0;
+  padding-left: 34px;
+  font-size: 13px;
+  line-height: 1.5;
+  opacity: 0.86;
+}
+
+.stepHandoffActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 34px;
+  flex-wrap: wrap;
+}
+.stepHandoffPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  color: #061018;
+  background: linear-gradient(180deg, #2dd4bf, #22d3ee);
+}
+.stepHandoffSecondary {
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  opacity: 0.86;
+}
+.stepHandoffSecondary:hover { opacity: 1; }
