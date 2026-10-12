@@ -11,11 +11,13 @@ import {
   studySessionHref,
   syllabusStudyScope,
 } from "@/features/study/routes";
-import type { StudyConversation } from "@/features/study/types";
+import { getStudyLabContext, recordStudyRouteHeartbeat } from "@/features/study/api";
+import type { StudyConversation, StudyScope } from "@/features/study/types";
+import type { StudyLabContext } from "@/features/planning/contracts";
 import { useCatalog } from "@/lib/catalog";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./home.module.css";
 
 function conversationHref(conversation: StudyConversation) {
@@ -33,10 +35,30 @@ function relativeTime(value: string) {
   return `${Math.round(hours / 24)}d ago`;
 }
 
+function studyRouteScope(context: StudyLabContext): StudyScope | null {
+  if (!context.current_unit_id) return null;
+  const chapter = context.chapters.find((candidate) => (
+    candidate.learning_units.some((unit) => unit.id === context.current_unit_id)
+  )) || context.chapters[0];
+  if (!chapter) return null;
+  const unit = chapter.learning_units.find((candidate) => candidate.id === context.current_unit_id);
+  if (!unit) return null;
+  return {
+    source: "syllabus",
+    catalogSource: "planning_manifest",
+    classLevel: "",
+    subject: "",
+    chapterId: chapter.chapter_slug,
+    chapterLabel: chapter.chapter,
+    topicId: unit.id,
+    topicLabel: unit.title,
+  };
+}
+
 export default function StudyHomePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { profile } = useAuth();
+  const { profile, userId, getAuthHeaders } = useAuth();
   const { chapters, source, settled } = useCatalog();
   const { conversations, syncState, reload } = useStudyConversations();
   const legacyHandoff = legacyStudyHandoff(searchParams);
@@ -44,10 +66,66 @@ export default function StudyHomePage() {
   const requestedTopic = searchParams.get("topic") || "";
   const [chapterId, setChapterId] = useState(requestedChapter);
   const [topicId, setTopicId] = useState(requestedTopic);
+  const [studyLab, setStudyLab] = useState<StudyLabContext | null>(null);
+  const [studyLabLoading, setStudyLabLoading] = useState(false);
+  const [studyLabOpening, setStudyLabOpening] = useState(false);
 
   useEffect(() => {
     if (legacyHandoff) router.replace(legacyHandoff);
   }, [legacyHandoff, router]);
+
+  // Read today's Planning route so Study Lab can present the exact step the
+  // student should work on. Returns null when no route exists — in that case
+  // the page behaves exactly as it did before this integration.
+  const loadStudyLabContext = useCallback(async () => {
+    if (!userId) return;
+    setStudyLabLoading(true);
+    try {
+      const context = await getStudyLabContext(
+        {
+          headers: await getAuthHeaders(),
+        },
+        userId,
+      );
+      setStudyLab(context);
+    } catch {
+      // A failed read must never break the existing Study home page.
+      setStudyLab(null);
+    } finally {
+      setStudyLabLoading(false);
+    }
+  }, [getAuthHeaders, userId]);
+
+  useEffect(() => {
+    void loadStudyLabContext();
+  }, [loadStudyLabContext]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const onFocus = () => { void loadStudyLabContext(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [loadStudyLabContext, userId]);
+
+  const startPlannedStudyRoute = useCallback(async () => {
+    if (!studyLab || studyLabOpening) return;
+    const scope = studyRouteScope(studyLab);
+    if (!scope) return;
+    setStudyLabOpening(true);
+    // Fire-and-forget heartbeat — position persistence must not block
+    // navigation to the session.
+    void recordStudyRouteHeartbeat(
+      { headers: await getAuthHeaders() },
+      studyLab.user_id,
+      { last_position: studyLab.last_position },
+    ).catch(() => undefined);
+    const destination = studySessionHref(createConversationId(), scope, { fresh: true });
+    router.push(`${destination}&entry=learn`);
+  }, [getAuthHeaders, router, studyLab, studyLabOpening]);
 
   const selectedChapter = chapters.find((chapter) => chapter.value === chapterId)
     || (settled ? chapters.find((chapter) => chapter.value === requestedChapter) || chapters[0] : undefined);
@@ -75,6 +153,8 @@ export default function StudyHomePage() {
     return <div className={styles.redirectState} role="status">Opening the focused learning workspace…</div>;
   }
 
+  const showStudyLabCard = Boolean(userId) && !studyLabLoading && Boolean(studyLab);
+
   return (
     <StudyScreen
       eyebrow="AgentifyAI / Study Lab"
@@ -82,6 +162,101 @@ export default function StudyHomePage() {
       description="Learn a planned concept, ask one doubt directly, or check what you understand. Choose one route and Study Lab will keep the session focused."
       aside={<StudySyncPill state={syncState} />}
     >
+      {showStudyLabCard && studyLab ? (
+        <section className={styles.todayRoutePanel} aria-labelledby="today-route-heading">
+          <div className={styles.todayRouteHeader}>
+            <div>
+              <p className={styles.todayRouteEyebrow}>Today&apos;s route</p>
+              <h2 id="today-route-heading" className={styles.todayRouteStep}>
+                {studyLab.step_label}
+              </h2>
+            </div>
+            {studyLab.override.active ? (
+              <span className={styles.todayRouteBranch} data-reason={studyLab.override.reason}>
+                {studyLab.override.reason_label}
+              </span>
+            ) : null}
+          </div>
+
+          <div className={styles.todayRouteBody}>
+            <div className={styles.todayRouteTopic}>
+              <span className={styles.todayRouteTopicStatus} data-status={studyLab.current_unit_status}>
+                {studyLab.current_unit_status === "mastered"
+                  ? "✓"
+                  : studyLab.current_unit_status === "needs_review"
+                    ? "!"
+                    : studyLab.current_unit_status === "practising" || studyLab.current_unit_status === "learning"
+                      ? "▶"
+                      : "○"}
+              </span>
+              <div>
+                <strong>{studyLab.current_topic}</strong>
+                <small>
+                  {studyLab.status === "completed"
+                    ? "Today's route complete"
+                    : studyLab.status === "not_started"
+                      ? "Ready to begin"
+                      : "In progress"}
+                </small>
+              </div>
+            </div>
+
+            {studyLab.why_now ? (
+              <p className={styles.todayRouteWhy}>{studyLab.why_now}</p>
+            ) : null}
+
+            {studyLab.recommended_approach.length ? (
+              <ol className={styles.todayRouteApproach} aria-label="Recommended approach">
+                {studyLab.recommended_approach.map((step, index) => (
+                  <li key={`${step}-${index}`}>
+                    <span className={styles.todayRouteApproachIndex}>{index + 1}</span>
+                    <span>{step}</span>
+                  </li>
+                ))}
+              </ol>
+            ) : null}
+
+            {studyLab.prerequisites.length ? (
+              <p className={styles.todayRoutePrereq}>
+                Prerequisite{studyLab.prerequisites.length > 1 ? "s" : ""}: {studyLab.prerequisites.join(", ")}
+              </p>
+            ) : null}
+
+            {studyLab.progress ? (
+              <div className={styles.todayRouteProgress} aria-label="Chapter progress">
+                <div className={styles.todayRouteProgressBar}>
+                  <span style={{ width: `${studyLab.progress.percentage}%` }} />
+                </div>
+                <span className={styles.todayRouteProgressLabel}>
+                  {studyLab.progress.mastered_units} of {studyLab.progress.total_units} units mastered
+                </span>
+              </div>
+            ) : null}
+          </div>
+
+          {studyLab.status === "completed" ? (
+            <div className={styles.todayRouteActions}>
+              <p className={styles.todayRouteComplete}>
+                You&apos;ve completed today&apos;s route. Come back tomorrow, or choose another route below.
+              </p>
+            </div>
+          ) : (
+            <div className={styles.todayRouteActions}>
+              <button
+                type="button"
+                className={styles.todayRouteStart}
+                disabled={studyLabOpening}
+                onClick={() => { void startPlannedStudyRoute(); }}
+              >
+                {studyLab.status === "in_progress" || studyLab.status === "paused"
+                  ? "Continue learning"
+                  : "Start learning"} <AppIcon name="arrowRight" />
+              </button>
+            </div>
+          )}
+        </section>
+      ) : null}
+
       <div className={styles.workspace}>
         <section className={styles.startPanel} aria-labelledby="start-study-heading">
           <div className={styles.panelHeading}>
