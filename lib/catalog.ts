@@ -26,33 +26,31 @@ export type CatalogChapter = {
 
 export const BUILTIN_CHAPTERS: CatalogChapter[] = [
   {
+    label: "Some Basic Concepts of Chemistry",
+    value: "some_basic_concepts_of_chemistry",
+    subject: "Chemistry",
+    classLevel: "Class 11",
+    topics: [
+      { label: "Atoms and Molecules", value: "atoms_and_molecules" },
+      { label: "Matter", value: "nature_and_classification_of_matter" },
+      { label: "Properties of Matter", value: "properties_of_matter_and_measurement" },
+      { label: "SI Units", value: "si_units_and_prefixes" },
+      { label: "Mass and Weight", value: "mass_weight_volume_density" },
+      { label: "Significant Figures", value: "significant_figures" },
+      { label: "Mole Concept", value: "mole_concept_and_molar_mass" },
+      { label: "Stoichiometry", value: "stoichiometry_and_limiting_reagent" }
+    ],
+  },
+  {
     label: "Hydrocarbons",
     value: "hydrocarbon",
     subject: "Chemistry",
+    classLevel: "Class 11",
     topics: [
       { label: "Alkanes", value: "alkanes" },
       { label: "Alkenes", value: "alkenes" },
       { label: "Alkynes", value: "alkynes" },
       { label: "Aromatic Hydrocarbons", value: "aromatics" },
-    ],
-  },
-  {
-    label: "Basic Concepts of Chemistry",
-    value: "matter",
-    subject: "Chemistry",
-    topics: [
-      { label: "Definition of Chemistry", value: "chemistry_definition" },
-      { label: "Alchemy and Iatrochemistry", value: "historical_alchemy" },
-      { label: "Ancient Indian Chemistry", value: "ancient_indian_chemistry" },
-      { label: "Role and Importance of Chemistry", value: "importance_of_chemistry" },
-      { label: "Matter Definition", value: "matter_definition" },
-      { label: "Properties of Matter", value: "properties_of_matter" },
-      { label: "States of Matter", value: "states_of_matter" },
-      { label: "Solid State", value: "solid_state" },
-      { label: "Liquid State", value: "liquid_state" },
-      { label: "Gaseous State", value: "gaseous_state" },
-      { label: "Interconversion of States", value: "interconversion_of_states" },
-      { label: "Classification of Matter", value: "classification_of_matter" },
     ],
   },
 ];
@@ -130,7 +128,8 @@ function normalizeClassLevel(value: string) {
 }
 
 export function catalogCacheKey(userId: string, classLevel: string) {
-  return `catalog:v2:${encodeURIComponent(userId)}:${normalizeClassLevel(classLevel) || "unspecified"}`;
+  // Bumped to v3 to force fresh data after the Chapter 1 seeding
+  return `catalog:v3:${encodeURIComponent(userId)}:${normalizeClassLevel(classLevel) || "unspecified"}`;
 }
 
 function mapBackendCatalog(payload: BackendCatalog, preferredClassLevel: string): CatalogChapter[] {
