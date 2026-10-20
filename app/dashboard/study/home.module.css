@@ -550,3 +550,132 @@
   font-size: 13px;
   opacity: 0.85;
 }
+/* ─── Notes Reader ─── */
+.notesContainer {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+.notesHeader {
+  margin-bottom: 40px;
+  border-bottom: 1px solid var(--border-subtle, rgba(148, 163, 184, 0.2));
+  padding-bottom: 20px;
+}
+
+.notesHeader h1 {
+  font-size: 32px;
+  margin: 10px 0;
+  color: var(--text-primary, #f8fafc);
+}
+
+.notesHeader p {
+  font-size: 14px;
+  color: var(--text-secondary, #94a3b8);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.notesHeader span {
+  font-size: 16px;
+  opacity: 0.8;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-secondary, #94a3b8);
+  text-decoration: none;
+  margin-bottom: 20px;
+  transition: color 0.2s ease;
+}
+
+.backLink:hover {
+  color: var(--text-primary, #f8fafc);
+}
+
+.backLink svg {
+  transform: rotate(180deg);
+}
+
+.notesContent {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.conceptCard {
+  padding: 30px;
+  border-radius: 16px;
+  background: rgba(30, 41, 59, 0.4);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.conceptCard h2 {
+  font-size: 24px;
+  color: var(--text-primary, #f8fafc);
+  margin-bottom: 24px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.conceptSection {
+  margin-bottom: 24px;
+}
+
+.conceptSection h3 {
+  font-size: 16px;
+  color: var(--brand-primary, #2dd4bf);
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.conceptSection ul {
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.conceptSection li {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-secondary, #cbd5e1);
+}
+
+.formulaList {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.formulaList li {
+  background: rgba(45, 212, 191, 0.1);
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(45, 212, 191, 0.2);
+  color: var(--brand-primary, #2dd4bf);
+}
+.todayRouteNotes {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary, #f8fafc);
+  background: transparent;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+.todayRouteNotes:hover {
+  background: rgba(148, 163, 184, 0.1);
+  border-color: rgba(148, 163, 184, 0.5);
+}

@@ -644,3 +644,56 @@ export async function recordStudyRouteHeartbeat(
     // Silent best-effort. Navigation must not wait on this.
   }
 }
+
+// =============================================================
+// CHAPTER NOTES — Direct student reading
+// =============================================================
+
+export interface ConceptNote {
+  id: string;
+  title: string;
+  definition: string;
+  explanation: string;
+  key_points: string[];
+  formulas: string[];
+  examples: string[];
+  common_mistakes: (string | { mistake?: string; correction?: string; note?: string })[];
+}
+
+export interface ChapterNotes {
+  chapter: {
+    slug: string;
+    name: string;
+    class_level: string;
+    subject: string;
+    chapter_number: number;
+  };
+  concepts: ConceptNote[];
+}
+
+/**
+ * Fetch the published master notes for a chapter so students can read them
+ * directly with KaTeX-rendered formulas.
+ */
+export async function getChapterNotes(
+  context: StudyApiContext,
+  chapterSlug: string,
+  signal?: AbortSignal,
+): Promise<ChapterNotes | null> {
+  try {
+    return await apiJson<ChapterNotes>(
+      `${apiBase(context.backendURL)}/study/notes/${encodeURIComponent(chapterSlug)}`,
+      {
+        headers: context.headers,
+        forceFresh: true,
+        retries: 1,
+        timeoutMs: 10000,
+        signal,
+      },
+    );
+  } catch (error) {
+    const normalized = normalizeError(error);
+    if (normalized.code === "material_missing") return null;
+    throw normalized;
+  }
+}

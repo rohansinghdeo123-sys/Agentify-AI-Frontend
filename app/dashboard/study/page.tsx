@@ -11,7 +11,10 @@ import {
   studySessionHref,
   syllabusStudyScope,
 } from "@/features/study/routes";
-import { getStudyLabContext, recordStudyRouteHeartbeat } from "@/features/study/api";
+import {
+  getStudyLabContext,
+  recordStudyRouteHeartbeat,
+} from "@/features/study/api";
 import type { StudyConversation, StudyScope } from "@/features/study/types";
 import type { StudyLabContext } from "@/features/planning/contracts";
 import { useCatalog } from "@/lib/catalog";
@@ -46,8 +49,8 @@ function studyRouteScope(context: StudyLabContext): StudyScope | null {
   return {
     source: "syllabus",
     catalogSource: "planning_manifest",
-    classLevel: "",
-    subject: "",
+    classLevel: context.class_level || "",
+    subject: context.subject || "",
     chapterId: chapter.chapter_slug,
     chapterLabel: chapter.chapter,
     topicId: unit.id,
@@ -74,22 +77,16 @@ export default function StudyHomePage() {
     if (legacyHandoff) router.replace(legacyHandoff);
   }, [legacyHandoff, router]);
 
-  // Read today's Planning route so Study Lab can present the exact step the
-  // student should work on. Returns null when no route exists — in that case
-  // the page behaves exactly as it did before this integration.
   const loadStudyLabContext = useCallback(async () => {
     if (!userId) return;
     setStudyLabLoading(true);
     try {
       const context = await getStudyLabContext(
-        {
-          headers: await getAuthHeaders(),
-        },
+        { headers: await getAuthHeaders() },
         userId,
       );
       setStudyLab(context);
     } catch {
-      // A failed read must never break the existing Study home page.
       setStudyLab(null);
     } finally {
       setStudyLabLoading(false);
@@ -116,16 +113,19 @@ export default function StudyHomePage() {
     const scope = studyRouteScope(studyLab);
     if (!scope) return;
     setStudyLabOpening(true);
-    // Fire-and-forget heartbeat — position persistence must not block
-    // navigation to the session.
     void recordStudyRouteHeartbeat(
       { headers: await getAuthHeaders() },
       studyLab.user_id,
-      { last_position: studyLab.last_position },
-    ).catch(() => undefined);
+      studyLab.last_position,
+    );
     const destination = studySessionHref(createConversationId(), scope, { fresh: true });
     router.push(`${destination}&entry=learn`);
   }, [getAuthHeaders, router, studyLab, studyLabOpening]);
+
+  // Find active chapter slug for the notes button
+  const activeChapter = studyLab?.chapters.find((c) => 
+    c.learning_units.some((u) => u.id === studyLab.current_unit_id)
+  ) || studyLab?.chapters[0];
 
   const selectedChapter = chapters.find((chapter) => chapter.value === chapterId)
     || (settled ? chapters.find((chapter) => chapter.value === requestedChapter) || chapters[0] : undefined);
@@ -242,6 +242,15 @@ export default function StudyHomePage() {
             </div>
           ) : (
             <div className={styles.todayRouteActions}>
+              {activeChapter ? (
+                <Link
+                  href={`/dashboard/study/notes/${encodeURIComponent(activeChapter.chapter_slug)}`}
+                  className={styles.todayRouteNotes}
+                >
+                  Read Notes
+                </Link>
+              ) : null}
+              
               <button
                 type="button"
                 className={styles.todayRouteStart}
