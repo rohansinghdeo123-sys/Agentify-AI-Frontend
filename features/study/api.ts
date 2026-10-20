@@ -682,7 +682,7 @@ export async function getChapterNotes(
 ): Promise<ChapterNotes | null> {
   try {
     return await apiJson<ChapterNotes>(
-      `${apiBase(context.backendURL)}/study/notes/${encodeURIComponent(chapterSlug)}`,
+      `${apiBase(context.backendURL)}/notes/${encodeURIComponent(chapterSlug)}`,
       {
         headers: context.headers,
         forceFresh: true,
