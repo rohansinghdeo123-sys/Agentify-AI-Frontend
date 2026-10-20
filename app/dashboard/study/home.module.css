@@ -555,23 +555,24 @@
   max-width: 900px;
   margin: 0 auto;
   padding: 40px 20px;
+  color: var(--text-primary, inherit);
 }
 
 .notesHeader {
   margin-bottom: 40px;
-  border-bottom: 1px solid var(--border-subtle, rgba(148, 163, 184, 0.2));
+  border-bottom: 1px solid var(--border-subtle, rgba(128, 128, 128, 0.2));
   padding-bottom: 20px;
 }
 
 .notesHeader h1 {
   font-size: 32px;
   margin: 10px 0;
-  color: var(--text-primary, #f8fafc);
+  color: var(--text-primary, inherit);
 }
 
 .notesHeader p {
   font-size: 14px;
-  color: var(--text-secondary, #94a3b8);
+  color: var(--text-secondary, #64748b);
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
@@ -586,14 +587,14 @@
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  color: var(--text-secondary, #94a3b8);
+  color: var(--text-secondary, #64748b);
   text-decoration: none;
   margin-bottom: 20px;
   transition: color 0.2s ease;
 }
 
 .backLink:hover {
-  color: var(--text-primary, #f8fafc);
+  color: var(--text-primary, inherit);
 }
 
 .backLink svg {
@@ -609,16 +610,16 @@
 .conceptCard {
   padding: 30px;
   border-radius: 16px;
-  background: rgba(30, 41, 59, 0.4);
-  border: 1px solid rgba(148, 163, 184, 0.15);
+  background: var(--surface-secondary, rgba(128, 128, 128, 0.05));
+  border: 1px solid var(--border-subtle, rgba(128, 128, 128, 0.15));
 }
 
 .conceptCard h2 {
   font-size: 24px;
-  color: var(--text-primary, #f8fafc);
+  color: var(--text-primary, inherit);
   margin-bottom: 24px;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  border-bottom: 1px solid var(--border-subtle, rgba(128, 128, 128, 0.1));
 }
 
 .conceptSection {
@@ -627,7 +628,7 @@
 
 .conceptSection h3 {
   font-size: 16px;
-  color: var(--brand-primary, #2dd4bf);
+  color: var(--brand-primary, #14b8a6);
   margin-bottom: 12px;
   font-weight: 600;
 }
@@ -642,7 +643,7 @@
 .conceptSection li {
   font-size: 15px;
   line-height: 1.6;
-  color: var(--text-secondary, #cbd5e1);
+  color: var(--text-secondary, #475569);
 }
 
 .formulaList {
@@ -654,11 +655,11 @@
 }
 
 .formulaList li {
-  background: rgba(45, 212, 191, 0.1);
+  background: var(--brand-light, rgba(20, 184, 166, 0.1));
   padding: 8px 16px;
   border-radius: 8px;
-  border: 1px solid rgba(45, 212, 191, 0.2);
-  color: var(--brand-primary, #2dd4bf);
+  border: 1px solid var(--brand-border, rgba(20, 184, 166, 0.2));
+  color: var(--brand-primary, #14b8a6);
 }
 .todayRouteNotes {
   display: inline-flex;
