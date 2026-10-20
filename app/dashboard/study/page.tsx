@@ -49,8 +49,8 @@ function studyRouteScope(context: StudyLabContext): StudyScope | null {
   return {
     source: "syllabus",
     catalogSource: "planning_manifest",
-    classLevel: context.class_level || "",
-    subject: context.subject || "",
+    classLevel: "",
+    subject: "",
     chapterId: chapter.chapter_slug,
     chapterLabel: chapter.chapter,
     topicId: unit.id,
