@@ -9,10 +9,21 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import styles from "../../home.module.css";
 
+// Helper to convert boring long paragraphs into bite-sized bullet points
+function formatToBullets(text: string): string {
+  if (!text) return "";
+  // Split by sentences (., !, ?) followed by a space.
+  const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean);
+  if (sentences.length <= 1) return text;
+  return sentences.map((s) => `- ${s.trim()}`).join("\n");
+}
+
 export default function StudyNotesPage() {
   const params = useParams<{ chapterSlug: string }>();
   const searchParams = useSearchParams();
+  
   const chapterSlug = decodeURIComponent(String(params.chapterSlug || ""));
+  const topicId = searchParams.get("topic") || undefined;
   const { userId, getAuthHeaders, loading: authBusy } = useAuth();
 
   const [notes, setNotes] = useState<ChapterNotes | null>(null);
@@ -33,14 +44,15 @@ export default function StudyNotesPage() {
       try {
         const data = await getChapterNotes(
           { headers: await getAuthHeaders() },
-          chapterSlug
+          chapterSlug,
+          topicId // Passes the specific section to filter!
         );
         if (active) {
           if (data) {
             setNotes(data);
             setError("");
           } else {
-            setError("Notes for this chapter are not yet available.");
+            setError("Notes for this section are not yet available.");
           }
         }
       } catch (err) {
@@ -50,10 +62,10 @@ export default function StudyNotesPage() {
       }
     })();
     return () => { active = false; };
-  }, [authBusy, chapterSlug, getAuthHeaders, userId]);
+  }, [authBusy, chapterSlug, getAuthHeaders, userId, topicId]);
 
   if (authBusy || loading) {
-    return <LoadingState title="Loading chapter notes…" detail="Preparing your study material." />;
+    return <LoadingState title="Loading master notes…" detail="Formatting your study material." />;
   }
 
   if (error || !notes) {
@@ -76,11 +88,15 @@ export default function StudyNotesPage() {
         <div>
           <p>{notes.chapter.class_level} • {notes.chapter.subject}</p>
           <h1>Chapter {notes.chapter.chapter_number}: {notes.chapter.name}</h1>
-          <span>Master Notes</span>
+          <span>{topicId ? "Focused Section" : "Full Chapter Master Notes"}</span>
         </div>
       </header>
 
       <div className={styles.notesContent}>
+        {notes.concepts.length === 0 && (
+          <p style={{ textAlign: "center", opacity: 0.7 }}>No notes found for this specific topic. Try viewing the full chapter.</p>
+        )}
+        
         {notes.concepts.map((concept: ConceptNote) => (
           <article key={concept.id} className={styles.conceptCard}>
             <h2>{concept.title}</h2>
@@ -95,7 +111,8 @@ export default function StudyNotesPage() {
             {concept.explanation && (
               <div className={styles.conceptSection}>
                 <h3>Explanation</h3>
-                <RichMarkdown content={concept.explanation} />
+                {/* Automatically converts long paragraphs into a clean bulleted list */}
+                <RichMarkdown content={formatToBullets(concept.explanation)} />
               </div>
             )}
 

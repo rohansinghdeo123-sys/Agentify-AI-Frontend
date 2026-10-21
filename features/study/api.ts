@@ -506,10 +506,6 @@ export function studyErrorMessage(error: unknown) {
 // =============================================================
 // PLANNING ↔ STUDY LAB — COACH-SIDE CONTEXT + COMPLETION
 // =============================================================
-// Additive functions for the /coach/study-lab/* endpoints. They reuse the
-// existing StudyApiContext, apiBase, normalizeError, and apiJson so behavior,
-// auth, and error messages remain consistent with the rest of the Study API.
-// No existing function above is modified.
 
 export type StudyLabCompleteUnitPayload = {
   userId: string;
@@ -523,20 +519,6 @@ export type StudyLabCompleteUnitPayload = {
   lastPosition?: Record<string, unknown>;
 };
 
-/**
- * Fetch the current Study Lab context for today's Planning route.
- *
- * Returns the exact payload the Study Lab UI needs to render:
- *   - current topic
- *   - Step X of Y
- *   - why this topic is being studied now
- *   - recommended approach + depth
- *   - prerequisites
- *   - progress through the current step
- *
- * Returns null when no active route exists for today, so the UI can fall
- * back to its normal "no route yet" view without treating it as an error.
- */
 export async function getStudyLabContext(
   context: StudyApiContext,
   userId: string,
@@ -557,21 +539,12 @@ export async function getStudyLabContext(
   } catch (error) {
     const normalized = normalizeError(error);
     if (normalized.code === "material_missing") {
-      // No active route for today — the caller should render the empty state.
       return null;
     }
     throw normalized;
   }
 }
 
-/**
- * Complete a Study Lab unit and receive the next recommended action.
- *
- * The backend writes scored evidence through the same tables Planning reads
- * from and then recomputes the roadmap engine's next step, so the returned
- * `next_action` reflects the engine's deterministic decision — never a
- * client-cached one.
- */
 export async function completeStudyLabUnit(
   context: StudyApiContext,
   payload: StudyLabCompleteUnitPayload,
@@ -613,14 +586,6 @@ export async function completeStudyLabUnit(
   }
 }
 
-
-/**
- * Persist a lightweight mid-step position marker for "Continue Learning".
- *
- * Study-side wrapper over the Planning heartbeat endpoint. Best-effort: a
- * failure here never blocks navigation or the study session, because the next
- * real advance or route read will still land on the server.
- */
 export async function recordStudyRouteHeartbeat(
   context: StudyApiContext,
   userId: string,
@@ -641,7 +606,6 @@ export async function recordStudyRouteHeartbeat(
       },
     );
   } catch {
-    // Silent best-effort. Navigation must not wait on this.
   }
 }
 
@@ -671,26 +635,25 @@ export interface ChapterNotes {
   concepts: ConceptNote[];
 }
 
-/**
- * Fetch the published master notes for a chapter so students can read them
- * directly with KaTeX-rendered formulas.
- */
 export async function getChapterNotes(
   context: StudyApiContext,
   chapterSlug: string,
+  topicId?: string,
   signal?: AbortSignal,
 ): Promise<ChapterNotes | null> {
   try {
-    return await apiJson<ChapterNotes>(
-      `${apiBase(context.backendURL)}/notes/${encodeURIComponent(chapterSlug)}`,
-      {
-        headers: context.headers,
-        forceFresh: true,
-        retries: 1,
-        timeoutMs: 10000,
-        signal,
-      },
-    );
+    const url = new URL(`${apiBase(context.backendURL)}/notes/${encodeURIComponent(chapterSlug)}`);
+    if (topicId) {
+      url.searchParams.append("topic_id", topicId);
+    }
+    
+    return await apiJson<ChapterNotes>(url.toString(), {
+      headers: context.headers,
+      forceFresh: true,
+      retries: 1,
+      timeoutMs: 10000,
+      signal,
+    });
   } catch (error) {
     const normalized = normalizeError(error);
     if (normalized.code === "material_missing") return null;
