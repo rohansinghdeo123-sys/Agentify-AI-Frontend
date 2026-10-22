@@ -9,13 +9,21 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import styles from "../../home.module.css";
 
-// Helper to convert boring long paragraphs into bite-sized bullet points
+// Converts paragraphs into bullet points by normalizing newlines and splitting by sentences.
 function formatToBullets(text: string): string {
   if (!text) return "";
-  // Split by sentences (., !, ?) followed by a space.
-  const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean);
-  if (sentences.length <= 1) return text;
-  return sentences.map((s) => `- ${s.trim()}`).join("\n");
+  // Replace all newlines with a space so it becomes one continuous block
+  const cleanText = text.replace(/\r?\n/g, " ").trim();
+  
+  // Split by sentence endings (. ! ?) followed by a space.
+  const sentences = cleanText.split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 0);
+  
+  // If there are multiple sentences, format as bullet points
+  if (sentences.length > 1) {
+    return sentences.map((s) => `- ${s.trim()}`).join("\n");
+  }
+  
+  return cleanText;
 }
 
 export default function StudyNotesPage() {
@@ -45,7 +53,7 @@ export default function StudyNotesPage() {
         const data = await getChapterNotes(
           { headers: await getAuthHeaders() },
           chapterSlug,
-          topicId // Passes the specific section to filter!
+          topicId // Passes the specific section to filter
         );
         if (active) {
           if (data) {

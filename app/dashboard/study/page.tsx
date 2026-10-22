@@ -122,7 +122,6 @@ export default function StudyHomePage() {
     router.push(`${destination}&entry=learn`);
   }, [getAuthHeaders, router, studyLab, studyLabOpening]);
 
-  // Find active chapter slug for the notes button
   const activeChapter = studyLab?.chapters.find((c) => 
     c.learning_units.some((u) => u.id === studyLab.current_unit_id)
   ) || studyLab?.chapters[0];
@@ -244,7 +243,7 @@ export default function StudyHomePage() {
             <div className={styles.todayRouteActions}>
               {activeChapter ? (
                 <Link
-                  href={`/dashboard/study/notes/${encodeURIComponent(activeChapter.chapter_slug)}`}
+                  href={`/dashboard/study/notes/${encodeURIComponent(activeChapter.chapter_slug)}?topic=${encodeURIComponent(studyLab.current_unit_id)}`}
                   className={styles.todayRouteNotes}
                 >
                   Read Notes
@@ -313,6 +312,15 @@ export default function StudyHomePage() {
                   {(selectedChapter?.topics || []).map((topic) => <option key={topic.value} value={topic.value}>{topic.label}</option>)}
                 </select>
               </label>
+              
+              <Link
+                href={selectedChapter && selectedTopic ? `/dashboard/study/notes/${encodeURIComponent(selectedChapter.value)}?topic=${encodeURIComponent(selectedTopic.value)}` : "#"}
+                className={styles.readNotesBtn}
+                style={{ pointerEvents: selectedChapter && selectedTopic ? "auto" : "none", opacity: selectedChapter && selectedTopic ? 1 : 0.5 }}
+              >
+                Read Notes
+              </Link>
+              
               <button
                 type="button"
                 disabled={!settled || !selectedChapter || !selectedTopic}
