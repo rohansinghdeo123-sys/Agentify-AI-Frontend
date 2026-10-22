@@ -9,16 +9,17 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import styles from "../../home.module.css";
 
-// Converts paragraphs into bullet points by normalizing newlines and splitting by sentences.
+// Engineering fix: Split by punctuation followed by a space. Clean and reliable.
 function formatToBullets(text: string): string {
   if (!text) return "";
-  // Replace all newlines with a space so it becomes one continuous block
-  const cleanText = text.replace(/\r?\n/g, " ").trim();
   
-  // Split by sentence endings (. ! ?) followed by a space.
+  // Clean newlines and collapse multiple spaces
+  const cleanText = text.replace(/\r?\n/g, " ").replace(/\s+/g, " ").trim();
+  
+  // Split by sentence boundaries
   const sentences = cleanText.split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 0);
   
-  // If there are multiple sentences, format as bullet points
+  // If multiple sentences, format as a bulleted list
   if (sentences.length > 1) {
     return sentences.map((s) => `- ${s.trim()}`).join("\n");
   }
@@ -53,7 +54,7 @@ export default function StudyNotesPage() {
         const data = await getChapterNotes(
           { headers: await getAuthHeaders() },
           chapterSlug,
-          topicId // Passes the specific section to filter
+          topicId
         );
         if (active) {
           if (data) {
@@ -119,7 +120,6 @@ export default function StudyNotesPage() {
             {concept.explanation && (
               <div className={styles.conceptSection}>
                 <h3>Explanation</h3>
-                {/* Automatically converts long paragraphs into a clean bulleted list */}
                 <RichMarkdown content={formatToBullets(concept.explanation)} />
               </div>
             )}
