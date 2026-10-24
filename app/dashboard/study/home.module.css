@@ -680,3 +680,26 @@
   background: rgba(148, 163, 184, 0.1);
   border-color: rgba(148, 163, 184, 0.5);
 }
+.readNotesBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary, #f8fafc);
+  background: transparent;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  height: 42px; /* Matches the dropdown height */
+  align-self: flex-end; /* Aligns with the bottom of the dropdowns */
+  margin-bottom: 2px;
+}
+.readNotesBtn:hover {
+  background: rgba(148, 163, 184, 0.1);
+  border-color: rgba(148, 163, 184, 0.5);
+}

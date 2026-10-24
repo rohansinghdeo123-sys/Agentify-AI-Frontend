@@ -9,21 +9,17 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import styles from "../../home.module.css";
 
-// Engineering fix: Split by punctuation followed by a space. Clean and reliable.
-function formatToBullets(text: string): string {
+// Splits text into bullet points reliably.
+function formatToBullets(text: string | undefined | null): string {
   if (!text) return "";
-  
   // Clean newlines and collapse multiple spaces
   const cleanText = text.replace(/\r?\n/g, " ").replace(/\s+/g, " ").trim();
-  
-  // Split by sentence boundaries
+  // Split by sentence boundaries (., !, ?)
   const sentences = cleanText.split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 0);
   
-  // If multiple sentences, format as a bulleted list
   if (sentences.length > 1) {
     return sentences.map((s) => `- ${s.trim()}`).join("\n");
   }
-  
   return cleanText;
 }
 
@@ -113,13 +109,15 @@ export default function StudyNotesPage() {
             {concept.definition && (
               <div className={styles.conceptSection}>
                 <h3>Definition</h3>
-                <RichMarkdown content={concept.definition} />
+                {/* FORCED BULLETS HERE */}
+                <RichMarkdown content={formatToBullets(concept.definition)} />
               </div>
             )}
 
             {concept.explanation && (
               <div className={styles.conceptSection}>
                 <h3>Explanation</h3>
+                {/* FORCED BULLETS HERE */}
                 <RichMarkdown content={formatToBullets(concept.explanation)} />
               </div>
             )}
@@ -151,7 +149,7 @@ export default function StudyNotesPage() {
                 <h3>Examples</h3>
                 <ul>
                   {concept.examples.map((example, i) => (
-                    <li key={i}><RichMarkdown content={example} /></li>
+                    <li key={i}><RichMarkdown content={formatToBullets(example)} /></li>
                   ))}
                 </ul>
               </div>

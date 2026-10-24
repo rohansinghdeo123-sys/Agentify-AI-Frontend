@@ -122,10 +122,6 @@ export default function StudyHomePage() {
     router.push(`${destination}&entry=learn`);
   }, [getAuthHeaders, router, studyLab, studyLabOpening]);
 
-  const activeChapter = studyLab?.chapters.find((c) => 
-    c.learning_units.some((u) => u.id === studyLab.current_unit_id)
-  ) || studyLab?.chapters[0];
-
   const selectedChapter = chapters.find((chapter) => chapter.value === chapterId)
     || (settled ? chapters.find((chapter) => chapter.value === requestedChapter) || chapters[0] : undefined);
   const selectedTopic = selectedChapter?.topics.find((topic) => topic.value === topicId)
@@ -241,15 +237,6 @@ export default function StudyHomePage() {
             </div>
           ) : (
             <div className={styles.todayRouteActions}>
-              {activeChapter ? (
-                <Link
-                  href={`/dashboard/study/notes/${encodeURIComponent(activeChapter.chapter_slug)}?topic=${encodeURIComponent(studyLab.current_unit_id)}`}
-                  className={styles.todayRouteNotes}
-                >
-                  Read Notes
-                </Link>
-              ) : null}
-              
               <button
                 type="button"
                 className={styles.todayRouteStart}
