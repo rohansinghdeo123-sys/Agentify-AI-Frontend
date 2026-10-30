@@ -22,6 +22,7 @@ export default function AppShell({
   onLogout: () => Promise<void>;
 }) {
   const pathname = usePathname();
+  const isNotes = pathname.startsWith("/dashboard/study/notes/");
   const isLanding = pathname === "/dashboard" || pathname === "/dashboard/";
   const immersive = pathname.startsWith("/dashboard/study")
     || pathname.startsWith("/dashboard/revision")
@@ -96,10 +97,13 @@ export default function AppShell({
 
       <main
         id="main-content"
+        aria-label={isNotes ? "Study notes" : undefined}
+        tabIndex={isNotes ? 0 : undefined}
         className={[
           "market-shell-main",
           isLanding ? "is-landing" : "is-route",
           immersive ? "is-immersive" : "",
+          isNotes ? "is-notes" : "",
         ].filter(Boolean).join(" ")}
       >
         {children}

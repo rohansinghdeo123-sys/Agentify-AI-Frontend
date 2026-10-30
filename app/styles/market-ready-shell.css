@@ -59,6 +59,17 @@
   padding: 0;
 }
 
+/* Notes use the shell viewport as their single scroll container. Tutor and
+   other immersive workspaces continue to manage their own internal scrolling. */
+.market-shell-main.is-immersive.is-notes {
+  overflow-y: auto;
+  overflow-x: hidden;
+  touch-action: pan-y pinch-zoom;
+  -webkit-overflow-scrolling: touch;
+  scroll-padding-top: 5rem;
+  scroll-padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+}
+
 .market-shell-main.is-route:not(.is-immersive) {
   padding-top: max(4.15rem, calc(env(safe-area-inset-top) + 3.55rem));
 }

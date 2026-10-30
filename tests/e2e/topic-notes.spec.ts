@@ -10,6 +10,7 @@ test(`Themed ${theme} notes preserve the Planning and Ask AI flow`,async({page},
  let saved=0;
  const headers={"access-control-allow-origin":"*","access-control-allow-headers":"Authorization, Content-Type"};
  const notes={chapter:{slug:"some_basic_concepts_of_chemistry",name:"Some Basic Concepts of Chemistry",class_level:"Class 11",subject:"Chemistry",chapter_number:1},topic_id:topic,topic_title:"Chemistry and the Nature of Matter",estimated_minutes:{min:30,max:35},proficiency:"new_to_it",concepts:[],pages:[{id:"a",title:"Matter",text:"Matter has mass and occupies space. H₂O, CO₂, H₂SO₄ and Ca(OH)₂."},{id:"b",title:"States of Matter",text:"Solids have a definite shape and volume."}]};
+ notes.pages[0].text += " " + Array(18).fill("Particles are continuously moving.").join(" ");
  await page.route(`${WORKSPACE_TEST_BACKEND}/planning/route/**`,route=>{
   if(route.request().method()==="OPTIONS")return route.fulfill({headers});
   if(route.request().url().includes("heartbeat"))saved=route.request().postDataJSON().last_position.notes_page ?? saved;
@@ -23,7 +24,38 @@ test(`Themed ${theme} notes preserve the Planning and Ask AI flow`,async({page},
  await expect(page.getByText("30–35 min · Topic duration")).toBeVisible();
  await expect(page.getByText("Page 1 of 2")).toBeVisible();
  await expect(page.locator("article")).toContainText("H2O, CO2, H2SO4 and Ca(OH)");
- await expect(page.locator("article li")).toHaveCount(2);
+ await expect(page.locator("article li")).toHaveCount(20);
+ const scroller = page.getByRole("main", {name:"Study notes"});
+ await expect(scroller).toHaveCSS("overflow-y", "auto");
+ expect(await scroller.evaluate(el => el.scrollHeight - el.clientHeight)).toBeGreaterThan(500);
+ // Real user input must move the viewport; programmatic element scrolling
+ // previously hid the overflow bug in tests that only clicked controls.
+ await page.mouse.move(200, 350);
+ if (testInfo.project.use.isMobile) {
+   const cdp = await page.context().newCDPSession(page);
+   const swipe = async (from: number, to: number) => {
+     await cdp.send("Input.dispatchTouchEvent", {type:"touchStart",touchPoints:[{x:200,y:from}]});
+     for (let step=1; step<=12; step++) {
+       await cdp.send("Input.dispatchTouchEvent", {type:"touchMove",touchPoints:[{x:200,y:from+(to-from)*step/12}]});
+     }
+     await cdp.send("Input.dispatchTouchEvent", {type:"touchEnd",touchPoints:[]});
+   };
+   await swipe(650,200);
+   await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeGreaterThan(100);
+   // Keyboard Home also cancels momentum and establishes a stable top position.
+   await scroller.focus(); await page.keyboard.press("Home");
+   await cdp.detach();
+ } else {
+   await page.mouse.wheel(0, 600);
+   await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeGreaterThan(100);
+   await page.mouse.wheel(0, -600);
+ }
+ await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeLessThan(5);
+ await scroller.focus(); await page.keyboard.press("End");
+ await expect.poll(()=>scroller.evaluate(el=>el.scrollHeight-el.clientHeight-el.scrollTop)).toBeLessThan(5);
+ await expect(page.getByRole("link",{name:"Continue to learning and quick check"})).toBeInViewport();
+ await page.keyboard.press("Home");
+ await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBeLessThan(5);
  await page.screenshot({path:testInfo.outputPath("themed-notes.png")});
  await page.getByRole("button",{name:"Next",exact:true}).click();
  await expect(page.getByText("Page 2 of 2")).toBeVisible();
@@ -37,6 +69,7 @@ test(`Themed ${theme} notes preserve the Planning and Ask AI flow`,async({page},
  });
  await page.getByRole("link",{name:"Ask AI about this page"}).click();
  const input=page.getByRole("textbox",{name:"Message your AI tutor"});await expect(input).toBeVisible({timeout:45000});
+ await expect(page.locator("#main-content")).toHaveCSS("overflow-y","hidden");
  await input.fill("Explain this page simply.");await page.getByRole("button",{name:"Send message"}).click();
  await expect.poll(()=>grounding).toContain("Solids have a definite shape and volume.");
  expect(grounding).toContain("Page: 2");expect(grounding).toContain("new_to_it");
