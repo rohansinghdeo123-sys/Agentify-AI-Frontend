@@ -1279,7 +1279,7 @@ describe("NCERT-ordered Planning roadmap", () => {
     expect(active).toContain("One best next step, separate progress for every chapter");
     expect(active).toContain("showTodayRoute");
     expect(active).toContain("Start today’s route");
-    expect(active).toContain("min recommended");
+    expect(active).toContain("min scheduled");
     expect(active).toContain("min available");
     expect(active).toContain("no time ceiling");
     expect(active).toContain("item.reason");

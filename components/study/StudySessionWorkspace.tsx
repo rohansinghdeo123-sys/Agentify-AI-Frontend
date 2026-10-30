@@ -10,6 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 import {
   completeStudyLabUnit,
   getStudyCoachName,
+  getChapterNotes,
   getStudyLabContext,
   recordPlanningStudyEvidence,
   recordStudyRouteHeartbeat,
@@ -561,6 +562,19 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
     scope.catalogSource || "",
   );
   const authBusy = loading || authLoading;
+  const [notesContext, setNotesContext] = useState("");
+  const notesTopic = searchParams.get("notesTopic");
+  const notesPage = searchParams.get("notesPage");
+  const notesReturn = notesTopic ? `/dashboard/study/notes/${encodeURIComponent(scope.chapterId)}?topic=${encodeURIComponent(notesTopic)}&page=${Number(notesPage) || 0}&planned=1` : "";
+  useEffect(() => {
+    if (!notesTopic || !userId || authBusy) return;
+    let active = true;
+    void getAuthHeaders().then((headers) => getChapterNotes({headers},scope.chapterId,notesTopic)).then((notes) => {
+      const page = notes?.pages?.[Number(notesPage) || 0];
+      if (active && page) setNotesContext(`Current notes reference. Chapter: ${notes!.chapter.name}. Planning topic: ${notes!.topic_title}. Subtopic: ${page.title}. Page: ${Number(notesPage)+1}. Proficiency: ${notes!.proficiency}. Explain using this content first; keep scientific meaning and units unchanged. Discuss other topics only if explicitly requested.\n${page.text}`);
+    }).catch(() => {if(active)setError("Page context could not load. Return to notes and retry.");});
+    return () => {active=false;};
+  },[notesTopic,notesPage,userId,authBusy,getAuthHeaders,scope.chapterId]);
   const [coachName, setCoachName] = useState("Aria");
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [input, setInput] = useState("");
@@ -756,6 +770,10 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
       requestSnapshot?: StudyTutorRequestSnapshot;
     },
   ) => {
+    if (notesTopic && !notesContext) {
+      setError("The current notes page is still loading. Please retry in a moment.");
+      return;
+    }
     const requestedSnapshot = options?.requestSnapshot;
     const typed = (requestedSnapshot?.prompt ?? override ?? input).trim();
     const requestAttachments = requestedSnapshot?.attachments ?? attachments;
@@ -797,7 +815,7 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
           userId,
           conversationId,
           prompt,
-          groundingContextPrompt: tutorContext.message,
+          groundingContextPrompt: [tutorContext.message, notesContext].filter(Boolean).join("\n\n"),
           scope,
           attachments: request.attachments,
           directAnswer: request.directAnswer,
@@ -1111,6 +1129,7 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
           </div>
         </div>
         <div className={styles.headerActions}>
+          {notesReturn ? <Link href={notesReturn}>Return to notes page</Link> : null}
           <span className={styles.syncState} data-state={syncState}><i />{syncState === "synced" ? "Synced" : syncState === "offline" ? "Device history" : "Connecting"}</span>
           <Link href={studyHistoryHref(scope)}><AppIcon name="history" /> History</Link>
           <button type="button" onClick={startNewConversation}><AppIcon name="plus" /> New chat</button>

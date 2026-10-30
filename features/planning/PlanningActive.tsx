@@ -83,7 +83,7 @@ function timeRange(range: { min: number; max: number }) {
 }
 
 function todayRouteTimeLabel(route: PlanningDailyRoute) {
-  const recommended = `${route.total_minutes} min recommended`;
+  const recommended = `${route.total_minutes} min scheduled`;
   if (route.source === "student_choice" && route.budget_minutes === null) {
     return `${recommended} · no time ceiling`;
   }
@@ -381,7 +381,11 @@ export default function PlanningActive() {
         : "Your first win starts with one clear step";
 
   const openStudy = (unit: PlanningLearningUnit, intent: "learn" | "ask") => {
-    if (intent === "learn") { router.push("/dashboard/study?planned=1"); return; }
+    if (intent === "learn") {
+      if (roadmap.curriculum.key !== "ncert_class_11_chemistry_chapter_01") { router.push("/dashboard/study?planned=1"); return; }
+      router.push(`/dashboard/study/notes/${encodeURIComponent(roadmap.chapter_slug)}?topic=${encodeURIComponent(unit.id)}&planned=1`);
+      return;
+    }
     const catalogSource = roadmap.curriculum.source_reference.authority
       === "approved_content_pipeline"
       ? "published"
@@ -414,7 +418,6 @@ export default function PlanningActive() {
           <p>{sharedRoute.current_step.step_label} · {sharedRoute.current_step.unit_status.replaceAll("_", " ")}</p>
           {sharedRoute.override.active ? <p>{sharedRoute.override.explanation}</p> : null}
           <p>{Object.values(sharedRoute.effective_proficiency).map((p) => p.effective ? `Effective proficiency: ${p.effective.replaceAll("_", " ")} (${p.demonstrated_accuracy}%)` : "").filter(Boolean).join(" · ")}</p>
-          <Link href="/dashboard/study?planned=1">{sharedRoute.current_step.last_position.conversation_id ? "Continue Learning" : "Start Learning"}</Link>
         </section> : null}
         {portfolio ? (
           <section className={styles.portfolioBar} aria-labelledby="portfolio-heading">
@@ -488,9 +491,7 @@ export default function PlanningActive() {
                 </p>
               ) : null}
             </div>
-            <button type="button" className={`${styles.primaryButton} ${styles.nextStepAction}`} onClick={() => openStudy(nextUnit, "learn")}>
-              <AppIcon name="study" /> Start Learning <AppIcon name="arrowRight" />
-            </button>
+
           </section>
         ) : null}
 
@@ -514,12 +515,12 @@ export default function PlanningActive() {
                       <p>{item.activity}</p>
                       {item.reason ? <p className={styles.routeReason}>{item.reason}</p> : null}
                     </div>
-                    <small>{item.minutes} min</small>
+                    <small>{item.minutes} min session · {timeRange(getPlanningUnit(roadmap, item.unit_id)?.estimated_minutes || { min: item.minutes, max: item.minutes })} topic</small>
                   </li>
                 ))}
               </ol>
               {firstRouteUnit ? (
-                <button type="button" className={`${styles.primaryButton} ${styles.todayRouteAction}`} onClick={() => openStudy(firstRouteUnit, "learn")}>
+                <button type="button" className={`${styles.primaryButton} ${styles.todayRouteAction}`} onClick={() => openStudy(getPlanningUnit(roadmap, sharedRoute?.current_step.current_unit_id || "") || firstRouteUnit, "learn")}>
                   <AppIcon name="study" /> Start today’s route <AppIcon name="arrowRight" />
                 </button>
               ) : null}

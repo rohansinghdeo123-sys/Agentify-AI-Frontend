@@ -1,182 +1,78 @@
 "use client";
-
+import LegacyNotes from "./LegacyNotes";
 import { useAuth } from "@/context/AuthContext";
-import { getChapterNotes, type ChapterNotes, type ConceptNote } from "@/features/study/api";
+import { getChapterNotes, getStudyLabContext, recordStudyRouteHeartbeat, type ChapterNotes } from "@/features/study/api";
+import NotesChemistryText from "@/components/study/NotesChemistryText";
 import RichMarkdown from "@/components/RichMarkdown";
-import { AppIcon, LoadingState } from "@/components/ui/Polished";
+import { LoadingState } from "@/components/ui/Polished";
+import { createConversationId } from "@/features/study/conversationUtils";
+import { studySessionHref } from "@/features/study/routes";
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import styles from "../../home.module.css";
 
-// Splits text into bullet points reliably.
-function formatToBullets(text: string | undefined | null): string {
-  if (!text) return "";
-  // Clean newlines and collapse multiple spaces
-  const cleanText = text.replace(/\r?\n/g, " ").replace(/\s+/g, " ").trim();
-  // Split by sentence boundaries (., !, ?)
-  const sentences = cleanText.split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 0);
-  
-  if (sentences.length > 1) {
-    return sentences.map((s) => `- ${s.trim()}`).join("\n");
-  }
-  return cleanText;
+export default function StudyNotesPage() {
+  const {chapterSlug} = useParams<{chapterSlug:string}>();
+  return chapterSlug.includes("some_basic_concepts_of_chemistry") || chapterSlug === "matter" ? <TopicNotesReader /> : <LegacyNotes />;
 }
 
-export default function StudyNotesPage() {
-  const params = useParams<{ chapterSlug: string }>();
-  const searchParams = useSearchParams();
-  
-  const chapterSlug = decodeURIComponent(String(params.chapterSlug || ""));
-  const topicId = searchParams.get("topic") || undefined;
-  const { userId, getAuthHeaders, loading: authBusy } = useAuth();
-
+function TopicNotesReader() {
+  const { chapterSlug } = useParams<{chapterSlug: string}>();
+  const params = useSearchParams();
+  const router = useRouter();
+  const topic = params.get("topic") || undefined;
+  const {userId, getAuthHeaders, loading: authBusy} = useAuth();
   const [notes, setNotes] = useState<ChapterNotes | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
   const [error, setError] = useState("");
-
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
-    if (authBusy) return;
-    if (!userId || !chapterSlug) {
-      setLoading(false);
-      setError("You must be signed in to view notes.");
-      return;
-    }
-
+    if (authBusy || !userId) return;
     let active = true;
-    setLoading(true);
-    void (async () => {
-      try {
-        const data = await getChapterNotes(
-          { headers: await getAuthHeaders() },
-          chapterSlug,
-          topicId
-        );
-        if (active) {
-          if (data) {
-            setNotes(data);
-            setError("");
-          } else {
-            setError("Notes for this section are not yet available.");
-          }
-        }
-      } catch (err) {
-        if (active) setError("Failed to load notes. Please try again.");
-      } finally {
-        if (active) setLoading(false);
+    void getAuthHeaders().then((headers) => { if (active) setLoading(true); return getChapterNotes({headers},chapterSlug,topic); }).then((data) => {
+      if (!active) return;
+      setNotes(data);
+      const count = data?.pages?.length || data?.concepts.length || 1;
+      const requested = params.get("page");
+      setPage(Math.max(0,Math.min(count-1,requested !== null ? Number(requested) || 0 : data?.saved_page || 0)));
+    }).catch(() => { if (active) setError("Notes could not load. Please retry."); }).finally(() => {if(active)setLoading(false);});
+    return () => {active=false;};
+  },[authBusy,userId,getAuthHeaders,chapterSlug,topic,params]);
+  const pages = notes?.pages || notes?.concepts.map((c) => ({id:c.id,title:c.title,text:[c.definition,c.explanation,...c.key_points.map((p)=>`- ${p}`),...c.formulas,...c.examples].filter(Boolean).join("\n\n")})) || [];
+  const current = pages[page];
+  const navigate = async (next: number) => {
+    const query = new URLSearchParams(params.toString()); query.set("page",String(next));
+    setPage(next); router.replace(`?${query}`,{scroll:false});
+    try {
+      const headers = await getAuthHeaders();
+      const context = await getStudyLabContext({headers},userId);
+      if (context) {
+        await recordStudyRouteHeartbeat({headers},userId,{unit_id:context.current_unit_id,notes_page:next,notes_topic:notes?.topic_id || topic});
       }
-    })();
-    return () => { active = false; };
-  }, [authBusy, chapterSlug, getAuthHeaders, userId, topicId]);
-
-  if (authBusy || loading) {
-    return <LoadingState title="Loading master notes…" detail="Formatting your study material." />;
-  }
-
-  if (error || !notes) {
-    return (
-      <div className={styles.redirectState} role="alert">
-        <p>{error || "Notes could not be found."}</p>
-        <Link href="/dashboard/study" className={styles.backLink}>
-          <AppIcon name="arrowRight" /> Back to Study Lab
-        </Link>
-      </div>
-    );
-  }
-
-  return (
-    <div className={styles.notesContainer}>
-      <header className={styles.notesHeader}>
-        <Link href="/dashboard/study" className={styles.backLink}>
-          <AppIcon name="arrowRight" /> Study Lab
-        </Link>
-        <div>
-          <p>{notes.chapter.class_level} • {notes.chapter.subject}</p>
-          <h1>Chapter {notes.chapter.chapter_number}: {notes.chapter.name}</h1>
-          <span>{topicId ? "Focused Section" : "Full Chapter Master Notes"}</span>
-        </div>
-      </header>
-
-      <div className={styles.notesContent}>
-        {notes.concepts.length === 0 && (
-          <p style={{ textAlign: "center", opacity: 0.7 }}>No notes found for this specific topic. Try viewing the full chapter.</p>
-        )}
-        
-        {notes.concepts.map((concept: ConceptNote) => (
-          <article key={concept.id} className={styles.conceptCard}>
-            <h2>{concept.title}</h2>
-            
-            {concept.definition && (
-              <div className={styles.conceptSection}>
-                <h3>Definition</h3>
-                {/* FORCED BULLETS HERE */}
-                <RichMarkdown content={formatToBullets(concept.definition)} />
-              </div>
-            )}
-
-            {concept.explanation && (
-              <div className={styles.conceptSection}>
-                <h3>Explanation</h3>
-                {/* FORCED BULLETS HERE */}
-                <RichMarkdown content={formatToBullets(concept.explanation)} />
-              </div>
-            )}
-
-            {concept.key_points.length > 0 && (
-              <div className={styles.conceptSection}>
-                <h3>Key Points</h3>
-                <ul>
-                  {concept.key_points.map((point, i) => (
-                    <li key={i}><RichMarkdown content={point} /></li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {concept.formulas.length > 0 && (
-              <div className={styles.conceptSection}>
-                <h3>Formulas</h3>
-                <ul className={styles.formulaList}>
-                  {concept.formulas.map((formula, i) => (
-                    <li key={i}><RichMarkdown content={formula} /></li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {concept.examples.length > 0 && (
-              <div className={styles.conceptSection}>
-                <h3>Examples</h3>
-                <ul>
-                  {concept.examples.map((example, i) => (
-                    <li key={i}><RichMarkdown content={formatToBullets(example)} /></li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {concept.common_mistakes.length > 0 && (
-              <div className={styles.conceptSection}>
-                <h3>Common Mistakes</h3>
-                <ul>
-                  {concept.common_mistakes.map((item, i) => (
-                    <li key={i}>
-                      {typeof item === "string" ? (
-                        <RichMarkdown content={item} />
-                      ) : (
-                        <span>
-                          {item.mistake || item.note}
-                          {item.correction && <strong> Correction: {item.correction}</strong>}
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </article>
-        ))}
-      </div>
-    </div>
-  );
+    } catch {setError("Reading position could not sync. This page remains in the address bar; retry before leaving.");}
+  };
+  const askHref = current ? `${studySessionHref(createConversationId(),{source:"syllabus",catalogSource:notes?.topic_id?.startsWith("chem11_u01") ? "planning_manifest" : "published",classLevel:notes?.chapter.class_level,subject:notes?.chapter.subject || "",chapterId:chapterSlug,chapterLabel:notes?.chapter.name || chapterSlug,topicId:notes?.topic_id || topic || current.id,topicLabel:notes?.topic_title || current.title},{fresh:true})}&entry=ask_ai&notesPage=${page}&notesTopic=${encodeURIComponent(notes?.topic_id || topic || current.id)}` : "#";
+  if (authBusy || loading) return <LoadingState title="Loading topic notes" detail="Opening your saved reading position." />;
+  if (!userId) return <p>Please sign in to read notes.</p>;
+  return <main className={styles.notesContainer}>
+    <header className={styles.notesHeader}><Link href="/dashboard/planning/active">Return to Planning</Link><div>
+      <p>{notes?.chapter.name}</p><h1>{notes?.topic_title || "Topic notes"}</h1>
+      {notes?.estimated_minutes ? <p>{notes.estimated_minutes.min}–{notes.estimated_minutes.max} min · Topic duration</p> : null}
+    </div></header>
+    {error ? <p role="alert">{error}</p> : null}
+    {current ? <>
+      <nav aria-label="Reading pages" style={{display:"flex",gap:"1rem",alignItems:"center",flexWrap:"wrap"}}>
+        <button disabled={page===0} onClick={()=>void navigate(page-1)}>Previous</button>
+        <span>Page {page+1} of {pages.length}</span>
+        <button disabled={page===pages.length-1} onClick={()=>void navigate(page+1)}>Next</button>
+        <Link href={askHref}>Ask AI about this page</Link>
+      </nav>
+      <progress aria-label="Reading progress" value={page+1} max={pages.length} style={{width:"100%"}} />
+      <article className={styles.conceptCard}><h2>{current.title}</h2>{notes?.pages ? <ul><li><NotesChemistryText text={current.text} /></li></ul> : <RichMarkdown content={current.text} />}</article>
+      <p>Reading progress records your position. Demonstrate mastery with a quick check.</p>
+      <Link href="/dashboard/study?planned=1">Continue to learning and quick check</Link>
+    </> : <p>No verified notes are mapped to this topic yet.</p>}
+    {notes?.review_required?.length ? <details><summary>Source material awaiting review</summary><p>Mixed summaries and exercises are excluded until their topic boundaries and scientific content are verified.</p><ul>{Array.from(new Set(notes.review_required.map(r=>r.reason))).map(r=><li key={r}>{r}</li>)}</ul></details> : null}
+  </main>;
 }

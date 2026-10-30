@@ -628,6 +628,13 @@ export interface ConceptNote {
 }
 
 export interface ChapterNotes {
+  topic_id?: string;
+  topic_title?: string;
+  estimated_minutes?: {min: number; max: number};
+  pages?: Array<{id: string; title: string; text: string; source_concept_id?: string}>;
+  saved_page?: number;
+  proficiency?: string;
+  review_required?: Array<{reason: string}>;
   chapter: {
     slug: string;
     name: string;
