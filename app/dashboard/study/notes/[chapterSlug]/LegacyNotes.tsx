@@ -16,7 +16,7 @@ function formatToBullets(text: string | undefined | null): string {
   const cleanText = text.replace(/\r?\n/g, " ").replace(/\s+/g, " ").trim();
   // Split by sentence boundaries (., !, ?)
   const sentences = cleanText.split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 0);
-  
+
   if (sentences.length > 1) {
     return sentences.map((s) => `- ${s.trim()}`).join("\n");
   }
@@ -26,7 +26,7 @@ function formatToBullets(text: string | undefined | null): string {
 export default function LegacyNotes() {
   const params = useParams<{ chapterSlug: string }>();
   const searchParams = useSearchParams();
-  
+
   const chapterSlug = decodeURIComponent(String(params.chapterSlug || ""));
   const topicId = searchParams.get("topic") || undefined;
   const { userId, getAuthHeaders, loading: authBusy } = useAuth();
@@ -101,11 +101,11 @@ export default function LegacyNotes() {
         {notes.concepts.length === 0 && (
           <p style={{ textAlign: "center", opacity: 0.7 }}>No notes found for this specific topic. Try viewing the full chapter.</p>
         )}
-        
+
         {notes.concepts.map((concept: ConceptNote) => (
           <article key={concept.id} className={styles.conceptCard}>
             <h2>{concept.title}</h2>
-            
+
             {concept.definition && (
               <div className={styles.conceptSection}>
                 <h3>Definition</h3>
