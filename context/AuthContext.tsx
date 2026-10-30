@@ -32,7 +32,6 @@ import { getPublicBackendUrl } from "@/lib/env";
 import {
   ApiRequestError,
   apiJson,
-  ensureBackendReady,
   invalidateApiCache,
   primeBackend,
 } from "@/lib/apiClient";
@@ -329,25 +328,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               cacheKey: `account-profile:${currentUser.uid}`,
               cacheTtlMs: 30000,
               forceFresh: fresh,
-              retries: 2,
+              retries: 0,
               timeoutMs,
             },
           );
-        let loadedProfile: BackendUserProfile;
-        try {
-          loadedProfile = await loadAccountProfile(12000, forceFresh);
-        } catch (error) {
-          if (!isTemporaryBackendError(error)) throw error;
-
-          const ready = await ensureBackendReady(backendURL, {
-            forceFresh: true,
-            pollMs: 1500,
-            timeoutMs: 45000,
-          });
-
-          if (!ready) throw error;
-          loadedProfile = await loadAccountProfile(18000, true);
-        }
+        // One bounded request: health polling plus nested retries previously
+        // kept the entire signed-in UI waiting for over a minute.
+        const loadedProfile = await loadAccountProfile(8000, forceFresh);
+        if (authRef.current?.currentUser?.uid !== currentUser.uid) return null;
         setAccountProfile(loadedProfile);
         return loadedProfile;
       } catch (error) {
@@ -394,23 +382,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               Authorization: `Bearer ${token}`,
             },
             forceFresh: true,
-            retries: 1,
+            retries: 0,
             timeoutMs,
           },
         );
-        let access: BackendAdminAccess;
-        try {
-          access = await requestAccess(15000);
-        } catch (error) {
-          if (!isTemporaryBackendError(error)) throw error;
-          const ready = await ensureBackendReady(backendURL, {
-            forceFresh: true,
-            pollMs: 1500,
-            timeoutMs: 55000,
-          });
-          if (!ready) throw error;
-          access = await requestAccess(20000);
-        }
+        const access = await requestAccess(8000);
 
         if (authRef.current?.currentUser?.uid === currentUser.uid) {
           setBackendAdminAccess(access);
@@ -588,6 +564,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Keep the observer active: a late callback can still restore an
       // existing session. This only releases the UI from an endless loader.
       setAuthLoading(false);
+      setProfileLoading(false);
       setAuthStartupMessage(AUTH_BOOTSTRAP_TIMEOUT_MESSAGE);
     }, AUTH_BOOTSTRAP_TIMEOUT_MS);
 
@@ -619,8 +596,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setClaimsLoading(true);
       setAdminAccessLoading(true);
       primeBackend(getPublicBackendUrl());
-      await Promise.all([refreshClaims(), loadProfile(currentUser)]);
-      await loadAdminAccess(currentUser);
+      await Promise.allSettled([refreshClaims(), loadProfile(currentUser), loadAdminAccess(currentUser)]);
     });
 
     return () => {
