@@ -21,6 +21,7 @@ import {
   planningErrorMessage,
   PlanningApiError,
   startStudyRoute,
+  getCurrentStudyRoute,
   type PlanningCatalogChapter,
 } from "./api";
 import {
@@ -32,6 +33,7 @@ import {
   type PlanningPortfolioState,
   type PlanningScope,
   type PlanningStudyTime,
+  type StudyRouteState,
 } from "./contracts";
 import {
   clearPlanningPortfolio,
@@ -43,6 +45,7 @@ import {
 } from "./storage";
 
 type PlanningExperienceValue = {
+  sharedRoute: StudyRouteState | null;
   authBusy: boolean;
   hydrated: boolean;
   userId: string;
@@ -95,6 +98,7 @@ function portfolioMatchesCatalog(
 export function PlanningExperienceProvider({ children }: { children: ReactNode }) {
   const { userId, loading, claimsLoading, getAuthHeaders, profile } = useAuth();
   const authBusy = loading || claimsLoading;
+  const [sharedRoute, setSharedRoute] = useState<StudyRouteState | null>(null);
   const [draft, setDraft] = useState<PlanningDraft>(DEFAULT_DRAFT);
   const [portfolioState, setPortfolioState] = useState<PlanningPortfolioState | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -218,6 +222,7 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     setRefreshingPlan(false);
     setRefreshNotice("");
     setHydrated(false);
+    setSharedRoute(null);
     if (userId) {
       const savedDraft = readPlanningDraft(userId);
       const savedPortfolio = readPlanningPortfolioState(userId);
@@ -239,6 +244,37 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     }
     setHydrated(true);
   }, [authBusy, userId]);
+
+  useEffect(() => {
+    if (!userId || authBusy || !hydrated) return;
+    let active = true;
+    const restore = async () => {
+      try {
+        let route = await getCurrentStudyRoute({ userId, getAuthHeaders });
+        const cached = readPlanningPortfolioState(userId).state?.portfolio;
+        if (!route && cached && active) {
+          route = await startStudyRoute({ userId, getAuthHeaders }, {
+            class_level: cached.class_level, subject: cached.subject,
+            chapters: cached.chapters.map((c) => ({ chapter_ref: c.chapter_slug, chapter_proficiency: c.chapter_proficiency })),
+            ...(cached.study_time_today ? { study_time_today: cached.study_time_today } : {}),
+            ...(cached.session_duration_minutes ? { session_duration_minutes: cached.session_duration_minutes } : {}),
+          });
+        }
+        if (!active) return;
+        setSharedRoute(route);
+        if (route?.portfolio) {
+          setPortfolioState(writePlanningPortfolio(userId, route.portfolio, activeChapterSlugRef.current));
+          setRefreshNotice("");
+        }
+      } catch (error) {
+        if (active) setRefreshNotice(planningErrorMessage(error));
+      }
+    };
+    void restore();
+    const onFocus = () => { if (document.visibilityState === "visible") void restore(); };
+    window.addEventListener("focus", onFocus);
+    return () => { active = false; window.removeEventListener("focus", onFocus); };
+  }, [authBusy, getAuthHeaders, hydrated, userId]);
 
   useEffect(() => {
     if (!catalogLoaded || !catalogChapters.length) return;
@@ -395,23 +431,14 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
         setError("The planner returned a chapter that is not available in Planning yet. Please try again.");
         return null;
       }
-      const state = writePlanningPortfolio(userId, nextPortfolio);
-      setPortfolioState(state);
-      lastRefreshAtRef.current = Date.now();
-      setStaleNotice("");
-
-      // Persist today's route for Study Lab. Fire-and-forget: the roadmap is
-      // already saved locally and on screen, so a failure here must never
-      // block or alarm the student. The next explicit plan creation retries
-      // naturally, and the Study Lab page falls back to its empty state if
-      // no route exists yet.
+      // Persist before advertising Start Learning; errors remain actionable.
       const [firstScope] = scopes;
       if (firstScope) {
         const sessionDuration = firstScope.sessionDurationMinutes;
         const hasSessionDuration = Number.isInteger(sessionDuration)
           && Number(sessionDuration) >= 15
           && Number(sessionDuration) <= 120;
-        void startStudyRoute(
+        const savedRoute = await startStudyRoute(
           { userId, getAuthHeaders },
           {
             class_level: firstScope.classLevel,
@@ -427,10 +454,12 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
               ? { session_duration_minutes: sessionDuration }
               : {}),
           },
-        ).catch(() => {
-          // Non-blocking. Route persistence will be retried on the next
-          // explicit plan creation or on Study Lab entry.
-        });
+        );
+        if (signal?.aborted || generationId !== generationRef.current || requestInput !== currentInputRef.current) return null;
+        setSharedRoute(savedRoute);
+        setPortfolioState(writePlanningPortfolio(userId, savedRoute.portfolio ?? nextPortfolio));
+        lastRefreshAtRef.current = Date.now();
+        setStaleNotice("");
       }
 
       return nextPortfolio;
@@ -472,12 +501,12 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     setRefreshingPlan(true);
     setRefreshNotice("");
     try {
-      const refreshed = await generatePlanningPortfolio(
-        { userId, getAuthHeaders },
-        refreshScopes,
-        controller.signal,
+      const route = await getCurrentStudyRoute({ userId, getAuthHeaders }, controller.signal);
+      const refreshed = route?.portfolio ?? await generatePlanningPortfolio(
+        { userId, getAuthHeaders }, refreshScopes, controller.signal,
       );
       if (controller.signal.aborted || refreshId !== refreshIdRef.current) return;
+      setSharedRoute(route);
       if (!portfolioMatchesCatalog(refreshed, catalogChapters)) {
         setRefreshNotice("Your saved roadmap is still available, but its latest progress could not be verified. Try again.");
         return;
@@ -502,6 +531,7 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
   }, []);
 
   const value = useMemo<PlanningExperienceValue>(() => ({
+    sharedRoute,
     authBusy,
     hydrated,
     userId,
@@ -531,6 +561,7 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     refreshActivePlan,
     clearError: () => setError(""),
   }), [
+    sharedRoute,
     activePlan,
     authBusy,
     catalogNotice,

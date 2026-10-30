@@ -511,8 +511,9 @@ export type StudyLabCompleteUnitPayload = {
   userId: string;
   completedUnitId: string;
   interactionId: string;
-  correctAnswers: number;
-  totalQuestions: number;
+  correctAnswers?: number;
+  totalQuestions?: number;
+  answers?: Record<string, string>;
   timeSpentSeconds?: number;
   confidenceAfter?: number;
   xpEarned?: number;
@@ -563,6 +564,7 @@ export async function completeStudyLabUnit(
         body: JSON.stringify({
           completed_unit_id: payload.completedUnitId,
           interaction_id: receipt,
+          answers: payload.answers,
           correct_answers: payload.correctAnswers,
           total_questions: payload.totalQuestions,
           ...(payload.timeSpentSeconds !== undefined ? { time_spent_seconds: payload.timeSpentSeconds } : {}),
@@ -605,7 +607,8 @@ export async function recordStudyRouteHeartbeat(
         signal,
       },
     );
-  } catch {
+  } catch (error) {
+    throw normalizeError(error);
   }
 }
 
@@ -659,4 +662,16 @@ export async function getChapterNotes(
     if (normalized.code === "material_missing") return null;
     throw normalized;
   }
+}
+
+export interface StudyRouteCheck {
+  id: string;
+  unit_id: string;
+  questions: Array<{ id: string; question: string; options: string[] }>;
+}
+
+export async function getStudyRouteCheck(context: StudyApiContext, userId: string): Promise<StudyRouteCheck> {
+  return apiJson<StudyRouteCheck>(`${apiBase(context.backendURL)}/planning/route/check/${encodeURIComponent(userId)}`, {
+    method: "POST", headers: context.headers, body: "{}", retries: 0, timeoutMs: 90000, forceFresh: true,
+  });
 }

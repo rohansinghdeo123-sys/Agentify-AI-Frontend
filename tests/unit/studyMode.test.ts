@@ -358,8 +358,8 @@ describe("focused Study Lab architecture", () => {
   });
 
   it("isolates authenticated catalog caches by account and normalized class", () => {
-    expect(catalogCacheKey("student-a", "Class 11")).toBe("catalog:v2:student-a:11");
-    expect(catalogCacheKey("student-b", "11")).toBe("catalog:v2:student-b:11");
+    expect(catalogCacheKey("student-a", "Class 11")).toBe("catalog:v3:student-a:11");
+    expect(catalogCacheKey("student-b", "11")).toBe("catalog:v3:student-b:11");
     expect(catalogCacheKey("student-a", "Class 11")).not.toBe(catalogCacheKey("student-b", "Class 11"));
 
     const catalog = source("lib/catalog.ts");

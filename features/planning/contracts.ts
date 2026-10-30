@@ -1149,6 +1149,8 @@ export interface StudyRouteOverride {
   reason: StudyRouteOverrideReason;
   reason_label: string;
   until_unit_id: string;
+  return_unit_id?: string;
+  explanation?: string;
 }
 
 export interface StudyRouteCurrentStep {
@@ -1170,11 +1172,14 @@ export interface StudyRouteCurrentStep {
   unit_importance: string;
   prerequisites: string[];
   unit_status: string;
+  key_notes?: string[];
+  progress_percentage?: number;
   last_position: Record<string, unknown>;
 }
 
 export interface StudyRouteEffectiveProficiency {
   self_reported: string;
+  effective?: string;
   demonstrated_accuracy: number;
   evidence_count: number;
   last_updated: string;
@@ -1190,6 +1195,8 @@ export interface StudyRouteNextAction {
 }
 
 export interface StudyRouteState {
+  portfolio?: PlanningPortfolio;
+  completed_unit_ids?: string[];
   user_id: string;
   route_date: string;
   class_level: string;
@@ -1220,6 +1227,13 @@ export interface StudyRouteAdvanceResult {
 }
 
 export interface StudyLabContext {
+  study_time_today?: PlanningStudyTime | null;
+  session_duration_minutes?: number | null;
+  class_level?: string;
+  subject?: string;
+  key_notes?: string[];
+  recommended_minutes?: number;
+  progress_percentage?: number;
   user_id: string;
   route_date: string;
   status: StudyRouteStatus;
@@ -1266,8 +1280,9 @@ export interface StudyRouteStartRequest {
 export interface StudyRouteAdvanceRequest {
   completed_unit_id: string;
   interaction_id: string;
-  correct_answers: number;
-  total_questions: number;
+  correct_answers?: number;
+  total_questions?: number;
+  answers?: Record<string, string>;
   time_spent_seconds?: number;
   confidence_after?: number;
   xp_earned?: number;
@@ -1408,6 +1423,8 @@ export function normalizeStudyRouteState(value: unknown): StudyRouteState | null
     : [];
 
   return {
+    portfolio: normalizePlanningPortfolio(value.portfolio) ?? undefined,
+    completed_unit_ids: Array.isArray(value.completed_unit_ids) ? value.completed_unit_ids.filter(nonEmptyString) : [],
     user_id: value.user_id,
     route_date: value.route_date,
     class_level: value.class_level,
@@ -1459,6 +1476,13 @@ export function normalizeStudyLabContext(value: unknown): StudyLabContext | null
   }
 
   return {
+    study_time_today: isPlanningStudyTime(value.study_time_today) ? value.study_time_today : null,
+    session_duration_minutes: typeof value.session_duration_minutes === "number" ? value.session_duration_minutes : null,
+    class_level: typeof value.class_level === "string" ? value.class_level : "",
+    subject: typeof value.subject === "string" ? value.subject : "",
+    key_notes: Array.isArray(value.key_notes) ? value.key_notes.filter(nonEmptyString) : [],
+    recommended_minutes: typeof value.recommended_minutes === "number" ? value.recommended_minutes : 0,
+    progress_percentage: typeof value.progress_percentage === "number" ? value.progress_percentage : 0,
     user_id: value.user_id,
     route_date: value.route_date,
     status: value.status,

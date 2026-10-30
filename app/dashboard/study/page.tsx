@@ -1,5 +1,6 @@
 "use client";
 
+import PlannedLearningContext from "@/components/study/PlannedLearningContext";
 import { StudyScreen, StudySyncPill } from "@/components/study/StudyScreen";
 import { AppIcon } from "@/components/ui/Polished";
 import { useAuth } from "@/context/AuthContext";
@@ -16,6 +17,7 @@ import {
   recordStudyRouteHeartbeat,
 } from "@/features/study/api";
 import type { StudyConversation, StudyScope } from "@/features/study/types";
+import { startStudyRoute } from "@/features/planning/api";
 import type { StudyLabContext } from "@/features/planning/contracts";
 import { useCatalog } from "@/lib/catalog";
 import Link from "next/link";
@@ -48,9 +50,9 @@ function studyRouteScope(context: StudyLabContext): StudyScope | null {
   if (!unit) return null;
   return {
     source: "syllabus",
-    catalogSource: "planning_manifest",
-    classLevel: "",
-    subject: "",
+    catalogSource: chapter.curriculum.source_reference.authority === "approved_content_pipeline" ? "published" : "planning_manifest",
+    classLevel: context.class_level || "",
+    subject: context.subject || "",
     chapterId: chapter.chapter_slug,
     chapterLabel: chapter.chapter,
     topicId: unit.id,
@@ -71,6 +73,7 @@ export default function StudyHomePage() {
   const [topicId, setTopicId] = useState(requestedTopic);
   const [studyLab, setStudyLab] = useState<StudyLabContext | null>(null);
   const [studyLabLoading, setStudyLabLoading] = useState(false);
+  const [studyLabError, setStudyLabError] = useState("");
   const [studyLabOpening, setStudyLabOpening] = useState(false);
 
   useEffect(() => {
@@ -80,6 +83,7 @@ export default function StudyHomePage() {
   const loadStudyLabContext = useCallback(async () => {
     if (!userId) return;
     setStudyLabLoading(true);
+    setStudyLabError("");
     try {
       const context = await getStudyLabContext(
         { headers: await getAuthHeaders() },
@@ -87,7 +91,7 @@ export default function StudyHomePage() {
       );
       setStudyLab(context);
     } catch {
-      setStudyLab(null);
+      setStudyLabError("Your learning route could not be loaded. Try syncing again.");
     } finally {
       setStudyLabLoading(false);
     }
@@ -110,16 +114,36 @@ export default function StudyHomePage() {
 
   const startPlannedStudyRoute = useCallback(async () => {
     if (!studyLab || studyLabOpening) return;
-    const scope = studyRouteScope(studyLab);
-    if (!scope) return;
     setStudyLabOpening(true);
-    void recordStudyRouteHeartbeat(
-      { headers: await getAuthHeaders() },
-      studyLab.user_id,
-      studyLab.last_position,
-    );
-    const destination = studySessionHref(createConversationId(), scope, { fresh: true });
-    router.push(`${destination}&entry=learn`);
+    try {
+      let context = studyLab;
+      if (context.status === "completed") {
+        const saved = await startStudyRoute({ userId: context.user_id, getAuthHeaders }, {
+          class_level: context.class_level || "", subject: context.subject || "",
+          chapters: context.chapters.map((c) => ({ chapter_ref: c.chapter_slug, chapter_proficiency: c.chapter_proficiency })),
+          ...(context.study_time_today ? { study_time_today: context.study_time_today } : {}),
+          ...(context.session_duration_minutes ? { session_duration_minutes: context.session_duration_minutes } : {}),
+        });
+        const updated = await getStudyLabContext({ headers: await getAuthHeaders() }, saved.user_id);
+        if (!updated) throw new Error("No learning route");
+        context = updated;
+        setStudyLab(context);
+      }
+      const scope = studyRouteScope(context);
+      if (!scope) throw new Error("No learning unit");
+      const savedId = context.last_position.conversation_id;
+      const resume = typeof savedId === "string" && Boolean(savedId);
+      const id = resume ? savedId : createConversationId();
+      await recordStudyRouteHeartbeat(
+        { headers: await getAuthHeaders() }, context.user_id,
+        { ...context.last_position, unit_id: context.current_unit_id, conversation_id: id },
+      );
+      const destination = studySessionHref(id, scope, { fresh: !resume });
+      router.push(`${destination}&entry=planning`);
+    } catch {
+      setStudyLabError("Your session could not be opened. Please try again.");
+      setStudyLabOpening(false);
+    }
   }, [getAuthHeaders, router, studyLab, studyLabOpening]);
 
   const selectedChapter = chapters.find((chapter) => chapter.value === chapterId)
@@ -157,6 +181,9 @@ export default function StudyHomePage() {
       description="Learn a planned concept, ask one doubt directly, or check what you understand. Choose one route and Study Lab will keep the session focused."
       aside={<StudySyncPill state={syncState} />}
     >
+      {studyLabError ? <p role="alert">{studyLabError} <button onClick={() => void loadStudyLabContext()}>Retry</button></p> : null}
+      {studyLabLoading ? <p role="status">Loading your saved learning route...</p> : null}
+      {searchParams.get("planned") && !studyLab && !studyLabLoading ? <p role="alert">No saved route is available. <Link href="/dashboard/planning">Return to Planning</Link></p> : null}
       {showStudyLabCard && studyLab ? (
         <section className={styles.todayRoutePanel} aria-labelledby="today-route-heading">
           <div className={styles.todayRouteHeader}>
@@ -173,67 +200,15 @@ export default function StudyHomePage() {
             ) : null}
           </div>
 
-          <div className={styles.todayRouteBody}>
-            <div className={styles.todayRouteTopic}>
-              <span className={styles.todayRouteTopicStatus} data-status={studyLab.current_unit_status}>
-                {studyLab.current_unit_status === "mastered"
-                  ? "✓"
-                  : studyLab.current_unit_status === "needs_review"
-                    ? "!"
-                    : studyLab.current_unit_status === "practising" || studyLab.current_unit_status === "learning"
-                      ? "▶"
-                      : "○"}
-              </span>
-              <div>
-                <strong>{studyLab.current_topic}</strong>
-                <small>
-                  {studyLab.status === "completed"
-                    ? "Today's route complete"
-                    : studyLab.status === "not_started"
-                      ? "Ready to begin"
-                      : "In progress"}
-                </small>
-              </div>
-            </div>
-
-            {studyLab.why_now ? (
-              <p className={styles.todayRouteWhy}>{studyLab.why_now}</p>
-            ) : null}
-
-            {studyLab.recommended_approach.length ? (
-              <ol className={styles.todayRouteApproach} aria-label="Recommended approach">
-                {studyLab.recommended_approach.map((step, index) => (
-                  <li key={`${step}-${index}`}>
-                    <span className={styles.todayRouteApproachIndex}>{index + 1}</span>
-                    <span>{step}</span>
-                  </li>
-                ))}
-              </ol>
-            ) : null}
-
-            {studyLab.prerequisites.length ? (
-              <p className={styles.todayRoutePrereq}>
-                Prerequisite{studyLab.prerequisites.length > 1 ? "s" : ""}: {studyLab.prerequisites.join(", ")}
-              </p>
-            ) : null}
-
-            {studyLab.progress ? (
-              <div className={styles.todayRouteProgress} aria-label="Chapter progress">
-                <div className={styles.todayRouteProgressBar}>
-                  <span style={{ width: `${studyLab.progress.percentage}%` }} />
-                </div>
-                <span className={styles.todayRouteProgressLabel}>
-                  {studyLab.progress.mastered_units} of {studyLab.progress.total_units} units mastered
-                </span>
-              </div>
-            ) : null}
-          </div>
+          <PlannedLearningContext context={studyLab} />
+          <Link href="/dashboard/planning/active">Return to Planning</Link>
 
           {studyLab.status === "completed" ? (
             <div className={styles.todayRouteActions}>
               <p className={styles.todayRouteComplete}>
-                You&apos;ve completed today&apos;s route. Come back tomorrow, or choose another route below.
+                Today&apos;s route is complete. You can finish here or continue with the next recommendation.
               </p>
+              <button className={styles.todayRouteStart} disabled={studyLabOpening} onClick={() => void startPlannedStudyRoute()}>Continue Learning</button>
             </div>
           ) : (
             <div className={styles.todayRouteActions}>
@@ -243,7 +218,7 @@ export default function StudyHomePage() {
                 disabled={studyLabOpening}
                 onClick={() => { void startPlannedStudyRoute(); }}
               >
-                {studyLab.status === "in_progress" || studyLab.status === "paused"
+                {Boolean(studyLab.last_position.conversation_id)
                   ? "Continue learning"
                   : "Start learning"} <AppIcon name="arrowRight" />
               </button>

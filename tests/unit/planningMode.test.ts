@@ -768,13 +768,13 @@ describe("NCERT-ordered Planning roadmap", () => {
     expect(value.global_next_step.unit_id).toBe(selectedChapter.learning_units[0].id);
   });
 
-  it("preserves the pre-existing shared Study and Exam topic taxonomy", () => {
-    const chapter = findCatalogChapter(BUILTIN_CHAPTERS, "matter");
-    expect(chapter?.value).toBe("matter");
-    expect(chapter?.topics).toHaveLength(12);
-    expect(reconcileSelection(BUILTIN_CHAPTERS, "matter", "gaseous_state")).toEqual({
-      chapter: "matter",
-      topic: "gaseous_state",
+  it("preserves the current shared Study and Exam catalog", () => {
+    const chapter = findCatalogChapter(BUILTIN_CHAPTERS, "some_basic_concepts_of_chemistry");
+    expect(chapter?.value).toBe("some_basic_concepts_of_chemistry");
+    expect(chapter?.topics).toHaveLength(8);
+    expect(reconcileSelection(BUILTIN_CHAPTERS, chapter!.value, "mole_concept_and_molar_mass")).toEqual({
+      chapter: chapter!.value,
+      topic: "mole_concept_and_molar_mass",
       changed: false,
     });
   });

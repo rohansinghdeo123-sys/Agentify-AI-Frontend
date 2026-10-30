@@ -315,6 +315,7 @@ export default function PlanningActive() {
     refreshingPlan,
     refreshNotice,
     refreshActivePlan,
+    sharedRoute,
     selectActiveChapter,
   } = usePlanningExperience();
 
@@ -380,6 +381,7 @@ export default function PlanningActive() {
         : "Your first win starts with one clear step";
 
   const openStudy = (unit: PlanningLearningUnit, intent: "learn" | "ask") => {
+    if (intent === "learn") { router.push("/dashboard/study?planned=1"); return; }
     const catalogSource = roadmap.curriculum.source_reference.authority
       === "approved_content_pipeline"
       ? "published"
@@ -407,6 +409,13 @@ export default function PlanningActive() {
       backLabel="Change plan"
     >
       <div className={styles.roadmapExperience}>
+        {sharedRoute ? <section className={styles.sharedProgress} aria-label="Current learning progress">
+          <strong>{sharedRoute.current_step.current_unit_title}</strong>
+          <p>{sharedRoute.current_step.step_label} · {sharedRoute.current_step.unit_status.replaceAll("_", " ")}</p>
+          {sharedRoute.override.active ? <p>{sharedRoute.override.explanation}</p> : null}
+          <p>{Object.values(sharedRoute.effective_proficiency).map((p) => p.effective ? `Effective proficiency: ${p.effective.replaceAll("_", " ")} (${p.demonstrated_accuracy}%)` : "").filter(Boolean).join(" · ")}</p>
+          <Link href="/dashboard/study?planned=1">{sharedRoute.current_step.last_position.conversation_id ? "Continue Learning" : "Start Learning"}</Link>
+        </section> : null}
         {portfolio ? (
           <section className={styles.portfolioBar} aria-labelledby="portfolio-heading">
             <div className={styles.portfolioHeading}>

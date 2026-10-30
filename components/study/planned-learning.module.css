@@ -1,0 +1,12 @@
+.context { margin: 1rem 0; padding: 1.25rem; border: 1px solid var(--market-border, #d7e1e9); border-radius: 18px; background: var(--market-surface-strong, #fff); color: var(--market-text, #182c3b); }
+.context h2 { margin: .4rem 0; font-size: 1.2rem; }
+.context h3 { font-size: .95rem; margin: 1rem 0 .5rem; }
+.context p, .context li { font-size: .9rem; line-height: 1.6; }
+.context ul { padding-left: 1.25rem; }
+.context progress { display: block; width: 100%; margin-top: .5rem; accent-color: #167d91; }
+.check { display: grid; gap: .75rem; }
+.check fieldset { border: 1px solid #d7e1e9; border-radius: 12px; padding: 1rem; }
+.check label { display: block; padding: .4rem; cursor: pointer; }
+.check button { padding: .65rem 1rem; border-radius: 10px; cursor: pointer; }
+
+.context { width: min(100%, 70rem); margin-inline: auto; overflow-wrap: anywhere; }
