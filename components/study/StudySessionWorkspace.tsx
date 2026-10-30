@@ -700,7 +700,7 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
   }, [composerMenuOpen]);
 
   useEffect(() => {
-    if (!messages.length || !userId) return;
+    if (!messages.length || !userId || loadingAnswer) return;
     setConversations((current) => {
       const previous = current.find((conversation) => conversation.id === conversationId);
       const conversation = {
@@ -718,11 +718,11 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
       };
       return [conversation, ...current.filter((item) => item.id !== conversationId)].slice(0, 40);
     });
-  }, [conversationId, messages, scope, setConversations, userId]);
+  }, [conversationId, loadingAnswer, messages, scope, setConversations, userId]);
 
   useEffect(() => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: reduced ? "auto" : "smooth" });
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: reduced || loadingAnswer ? "auto" : "smooth" });
   }, [loadingAnswer, messages]);
 
   useEffect(() => {

@@ -103,7 +103,7 @@ export default function StudyHomePage() {
 
   useEffect(() => {
     if (!userId) return;
-    const onFocus = () => { void loadStudyLabContext(); };
+    const onFocus = () => { if (document.visibilityState === "visible") void loadStudyLabContext(); };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onFocus);
     return () => {
@@ -172,7 +172,7 @@ export default function StudyHomePage() {
     return <div className={styles.redirectState} role="status">Opening the focused learning workspace…</div>;
   }
 
-  const showStudyLabCard = Boolean(userId) && !studyLabLoading && Boolean(studyLab);
+  const showStudyLabCard = Boolean(userId) && Boolean(studyLab);
 
   return (
     <StudyScreen

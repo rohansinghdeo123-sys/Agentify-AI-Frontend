@@ -9,7 +9,7 @@ import { LoadingState } from "@/components/ui/Polished";
 import { createConversationId } from "@/features/study/conversationUtils";
 import { studySessionHref } from "@/features/study/routes";
 import Link from "next/link";
-import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import styles from "../../home.module.css";
 
@@ -21,11 +21,11 @@ export default function StudyNotesPage() {
 function TopicNotesReader() {
   const { chapterSlug } = useParams<{chapterSlug: string}>();
   const params = useSearchParams();
-  const router = useRouter();
   const topic = params.get("topic") || undefined;
+  const requestedPage = params.get("page");
   const {userId, getAuthHeaders, loading: authBusy} = useAuth();
   const [notes, setNotes] = useState<ChapterNotes | null>(null);
-  const [page, setPage] = useState(0);
+  const [savedPage, setSavedPage] = useState(0);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   useEffect(() => {
@@ -34,22 +34,23 @@ function TopicNotesReader() {
     void getAuthHeaders().then((headers) => { if (active) setLoading(true); return getChapterNotes({headers},chapterSlug,topic); }).then((data) => {
       if (!active) return;
       setNotes(data);
-      const count = data?.pages?.length || data?.concepts.length || 1;
-      const requested = params.get("page");
-      setPage(Math.max(0,Math.min(count-1,requested !== null ? Number(requested) || 0 : data?.saved_page || 0)));
+      setSavedPage(data?.saved_page || 0);
     }).catch(() => { if (active) setError("Notes could not load. Please retry."); }).finally(() => {if(active)setLoading(false);});
     return () => {active=false;};
-  },[authBusy,userId,getAuthHeaders,chapterSlug,topic,params]);
+  },[authBusy,userId,getAuthHeaders,chapterSlug,topic]);
   const pages = notes?.pages || notes?.concepts.map((c) => ({id:c.id,title:c.title,text:[c.definition,c.explanation,...c.key_points.map((p)=>`- ${p}`),...c.formulas,...c.examples].filter(Boolean).join("\n\n")})) || [];
+  const page = Math.max(0, Math.min(pages.length - 1, requestedPage !== null ? Number(requestedPage) || 0 : savedPage));
   const current = pages[page];
   const navigate = async (next: number) => {
     const query = new URLSearchParams(params.toString()); query.set("page",String(next));
-    setPage(next); router.replace(`?${query}`,{scroll:false});
+    // Next synchronizes native history with useSearchParams without a server
+    // navigation. Paging an already-loaded lesson needs no RSC round trip.
+    window.history.replaceState(null, "", `?${query}`);
     try {
       const headers = await getAuthHeaders();
-      const context = await getStudyLabContext({headers},userId);
-      if (context) {
-        await recordStudyRouteHeartbeat({headers},userId,{unit_id:context.current_unit_id,notes_page:next,notes_topic:notes?.topic_id || topic});
+      const activeUnit = notes?.active_unit_id || (await getStudyLabContext({headers},userId))?.current_unit_id;
+      if (activeUnit) {
+        await recordStudyRouteHeartbeat({headers},userId,{unit_id:activeUnit,notes_page:next,notes_topic:notes?.topic_id || topic});
       }
     } catch {setError("Reading position could not sync. This page remains in the address bar; retry before leaving.");}
   };

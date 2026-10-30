@@ -104,3 +104,44 @@ describe("apiClient", () => {
     );
   });
 });
+
+// Privacy and freshness invariants for shared fast reads.
+describe("request coalescing and mutation freshness", () => {
+  beforeEach(() => resetApiClientForTests());
+  afterEach(() => vi.unstubAllGlobals());
+  it("coalesces concurrent forced-fresh reads", async () => {
+    let finish!: (value: Response) => void;
+    const fetchMock = vi.fn(() => new Promise<Response>(resolve => {finish = resolve;}));
+    vi.stubGlobal("fetch", fetchMock);
+    const requests = Array.from({length: 8}, () => apiJson("/route", {forceFresh:true,headers:{Authorization:"Bearer A"}}));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    finish(jsonResponse({current:"matter"}));
+    expect(await Promise.all(requests)).toHaveLength(8);
+  });
+  it("partitions custom cache keys by endpoint and credentials", async () => {
+    const mock=vi.fn().mockImplementation(async()=>jsonResponse({value:mock.mock.calls.length}));
+    vi.stubGlobal("fetch",mock);
+    const opts={cacheKey:"same",cacheTtlMs:30000};
+    expect(await apiJson("/private",{...opts,headers:{Authorization:"Bearer A"}})).toEqual({value:1});
+    expect(await apiJson("/private",{...opts,headers:{Authorization:"Bearer B"}})).toEqual({value:2});
+    expect(await apiJson("/other",{...opts,headers:{Authorization:"Bearer A"}})).toEqual({value:3});
+    expect(await apiJson("/private",{...opts,headers:{Authorization:"Bearer A"}})).toEqual({value:1});
+    expect(mock).toHaveBeenCalledTimes(3);
+  });
+  it("does not let an old GET repopulate cache after a successful mutation",async()=>{
+    let finish!: (value:Response)=>void;
+    const mock=vi.fn().mockImplementationOnce(()=>new Promise<Response>(resolve=>{finish=resolve;}))
+      .mockResolvedValueOnce(jsonResponse({saved:true})).mockResolvedValueOnce(jsonResponse({value:"new"}));
+    vi.stubGlobal("fetch",mock);
+    const stale=apiJson("/progress",{cacheTtlMs:30000});
+    await apiJson("/save",{method:"POST"});
+    finish(jsonResponse({value:"old"}));await stale;
+    expect(await apiJson("/progress",{cacheTtlMs:30000})).toEqual({value:"new"});
+  });
+  it("keeps caller-owned abort signals independent",async()=>{
+    const mock=vi.fn().mockImplementation(async()=>jsonResponse({ok:true}));vi.stubGlobal("fetch",mock);
+    const a=new AbortController(), b=new AbortController();
+    await Promise.all([apiJson("/private",{signal:a.signal}),apiJson("/private",{signal:b.signal})]);
+    expect(mock).toHaveBeenCalledTimes(2);
+  });
+});

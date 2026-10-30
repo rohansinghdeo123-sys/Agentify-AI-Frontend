@@ -288,11 +288,12 @@ function buildHeatmap(sessions: Session[], days = 35) {
   });
 }
 
-async function safeReadJson(url: string, headers?: HeadersInit) {
+async function safeReadJson(url: string, headers?: HeadersInit, forceFresh = false) {
   try {
     return await apiJson<unknown>(url, {
       headers,
       cacheKey: `analytics-read:${url}`,
+      forceFresh,
       cacheTtlMs: 30000,
       retries: 1,
       timeoutMs: 7000,
@@ -304,6 +305,7 @@ async function safeReadJson(url: string, headers?: HeadersInit) {
 
 function useDashboardData() {
   const { user, profile, loading: authLoading, getAuthHeaders } = useAuth();
+  const userId = user?.uid || "";
   const [sessions, setSessions] = useState<Session[]>([]);
   const [progress, setProgress] = useState<ProgressSummary>(emptyProgress);
   const [loading, setLoading] = useState(true);
@@ -315,7 +317,7 @@ function useDashboardData() {
     let active = true;
     async function load() {
       if (authLoading) return;
-      if (!user?.uid) {
+      if (!userId) {
         setSessions([]);
         setProgress(emptyProgress);
         setLoading(false);
@@ -326,7 +328,7 @@ function useDashboardData() {
         setLoading(true);
         setError(null);
         const headers = await getAuthHeaders();
-        const payload = await safeReadJson(`${backendURL}/dashboard/${user.uid}`, headers);
+        const payload = await safeReadJson(`${backendURL}/dashboard/${userId}?include_analytics=false&include_leaderboard=false`, headers, reloadToken > 0);
         if (!isRecord(payload)) throw new Error("Failed to load dashboard");
         const progressSummary = { ...emptyProgress, ...(isRecord(payload.progress) ? payload.progress : {}) } as ProgressSummary;
         if (!active) return;
@@ -344,7 +346,7 @@ function useDashboardData() {
     }
     load();
     return () => { active = false; };
-  }, [authLoading, backendURL, getAuthHeaders, profile?.classLevel, profile?.name, reloadToken, user]);
+  }, [authLoading, backendURL, getAuthHeaders, reloadToken, userId]);
 
   const retry = useCallback(() => {
     setReloadToken((current) => current + 1);

@@ -8,15 +8,16 @@ test(`Themed ${theme} notes preserve the Planning and Ask AI flow`,async({page},
  await installWorkspaceMocks(page,theme);
  const topic=fixture.context.current_unit_id;
  let saved=0;
+ let noteRequests=0;
  const headers={"access-control-allow-origin":"*","access-control-allow-headers":"Authorization, Content-Type"};
- const notes={chapter:{slug:"some_basic_concepts_of_chemistry",name:"Some Basic Concepts of Chemistry",class_level:"Class 11",subject:"Chemistry",chapter_number:1},topic_id:topic,topic_title:"Chemistry and the Nature of Matter",estimated_minutes:{min:30,max:35},proficiency:"new_to_it",concepts:[],pages:[{id:"a",title:"Matter",text:"Matter has mass and occupies space. H₂O, CO₂, H₂SO₄ and Ca(OH)₂."},{id:"b",title:"States of Matter",text:"Solids have a definite shape and volume."}]};
+ const notes={active_unit_id:topic,chapter:{slug:"some_basic_concepts_of_chemistry",name:"Some Basic Concepts of Chemistry",class_level:"Class 11",subject:"Chemistry",chapter_number:1},topic_id:topic,topic_title:"Chemistry and the Nature of Matter",estimated_minutes:{min:30,max:35},proficiency:"new_to_it",concepts:[],pages:[{id:"a",title:"Matter",text:"Matter has mass and occupies space. H₂O, CO₂, H₂SO₄ and Ca(OH)₂."},{id:"b",title:"States of Matter",text:"Solids have a definite shape and volume."}]};
  notes.pages[0].text += " " + Array(18).fill("Particles are continuously moving.").join(" ");
  await page.route(`${WORKSPACE_TEST_BACKEND}/planning/route/**`,route=>{
   if(route.request().method()==="OPTIONS")return route.fulfill({headers});
   if(route.request().url().includes("heartbeat"))saved=route.request().postDataJSON().last_position.notes_page ?? saved;
   return route.fulfill({headers,json:fixture.route});
  });
- await page.route(`${WORKSPACE_TEST_BACKEND}/notes/**`,route=>route.fulfill({headers,json:{...notes,saved_page:saved}}));
+ await page.route(`${WORKSPACE_TEST_BACKEND}/notes/**`,route=>{noteRequests++; return route.fulfill({headers,json:{...notes,saved_page:saved}});});
  await page.route(`${WORKSPACE_TEST_BACKEND}/coach/study-lab/context/**`,route=>route.fulfill({headers,json:fixture.context}));
  await page.goto("/dashboard/planning/active");
  await page.getByRole("button",{name:/Start today/}).click();
@@ -60,6 +61,7 @@ test(`Themed ${theme} notes preserve the Planning and Ask AI flow`,async({page},
  await page.getByRole("button",{name:"Next",exact:true}).click();
  await expect(page.getByText("Page 2 of 2")).toBeVisible();
  await expect.poll(()=>saved).toBe(1);
+ expect(noteRequests).toBe(1);
  await page.reload();await expect(page.getByText("Page 2 of 2")).toBeVisible();
  let grounding="";
  await page.route(`${WORKSPACE_TEST_BACKEND}/coach/chat/stream`,route=>{

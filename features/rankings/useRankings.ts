@@ -42,7 +42,7 @@ export function useRankings() {
 
     let active = true;
 
-    async function load(forceFresh: boolean, showLoading: boolean) {
+    async function loadData(forceFresh: boolean, showLoading: boolean) {
       if (!userId) {
         setEntries([]);
         setChallenge(null);
@@ -127,6 +127,13 @@ export function useRankings() {
       }
     }
 
+    let inFlight = false;
+    async function load(forceFresh: boolean, showLoading: boolean) {
+      if (inFlight) return;
+      inFlight = true;
+      try { await loadData(forceFresh, showLoading); }
+      finally { inFlight = false; }
+    }
     void load(reloadToken > 0, true);
     const refreshTimer = window.setInterval(() => {
       if (document.visibilityState === "visible") void load(true, false);

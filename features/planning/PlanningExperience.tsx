@@ -249,6 +249,9 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     if (!userId || authBusy || !hydrated) return;
     let active = true;
     const restore = async () => {
+      if (refreshInFlightRef.current) return;
+      const restoreId = ++refreshIdRef.current;
+      refreshInFlightRef.current = true;
       try {
         let route = await getCurrentStudyRoute({ userId, getAuthHeaders });
         const cached = readPlanningPortfolioState(userId).state?.portfolio;
@@ -260,14 +263,17 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
             ...(cached.session_duration_minutes ? { session_duration_minutes: cached.session_duration_minutes } : {}),
           });
         }
-        if (!active) return;
+        if (!active || restoreId !== refreshIdRef.current) return;
         setSharedRoute(route);
         if (route?.portfolio) {
           setPortfolioState(writePlanningPortfolio(userId, route.portfolio, activeChapterSlugRef.current));
           setRefreshNotice("");
+          lastRefreshAtRef.current = Date.now();
         }
       } catch (error) {
-        if (active) setRefreshNotice(planningErrorMessage(error));
+        if (active && restoreId === refreshIdRef.current) setRefreshNotice(planningErrorMessage(error));
+      } finally {
+        if (restoreId === refreshIdRef.current) refreshInFlightRef.current = false;
       }
     };
     void restore();
@@ -421,16 +427,6 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
     setGenerating(true);
     setError("");
     try {
-      const nextPortfolio = await generatePlanningPortfolio(
-        { userId, getAuthHeaders },
-        scopes,
-        signal,
-      );
-      if (signal?.aborted || generationId !== generationRef.current || requestInput !== currentInputRef.current) return null;
-      if (!portfolioMatchesCatalog(nextPortfolio, catalogChapters)) {
-        setError("The planner returned a chapter that is not available in Planning yet. Please try again.");
-        return null;
-      }
       // Persist before advertising Start Learning; errors remain actionable.
       const [firstScope] = scopes;
       if (firstScope) {
@@ -456,13 +452,17 @@ export function PlanningExperienceProvider({ children }: { children: ReactNode }
           },
         );
         if (signal?.aborted || generationId !== generationRef.current || requestInput !== currentInputRef.current) return null;
+        if (!savedRoute.portfolio || !portfolioMatchesCatalog(savedRoute.portfolio, catalogChapters)) {
+          throw new PlanningApiError("The saved route could not be verified. Please retry.", "invalid_response");
+        }
         setSharedRoute(savedRoute);
-        setPortfolioState(writePlanningPortfolio(userId, savedRoute.portfolio ?? nextPortfolio));
+        setPortfolioState(writePlanningPortfolio(userId, savedRoute.portfolio));
         lastRefreshAtRef.current = Date.now();
         setStaleNotice("");
+        return savedRoute.portfolio;
       }
 
-      return nextPortfolio;
+      return null;
     } catch (requestError) {
       if (signal?.aborted || generationId !== generationRef.current || requestInput !== currentInputRef.current) return null;
       setError(planningErrorMessage(requestError));

@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import type { Components } from "react-markdown";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -46,7 +47,7 @@ type RichMarkdownProps = {
  * Full markdown rendering for tutor answers: GitHub-flavored markdown (tables,
  * lists, code), LaTeX math via KaTeX, and a blinking cursor while streaming.
  */
-export default function RichMarkdown({ content, streaming = false, className }: RichMarkdownProps) {
+function RichMarkdown({ content, streaming = false, className }: RichMarkdownProps) {
   const text = normalizeMathDelimiters(String(content || ""));
   return (
     <div className={`study-markdown${className ? ` ${className}` : ""}`}>
@@ -57,3 +58,5 @@ export default function RichMarkdown({ content, streaming = false, className }: 
     </div>
   );
 }
+
+export default memo(RichMarkdown);

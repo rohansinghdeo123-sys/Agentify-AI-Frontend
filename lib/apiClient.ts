@@ -6,6 +6,7 @@ export type BackendHealth = {
 };
 
 type JsonRequestOptions = RequestInit & {
+  invalidateOnSuccess?: boolean;
   cacheKey?: string;
   cacheTtlMs?: number;
   forceFresh?: boolean;
@@ -29,6 +30,8 @@ const backendReadyAt = new Map<string, number>();
 const backendWarmups = new Map<string, Promise<BackendHealth | null>>();
 
 const BACKEND_READY_TTL_MS = 45000;
+const MAX_RESPONSE_CACHE_ENTRIES = 256;
+let cacheGeneration = 0;
 
 function sleep(ms: number) {
   return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
@@ -40,8 +43,11 @@ function isBackendLiveStatus(status?: string) {
 }
 
 function getRequestKey(url: string, options: JsonRequestOptions) {
-  if (options.cacheKey) return options.cacheKey;
-  return `${options.method || "GET"}:${url}:${String(options.body || "")}`;
+  // Partition even caller-supplied keys by endpoint and credentials. Never
+  // share private responses between accounts, tokens, or backend deployments.
+  const headers = Array.from(new Headers(options.headers).entries()).sort(([a], [b]) => a.localeCompare(b));
+  return JSON.stringify([options.cacheKey || "", options.method || "GET", url,
+    String(options.body || ""), options.credentials || "same-origin", headers]);
 }
 
 function shouldRetry(status: number) {
@@ -75,6 +81,7 @@ export async function apiFetch(
     const abort = () => controller.abort();
     const timeout = globalThis.setTimeout(abort, timeoutMs);
     signal?.addEventListener("abort", abort, { once: true });
+    if (signal?.aborted) controller.abort();
 
     try {
       const response = await fetch(url, {
@@ -107,12 +114,15 @@ export async function apiJson<T>(url: string, options: JsonRequestOptions = {}):
   const forceFresh = options.forceFresh ?? false;
   const requestKey = getRequestKey(url, options);
   const cached = responseCache.get(requestKey);
+  const generation = cacheGeneration;
+  // A caller-owned cancellation must never abort a different subscriber.
+  const canDeduplicate = method === "GET" && !options.signal;
 
-  if (!forceFresh && cached && cached.expiresAt > Date.now()) {
+  if (method === "GET" && !options.signal?.aborted && !forceFresh && cached && cached.expiresAt > Date.now()) {
     return cached.value as T;
   }
 
-  if (!forceFresh && method === "GET" && inFlightJson.has(requestKey)) {
+  if (canDeduplicate && inFlightJson.has(requestKey)) {
     return inFlightJson.get(requestKey) as Promise<T>;
   }
 
@@ -126,7 +136,10 @@ export async function apiJson<T>(url: string, options: JsonRequestOptions = {}):
           : "";
       throw new ApiRequestError(detail || `Request failed: ${response.status}`, response.status);
     }
-    if (cacheTtlMs > 0) {
+    if (method !== "GET" && method !== "HEAD" && options.invalidateOnSuccess !== false) invalidateApiCache();
+    if (method === "GET" && cacheTtlMs > 0 && generation === cacheGeneration) {
+      for (const [key, entry] of responseCache) if (entry.expiresAt <= Date.now()) responseCache.delete(key);
+      if (responseCache.size >= MAX_RESPONSE_CACHE_ENTRIES) responseCache.delete(responseCache.keys().next().value!);
       responseCache.set(requestKey, {
         expiresAt: Date.now() + cacheTtlMs,
         value: data,
@@ -135,20 +148,22 @@ export async function apiJson<T>(url: string, options: JsonRequestOptions = {}):
     return data as T;
   })();
 
-  if (!forceFresh && method === "GET") {
+  if (canDeduplicate) {
     inFlightJson.set(requestKey, request);
   }
 
   try {
     return await request;
   } finally {
-    if (!forceFresh && method === "GET") {
-      inFlightJson.delete(requestKey);
+    if (canDeduplicate) {
+      if (inFlightJson.get(requestKey) === request) inFlightJson.delete(requestKey);
     }
   }
 }
 
 export function invalidateApiCache(prefix?: string) {
+  cacheGeneration++;
+  inFlightJson.clear();
   if (!prefix) {
     responseCache.clear();
     return;
@@ -160,6 +175,7 @@ export function invalidateApiCache(prefix?: string) {
 }
 
 export function resetApiClientForTests() {
+  cacheGeneration++;
   responseCache.clear();
   inFlightJson.clear();
   backendReadyAt.clear();

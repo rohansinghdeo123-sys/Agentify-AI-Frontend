@@ -321,7 +321,6 @@ export default function PlanningActive() {
 
   useEffect(() => {
     if (!activePlan || !catalogSettled) return;
-    void refreshActivePlan();
 
     const refreshWhenVisible = () => {
       if (document.visibilityState === "visible") void refreshActivePlan();

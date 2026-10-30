@@ -416,6 +416,7 @@ export async function streamCoachTurn(
     let buffer = "";
     let streamDone = false;
     let completedIsSemantic = false;
+    let pendingDelta = "";
 
     const processFrame = (frameText: string) => {
       const frame = parseStudyStreamFrame(frameText);
@@ -426,7 +427,7 @@ export async function streamCoachTurn(
       if (frame.kind === "stage") callbacks.onStage?.(frame.stage);
       if (frame.kind === "delta") {
         streamed += frame.delta;
-        callbacks.onDelta?.(frame.delta);
+        pendingDelta += frame.delta;
       }
       if (frame.kind === "answer" && (!completedIsSemantic || frame.semantic)) {
         completed = frame.result;
@@ -434,6 +435,9 @@ export async function streamCoachTurn(
       }
     };
 
+    const flushDelta = () => {
+      if (pendingDelta) { callbacks.onDelta?.(pendingDelta); pendingDelta = ""; }
+    };
     while (!streamDone) {
       const { value, done } = await readStreamChunk(reader, streamController);
       if (done) break;
@@ -444,9 +448,11 @@ export async function streamCoachTurn(
         processFrame(frame);
         if (streamDone) break;
       }
+      flushDelta();
     }
     if (streamDone) await reader.cancel().catch(() => undefined);
     else if (buffer.trim()) processFrame(buffer);
+    flushDelta();
 
     const result = completed as CoachTurnResult | null;
     const answer = result?.answer || streamed.trim();
@@ -596,9 +602,10 @@ export async function recordStudyRouteHeartbeat(
 ): Promise<void> {
   try {
     await apiJson<unknown>(
-      `${apiBase(context.backendURL)}/planning/route/heartbeat/${encodeURIComponent(userId)}`,
+      `${apiBase(context.backendURL)}/planning/route/heartbeat/${encodeURIComponent(userId)}?compact=true`,
       {
         method: "POST",
+        invalidateOnSuccess: false,
         headers: context.headers,
         body: JSON.stringify({ last_position: lastPosition }),
         forceFresh: true,
@@ -628,6 +635,7 @@ export interface ConceptNote {
 }
 
 export interface ChapterNotes {
+  active_unit_id?: string | null;
   topic_id?: string;
   topic_title?: string;
   estimated_minutes?: {min: number; max: number};
