@@ -297,6 +297,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasAuthenticatedRef = useRef(false);
   const manualSignOutRef = useRef(false);
   const authStateResolvedRef = useRef(false);
+  const profileRequestRef = useRef(0);
   const backendURL = getPublicBackendUrl();
 
   const requireAuthClient = useCallback(() => {
@@ -312,11 +313,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loadProfile = useCallback(
     async (currentUser: User, forceFresh = false) => {
+      const requestId = ++profileRequestRef.current;
+      const isCurrent = () => requestId === profileRequestRef.current && authRef.current?.currentUser?.uid === currentUser.uid;
       setProfileLoading(true);
       setProfileError("");
       try {
         primeBackend(backendURL);
-        const token = await currentUser.getIdToken();
+        let token = await currentUser.getIdToken();
         const loadAccountProfile = (timeoutMs: number, fresh: boolean) =>
           apiJson<BackendUserProfile>(
             `${backendURL}/profile/me`,
@@ -332,18 +335,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               timeoutMs,
             },
           );
-        // One bounded request: health polling plus nested retries previously
-        // kept the entire signed-in UI waiting for over a minute.
-        const loadedProfile = await loadAccountProfile(8000, forceFresh);
-        if (authRef.current?.currentUser?.uid !== currentUser.uid) return null;
-        setAccountProfile(loadedProfile);
-        return loadedProfile;
+        let refreshedToken = false;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          try {
+            const loadedProfile = await loadAccountProfile(8000, forceFresh || attempt > 0);
+            if (!isCurrent()) return null;
+            setAccountProfile(loadedProfile);
+            setProfileError("");
+            return loadedProfile;
+          } catch (error) {
+            if (!isCurrent()) return null;
+            // A restored Firebase session can carry an expired cached token.
+            if (error instanceof ApiRequestError && error.status === 401 && !refreshedToken) {
+              refreshedToken = true;
+              token = await currentUser.getIdToken(true);
+              continue;
+            }
+            if (!isTemporaryBackendError(error) || attempt === 2) throw error;
+            // Keep recovery automatic without trapping the student in a loader.
+            setProfileLoading(false);
+            setProfileError("Your sign-in succeeded. Reconnecting to your study profile...");
+            await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)));
+            if (!isCurrent()) return null;
+          }
+        }
+        throw new Error("Your session could not be verified. Please sign in again.");
       } catch (error) {
-        setAccountProfile(null);
-        setProfileError(profileErrorMessage(error));
+        if (isCurrent()) {
+          setAccountProfile(null);
+          setProfileError(profileErrorMessage(error));
+        }
         return null;
       } finally {
-        setProfileLoading(false);
+        if (isCurrent()) setProfileLoading(false);
       }
     },
     [backendURL],

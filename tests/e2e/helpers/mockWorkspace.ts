@@ -169,6 +169,7 @@ export async function installWorkspaceMocks(
       expires_in: "3600",
       token_type: "Bearer",
       refresh_token: "synthetic-refresh-token",
+      access_token: idToken,
       id_token: idToken,
       user_id: WORKSPACE_TEST_USER_ID,
       project_id: "agentifyai-test",

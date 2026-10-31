@@ -194,6 +194,7 @@ export default function LoginPage() {
     authError: authSetupError,
     authStartupMessage,
     profileError,
+    refreshProfile,
     loginWithGoogle,
     sendPhoneOtp,
     verifyPhoneOtp,
@@ -223,6 +224,7 @@ export default function LoginPage() {
     authSetupError ||
     authStartupMessage ||
     authError ||
+    profileError ||
     (sessionExpired ? "Your session expired. Sign in again to continue studying." : "");
 
   useEffect(() => {
@@ -238,12 +240,6 @@ export default function LoginPage() {
       router.replace(accountProfile.onboarding_completed ? "/dashboard" : "/onboarding");
     }
   }, [accountProfile, backendURL, user, loading, profileError, router]);
-
-  useEffect(() => {
-    if (!loading && user && profileError) {
-      setAuthError("We could not load your AgentifyAI profile. Please try signing in again.");
-    }
-  }, [loading, profileError, user]);
 
   useEffect(() => {
     if (authError) {
@@ -574,6 +570,12 @@ export default function LoginPage() {
                 {visibleAuthError ? (
                   <div id="login-auth-error" className="mt-4">
                     <AlertState message={visibleAuthError} />
+                    {user && profileError ? (
+                      <button type="button" className="mt-3 w-full rounded-xl border px-4 py-3 text-sm font-semibold"
+                        onClick={() => { setAuthError(""); void refreshProfile(); }}>
+                        Retry loading my profile
+                      </button>
+                    ) : null}
                   </div>
                 ) : null}
 
