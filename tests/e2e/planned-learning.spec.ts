@@ -3,6 +3,7 @@ import fixture from "./fixtures/planned-learning.json";
 import { installWorkspaceMocks, WORKSPACE_TEST_BACKEND } from "./helpers/mockWorkspace";
 
 test.beforeAll(async ({ request }) => {
+  await request.get("/dashboard/study?planned=1", { timeout: 120000 });
   await request.get("/dashboard/study/session/compile-fixture?fresh=1", { timeout: 120000 });
 });
 

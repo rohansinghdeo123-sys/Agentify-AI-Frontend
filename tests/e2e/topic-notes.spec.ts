@@ -10,7 +10,7 @@ test(`Themed ${theme} notes preserve the Planning and Ask AI flow`,async({page},
  let saved=0;
  let noteRequests=0;
  const headers={"access-control-allow-origin":"*","access-control-allow-headers":"Authorization, Content-Type"};
- const notes={active_unit_id:topic,chapter:{slug:"some_basic_concepts_of_chemistry",name:"Some Basic Concepts of Chemistry",class_level:"Class 11",subject:"Chemistry",chapter_number:1},topic_id:topic,topic_title:"Chemistry and the Nature of Matter",estimated_minutes:{min:30,max:35},proficiency:"new_to_it",concepts:[],pages:[{id:"a",title:"Matter",text:"Matter has mass and occupies space. H₂O, CO₂, H₂SO₄ and Ca(OH)₂."},{id:"b",title:"States of Matter",text:"Solids have a definite shape and volume."}]};
+ const notes={active_unit_id:topic,chapter:{slug:"some_basic_concepts_of_chemistry",name:"Some Basic Concepts of Chemistry",class_level:"Class 11",subject:"Chemistry",chapter_number:1},topic_id:topic,topic_title:"Chemistry and the Nature of Matter",estimated_minutes:{min:30,max:35},proficiency:"new_to_it",concepts:[],pages:[{id:"a",title:"Matter",source:"Amit Master Notes",source_pages:[1],teaching_format:"concept",text:"Matter has mass and occupies space. H₂O, CO₂, H₂SO₄ and Ca(OH)₂."},{id:"b",title:"States of Matter",text:"Solids have a definite shape and volume."}]};
  notes.pages[0].text += " " + Array(18).fill("Particles are continuously moving.").join(" ");
  await page.route(`${WORKSPACE_TEST_BACKEND}/planning/route/**`,route=>{
   if(route.request().method()==="OPTIONS")return route.fulfill({headers});
@@ -24,6 +24,7 @@ test(`Themed ${theme} notes preserve the Planning and Ask AI flow`,async({page},
  await expect(page).toHaveURL(/\/study\/notes\//,{timeout:45000});
  await expect(page.getByText("30–35 min · Topic duration")).toBeVisible();
  await expect(page.getByText("Page 1 of 2")).toBeVisible();
+ await expect(page.locator("article")).toContainText("Amit Master Notes");
  await expect(page.locator("article")).toContainText("H2O, CO2, H2SO4 and Ca(OH)");
  await expect(page.locator("article li")).toHaveCount(20);
  const scroller = page.getByRole("main", {name:"Study notes"});

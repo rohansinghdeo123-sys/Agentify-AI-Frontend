@@ -38,7 +38,7 @@ function TopicNotesReader() {
     }).catch(() => { if (active) setError("Notes could not load. Please retry."); }).finally(() => {if(active)setLoading(false);});
     return () => {active=false;};
   },[authBusy,userId,getAuthHeaders,chapterSlug,topic]);
-  const pages = notes?.pages || notes?.concepts.map((c) => ({id:c.id,title:c.title,text:[c.definition,c.explanation,...c.key_points.map((p)=>`- ${p}`),...c.formulas,...c.examples].filter(Boolean).join("\n\n")})) || [];
+  const pages = notes?.pages || notes?.concepts.map((c) => ({id:c.id,title:c.title,source:undefined as string | undefined, source_pages:undefined as number[] | undefined, teaching_format:undefined as string | undefined,text:[c.definition,c.explanation,...c.key_points.map((p)=>`- ${p}`),...c.formulas,...c.examples].filter(Boolean).join("\n\n")})) || [];
   const page = Math.max(0, Math.min(pages.length - 1, requestedPage !== null ? Number(requestedPage) || 0 : savedPage));
   const current = pages[page];
   const navigate = async (next: number) => {
@@ -72,8 +72,8 @@ function TopicNotesReader() {
       </nav>
       <progress aria-label="Reading progress" value={page+1} max={pages.length} className={noteStyles.progress} />
       <article className={noteStyles.card} data-tone={page % 3}>
-        <div className={noteStyles.eyebrow}><span>Concept notes</span><span className={noteStyles.badge}>{notePoints(current.text).length} key {notePoints(current.text).length === 1 ? "point" : "points"}</span></div>
-        <h2>{current.title}</h2><ThemedNotePoints text={current.text} />
+        <div className={noteStyles.eyebrow}><span>{current.source || "Concept notes"}</span><span className={noteStyles.badge}>{notePoints(current.text).length} key {notePoints(current.text).length === 1 ? "point" : "points"}</span></div>
+        <h2>{current.title}</h2>{current.source_pages?.length ? <p>{current.source} · PDF page {current.source_pages.join(", ")} · {current.teaching_format || "concept"}</p> : null}<ThemedNotePoints text={current.text} />
       </article>
       <p>Reading progress records your position. Demonstrate mastery with a quick check.</p>
       <Link className={noteStyles.continue} href="/dashboard/study?planned=1">Continue to learning and quick check</Link>

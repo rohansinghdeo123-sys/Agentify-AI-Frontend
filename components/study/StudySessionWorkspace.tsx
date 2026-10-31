@@ -571,7 +571,7 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
     let active = true;
     void getAuthHeaders().then((headers) => getChapterNotes({headers},scope.chapterId,notesTopic)).then((notes) => {
       const page = notes?.pages?.[Number(notesPage) || 0];
-      if (active && page) setNotesContext(`Current notes reference. Chapter: ${notes!.chapter.name}. Planning topic: ${notes!.topic_title}. Subtopic: ${page.title}. Page: ${Number(notesPage)+1}. Proficiency: ${notes!.proficiency}. Explain using this content first; keep scientific meaning and units unchanged. Discuss other topics only if explicitly requested.\n${page.text}`);
+      if (active && page) setNotesContext(`Current notes reference. Source: ${page.source || "Study notes"}. Source PDF pages: ${(page.source_pages || []).join(", ")}. Teaching format: ${page.teaching_format || "concept"}. Chapter: ${notes!.chapter.name}. Planning topic: ${notes!.topic_title}. Subtopic: ${page.title}. Page: ${Number(notesPage)+1}. Proficiency: ${notes!.proficiency}. Explain using this content first; keep scientific meaning and units unchanged. Discuss other topics only if explicitly requested.\n${page.text}`);
     }).catch(() => {if(active)setError("Page context could not load. Return to notes and retry.");});
     return () => {active=false;};
   },[notesTopic,notesPage,userId,authBusy,getAuthHeaders,scope.chapterId]);
