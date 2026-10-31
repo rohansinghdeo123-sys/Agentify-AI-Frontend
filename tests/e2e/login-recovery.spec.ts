@@ -33,3 +33,19 @@ test("profile failure explains the error and supports retry with the existing se
   await page.getByRole("button", { name: "Retry loading my profile" }).click();
   await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30000 });
 });
+
+
+test("a slow successful profile request survives the former eight-second cutoff", async ({ page }) => {
+  await installWorkspaceMocks(page);
+  let requests = 0;
+  await page.route(`${WORKSPACE_TEST_BACKEND}/profile/me`, async (route) => {
+    if (route.request().method() === "OPTIONS") return route.fallback();
+    requests += 1;
+    await new Promise((resolve) => setTimeout(resolve, 11000));
+    return route.fallback();
+  });
+  await page.goto("/login");
+  await expect(page.getByText("Signed in. Opening your study workspace...", { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 45000 });
+  expect(requests).toBe(1);
+});

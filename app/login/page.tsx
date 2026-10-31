@@ -339,7 +339,10 @@ export default function LoginPage() {
   if (loading) {
     return (
       <main id="main-content">
-        <LoadingState title="Preparing secure sign in..." detail="Opening your private AgentifyAI study workspace." />
+        <LoadingState
+          title={user ? "Signed in. Opening your study workspace..." : "Preparing secure sign in..."}
+          detail={user ? "Connecting to your saved profile. The study server may need a moment to wake up; you do not need to sign in again." : "Opening your private AgentifyAI study workspace."}
+        />
       </main>
     );
   }

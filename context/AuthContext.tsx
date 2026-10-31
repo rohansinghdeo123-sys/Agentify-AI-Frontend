@@ -335,10 +335,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               timeoutMs,
             },
           );
+        // Hosted instances can take longer than eight seconds to wake up.
+        // Keep the original request alive instead of aborting useful work and
+        // restarting it. All transient retries share this one recovery budget.
+        const deadline = Date.now() + 60_000;
         let refreshedToken = false;
         for (let attempt = 0; attempt < 3; attempt += 1) {
           try {
-            const loadedProfile = await loadAccountProfile(8000, forceFresh || attempt > 0);
+            const remainingMs = deadline - Date.now();
+            if (remainingMs <= 0) throw new ApiRequestError("The study server took too long to respond. Please retry.", 408);
+            const loadedProfile = await loadAccountProfile(remainingMs, forceFresh || attempt > 0);
             if (!isCurrent()) return null;
             setAccountProfile(loadedProfile);
             setProfileError("");
@@ -352,10 +358,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               continue;
             }
             if (!isTemporaryBackendError(error) || attempt === 2) throw error;
-            // Keep recovery automatic without trapping the student in a loader.
-            setProfileLoading(false);
-            setProfileError("Your sign-in succeeded. Reconnecting to your study profile...");
-            await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)));
+            if (Date.now() >= deadline) throw error;
+            await new Promise((resolve) => setTimeout(resolve, Math.min(1500 * (attempt + 1), deadline - Date.now())));
             if (!isCurrent()) return null;
           }
         }
