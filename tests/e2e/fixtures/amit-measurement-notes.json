@@ -1,0 +1,592 @@
+{
+  "chapter": {
+    "slug": "some_basic_concepts_of_chemistry",
+    "name": "Some Basic Concepts of Chemistry",
+    "class_level": "Class 11",
+    "subject": "Chemistry",
+    "chapter_number": 1
+  },
+  "active_unit_id": null,
+  "topic_id": "chem11_u01_lu03_measuring_matter",
+  "topic_title": "Measurement and Reliable Chemical Data",
+  "estimated_minutes": {
+    "min": 45,
+    "max": 50
+  },
+  "subtopics": [
+    {
+      "id": "1.3",
+      "title": "Properties of Matter and their Measurement",
+      "section_id": "1.3"
+    },
+    {
+      "id": "1.3.1",
+      "title": "Physical and Chemical Properties",
+      "section_id": "1.3.1"
+    },
+    {
+      "id": "1.3.2",
+      "title": "Measurement of Physical Properties",
+      "section_id": "1.3.2"
+    },
+    {
+      "id": "1.3.3",
+      "title": "The International System of Units (SI)",
+      "section_id": "1.3.3"
+    },
+    {
+      "id": "1.3.4",
+      "title": "Mass and Weight",
+      "section_id": "1.3.4"
+    },
+    {
+      "id": "1.3.5",
+      "title": "Volume",
+      "section_id": "1.3.5"
+    },
+    {
+      "id": "1.3.6",
+      "title": "Density",
+      "section_id": "1.3.6"
+    },
+    {
+      "id": "1.3.7",
+      "title": "Temperature",
+      "section_id": "1.3.7"
+    },
+    {
+      "id": "1.4",
+      "title": "Uncertainty in Measurement",
+      "section_id": "1.4"
+    },
+    {
+      "id": "1.4.1",
+      "title": "Scientific Notation",
+      "section_id": "1.4.1"
+    },
+    {
+      "id": "1.4.2",
+      "title": "Significant Figures",
+      "section_id": "1.4.2"
+    },
+    {
+      "id": "1.4.3",
+      "title": "Dimensional Analysis",
+      "section_id": "1.4.3"
+    }
+  ],
+  "pages": [
+    {
+      "id": "amit-ch1-08",
+      "title": "Properties of Matter and their Measurement",
+      "source": "Amit Master Notes",
+      "subtopic_ids": [
+        "1.3"
+      ],
+      "source_pages": [
+        2
+      ],
+      "source_section_ids": [
+        "amit-ch1-08"
+      ],
+      "teaching_format": "concept",
+      "text": "Definition: Physical properties can be observed or measured without changing the chemical identity of a substance.\n\nExample / application: Examples include colour, density, melting point and boiling point.\n\nKey takeaway: Physical properties can be observed or measured without changing the chemical identity of a substance.",
+      "blocks": [
+        {
+          "label": "Definition",
+          "text": "Physical properties can be observed or measured without changing the chemical identity of a substance."
+        },
+        {
+          "label": "Example / application",
+          "text": "Examples include colour, density, melting point and boiling point."
+        },
+        {
+          "label": "Key takeaway",
+          "text": "Physical properties can be observed or measured without changing the chemical identity of a substance."
+        }
+      ]
+    },
+    {
+      "id": "amit-ch1-09",
+      "title": "Physical and Chemical Properties",
+      "source": "Amit Master Notes",
+      "subtopic_ids": [
+        "1.3.1"
+      ],
+      "source_pages": [
+        2
+      ],
+      "source_section_ids": [
+        "amit-ch1-09"
+      ],
+      "teaching_format": "concept",
+      "text": "Definition: Chemical properties describe how a substance reacts to form new substances.\n\nExample / application: For example, iron reacts with oxygen and moisture to form rust; wood burns and forms new substances.\n\nKey takeaway: Chemical properties describe how a substance reacts to form new substances.",
+      "blocks": [
+        {
+          "label": "Definition",
+          "text": "Chemical properties describe how a substance reacts to form new substances."
+        },
+        {
+          "label": "Example / application",
+          "text": "For example, iron reacts with oxygen and moisture to form rust; wood burns and forms new substances."
+        },
+        {
+          "label": "Key takeaway",
+          "text": "Chemical properties describe how a substance reacts to form new substances."
+        }
+      ]
+    },
+    {
+      "id": "amit-ch1-10",
+      "title": "Measurement of Physical Properties",
+      "source": "Amit Master Notes",
+      "subtopic_ids": [
+        "1.3.2"
+      ],
+      "source_pages": [
+        2
+      ],
+      "source_section_ids": [
+        "amit-ch1-10"
+      ],
+      "teaching_format": "concept",
+      "text": "Definition: A measurement includes a numerical value and a unit.\n\nExample / application: For example, 5 cm means five centimetres.\n\nSimple explanation: Units make measurements clear and comparable.\n\nKey takeaway: A measurement includes a numerical value and a unit.",
+      "blocks": [
+        {
+          "label": "Definition",
+          "text": "A measurement includes a numerical value and a unit."
+        },
+        {
+          "label": "Example / application",
+          "text": "For example, 5 cm means five centimetres."
+        },
+        {
+          "label": "Simple explanation",
+          "text": "Units make measurements clear and comparable."
+        },
+        {
+          "label": "Key takeaway",
+          "text": "A measurement includes a numerical value and a unit."
+        }
+      ]
+    },
+    {
+      "id": "amit-ch1-11",
+      "title": "The International System of Units (SI)",
+      "source": "Amit Master Notes",
+      "subtopic_ids": [
+        "1.3.3"
+      ],
+      "source_pages": [
+        2
+      ],
+      "source_section_ids": [
+        "amit-ch1-11",
+        "amit-ch1-12",
+        "amit-ch1-13"
+      ],
+      "teaching_format": "classification",
+      "text": "Definition: Length: metre (m); mass: kilogram (kg); time: second (s); electric current: ampere (A); thermodynamic temperature: kelvin (K); amount of substance: mole (mol); luminous intensity: candela (cd).\n\nCategories and characteristics: The SI base unit of mass is kilogram, although grams are common in chemistry.\n\nDefinition: Derived units combine base units.\n\nCategories and characteristics: Area uses m^2; volume uses m^3; speed uses m s^(-1); density uses kg m^(-3); force uses newton (N), equal to kg m s^(-2).\n\nCategories and characteristics: Chemistry also commonly uses litres (L), millilitres (mL) and grams (g).\n\nDefinition: kilo (k) = 10^3; centi (c) = 10^(-2); milli (m) = 10^(-3); micro (u) = 10^(-6); nano (n) = 10^(-9).\n\nCategories and characteristics: Thus, 1 km = 1000 m, 1 cm = 0.01 m, 1 mm = 0.001 m, and 1 L = 1000 mL.\n\nKey takeaway: Length: metre (m); mass: kilogram (kg); time: second (s); electric current: ampere (A); thermodynamic temperature: kelvin (K); amount of substance: mole (mol); luminous intensity: candela (cd).",
+      "blocks": [
+        {
+          "label": "Definition",
+          "text": "Length: metre (m); mass: kilogram (kg); time: second (s); electric current: ampere (A); thermodynamic temperature: kelvin (K); amount of substance: mole (mol); luminous intensity: candela (cd)."
+        },
+        {
+          "label": "Categories and characteristics",
+          "text": "The SI base unit of mass is kilogram, although grams are common in chemistry."
+        },
+        {
+          "label": "Definition",
+          "text": "Derived units combine base units."
+        },
+        {
+          "label": "Categories and characteristics",
+          "text": "Area uses m^2; volume uses m^3; speed uses m s^(-1); density uses kg m^(-3); force uses newton (N), equal to kg m s^(-2)."
+        },
+        {
+          "label": "Categories and characteristics",
+          "text": "Chemistry also commonly uses litres (L), millilitres (mL) and grams (g)."
+        },
+        {
+          "label": "Definition",
+          "text": "kilo (k) = 10^3; centi (c) = 10^(-2); milli (m) = 10^(-3); micro (u) = 10^(-6); nano (n) = 10^(-9)."
+        },
+        {
+          "label": "Categories and characteristics",
+          "text": "Thus, 1 km = 1000 m, 1 cm = 0.01 m, 1 mm = 0.001 m, and 1 L = 1000 mL."
+        },
+        {
+          "label": "Key takeaway",
+          "text": "Length: metre (m); mass: kilogram (kg); time: second (s); electric current: ampere (A); thermodynamic temperature: kelvin (K); amount of substance: mole (mol); luminous intensity: candela (cd)."
+        }
+      ]
+    },
+    {
+      "id": "amit-ch1-14",
+      "title": "Mass and Weight",
+      "source": "Amit Master Notes",
+      "subtopic_ids": [
+        "1.3.4"
+      ],
+      "source_pages": [
+        2
+      ],
+      "source_section_ids": [
+        "amit-ch1-14"
+      ],
+      "teaching_format": "concept",
+      "text": "Definition: Mass measures the amount of matter.\n\nSimple explanation: Its SI unit is kilogram (kg), though grams (g) are often used in chemistry.\n\nSimple explanation: Mass does not change when an object moves from Earth to the Moon.\n\nSimple explanation: Weight is gravitational force: W = m x g, where m is mass and g is gravitational acceleration.\n\nSimple explanation: Weight is measured in newtons (N) and changes with gravity.\n\nKey takeaway: Mass measures the amount of matter.",
+      "blocks": [
+        {
+          "label": "Definition",
+          "text": "Mass measures the amount of matter."
+        },
+        {
+          "label": "Simple explanation",
+          "text": "Its SI unit is kilogram (kg), though grams (g) are often used in chemistry."
+        },
+        {
+          "label": "Simple explanation",
+          "text": "Mass does not change when an object moves from Earth to the Moon."
+        },
+        {
+          "label": "Simple explanation",
+          "text": "Weight is gravitational force: W = m x g, where m is mass and g is gravitational acceleration."
+        },
+        {
+          "label": "Simple explanation",
+          "text": "Weight is measured in newtons (N) and changes with gravity."
+        },
+        {
+          "label": "Key takeaway",
+          "text": "Mass measures the amount of matter."
+        }
+      ]
+    },
+    {
+      "id": "amit-ch1-15",
+      "title": "Volume",
+      "source": "Amit Master Notes",
+      "subtopic_ids": [
+        "1.3.5"
+      ],
+      "source_pages": [
+        2
+      ],
+      "source_section_ids": [
+        "amit-ch1-15"
+      ],
+      "teaching_format": "concept",
+      "text": "Definition: Volume is the space occupied by an object or substance.\n\nSimple explanation: Its SI unit is m^3.\n\nSimple explanation: Useful conversions: 1 L = 1000 mL; 1 mL = 1 cm^3; 1 L = 1000 cm^3.\n\nSimple explanation: For a box, volume = length x breadth x height.\n\nSimple explanation: For an irregular solid that does not dissolve or react in water, the increase in water level after immersion equals its volume.\n\nKey takeaway: Volume is the space occupied by an object or substance.",
+      "blocks": [
+        {
+          "label": "Definition",
+          "text": "Volume is the space occupied by an object or substance."
+        },
+        {
+          "label": "Simple explanation",
+          "text": "Its SI unit is m^3."
+        },
+        {
+          "label": "Simple explanation",
+          "text": "Useful conversions: 1 L = 1000 mL; 1 mL = 1 cm^3; 1 L = 1000 cm^3."
+        },
+        {
+          "label": "Simple explanation",
+          "text": "For a box, volume = length x breadth x height."
+        },
+        {
+          "label": "Simple explanation",
+          "text": "For an irregular solid that does not dissolve or react in water, the increase in water level after immersion equals its volume."
+        },
+        {
+          "label": "Key takeaway",
+          "text": "Volume is the space occupied by an object or substance."
+        }
+      ]
+    },
+    {
+      "id": "amit-ch1-16",
+      "title": "Density",
+      "source": "Amit Master Notes",
+      "subtopic_ids": [
+        "1.3.6"
+      ],
+      "source_pages": [
+        2
+      ],
+      "source_section_ids": [
+        "amit-ch1-16"
+      ],
+      "teaching_format": "numerical",
+      "text": "Formula / application: Density is mass per unit volume: density = mass / volume.\n\nTerms and units: Common units are g cm^(-3), g mL^(-1) and kg m^(-3).\n\nWorked example: Example: mass = 60 g and volume = 20 cm^3.\n\nFormula / application: Density = 60 / 20 = 3 g cm^(-3).\n\nFormula / application: Rearranging gives mass = density x volume and volume = mass / density.\n\nPractice: Rework the source example above. Explain each conversion and include the units at every step.",
+      "blocks": [
+        {
+          "label": "Formula / application",
+          "text": "Density is mass per unit volume: density = mass / volume."
+        },
+        {
+          "label": "Terms and units",
+          "text": "Common units are g cm^(-3), g mL^(-1) and kg m^(-3)."
+        },
+        {
+          "label": "Worked example",
+          "text": "Example: mass = 60 g and volume = 20 cm^3."
+        },
+        {
+          "label": "Formula / application",
+          "text": "Density = 60 / 20 = 3 g cm^(-3)."
+        },
+        {
+          "label": "Formula / application",
+          "text": "Rearranging gives mass = density x volume and volume = mass / density."
+        },
+        {
+          "label": "Practice",
+          "text": "Rework the source example above. Explain each conversion and include the units at every step."
+        }
+      ]
+    },
+    {
+      "id": "amit-ch1-17",
+      "title": "Temperature",
+      "source": "Amit Master Notes",
+      "subtopic_ids": [
+        "1.3.7"
+      ],
+      "source_pages": [
+        3
+      ],
+      "source_section_ids": [
+        "amit-ch1-17"
+      ],
+      "teaching_format": "numerical",
+      "text": "Terms and units: Temperature indicates how hot or cold something is and is related to the average kinetic energy of its particles.\n\nTerms and units: SI unit: kelvin (K).\n\nFormula / application: T(K) = t(degrees C) + 273.15; t(degrees C) = T(K) - 273.15.\n\nWorked example: Example: 27 degrees C = 300.15 K, approximately 300 K.\n\nPractice: Rework the source example above. Explain each conversion and include the units at every step.",
+      "blocks": [
+        {
+          "label": "Terms and units",
+          "text": "Temperature indicates how hot or cold something is and is related to the average kinetic energy of its particles."
+        },
+        {
+          "label": "Terms and units",
+          "text": "SI unit: kelvin (K)."
+        },
+        {
+          "label": "Formula / application",
+          "text": "T(K) = t(degrees C) + 273.15; t(degrees C) = T(K) - 273.15."
+        },
+        {
+          "label": "Worked example",
+          "text": "Example: 27 degrees C = 300.15 K, approximately 300 K."
+        },
+        {
+          "label": "Practice",
+          "text": "Rework the source example above. Explain each conversion and include the units at every step."
+        }
+      ]
+    },
+    {
+      "id": "amit-ch1-18",
+      "title": "Uncertainty in Measurement",
+      "source": "Amit Master Notes",
+      "subtopic_ids": [
+        "1.4"
+      ],
+      "source_pages": [
+        3
+      ],
+      "source_section_ids": [
+        "amit-ch1-18"
+      ],
+      "teaching_format": "numerical",
+      "text": "Terms and units: No measurement is perfectly exact.\n\nTerms and units: Instruments have limited precision.\n\nTerms and units: A ruler marked only in centimetres cannot measure a length as finely as a ruler marked in millimetres.\n\nPractice: Rework the source example above. Explain each conversion and include the units at every step.",
+      "blocks": [
+        {
+          "label": "Terms and units",
+          "text": "No measurement is perfectly exact."
+        },
+        {
+          "label": "Terms and units",
+          "text": "Instruments have limited precision."
+        },
+        {
+          "label": "Terms and units",
+          "text": "A ruler marked only in centimetres cannot measure a length as finely as a ruler marked in millimetres."
+        },
+        {
+          "label": "Practice",
+          "text": "Rework the source example above. Explain each conversion and include the units at every step."
+        }
+      ]
+    },
+    {
+      "id": "amit-ch1-19",
+      "title": "Scientific Notation",
+      "source": "Amit Master Notes",
+      "subtopic_ids": [
+        "1.4.1"
+      ],
+      "source_pages": [
+        3
+      ],
+      "source_section_ids": [
+        "amit-ch1-19",
+        "amit-ch1-20",
+        "amit-ch1-21",
+        "amit-ch1-22"
+      ],
+      "teaching_format": "numerical",
+      "text": "Terms and units: Write a number as a x 10^n, where a is at least 1 but less than 10.\n\nFormula / application: Large number: 450000 = 4.5 x 10^5.\n\nFormula / application: Small number: 0.00072 = 7.2 x 10^(-4).\n\nTerms and units: The exponent tells how many places the decimal point moves.\n\nFormula / application: Multiply the coefficients and add exponents: (2 x 10^3) x (3 x 10^4) = 6 x 10^(3+4) = 6 x 10^7.\n\nFormula / application: Divide the coefficients and subtract exponents: (8 x 10^7) / (2 x 10^3) = 4 x 10^(7-3) = 4 x 10^4.\n\nTerms and units: First make the powers of 10 the same.\n\nWorked example: Example: 3 x 10^5 + 2 x 10^4 = 3 x 10^5 + 0.2 x 10^5 = 3.2 x 10^5.\n\nTerms and units: Do not add or subtract exponents when adding or subtracting numbers.\n\nPractice: Rework the source example above. Explain each conversion and include the units at every step.",
+      "blocks": [
+        {
+          "label": "Terms and units",
+          "text": "Write a number as a x 10^n, where a is at least 1 but less than 10."
+        },
+        {
+          "label": "Formula / application",
+          "text": "Large number: 450000 = 4.5 x 10^5."
+        },
+        {
+          "label": "Formula / application",
+          "text": "Small number: 0.00072 = 7.2 x 10^(-4)."
+        },
+        {
+          "label": "Terms and units",
+          "text": "The exponent tells how many places the decimal point moves."
+        },
+        {
+          "label": "Formula / application",
+          "text": "Multiply the coefficients and add exponents: (2 x 10^3) x (3 x 10^4) = 6 x 10^(3+4) = 6 x 10^7."
+        },
+        {
+          "label": "Formula / application",
+          "text": "Divide the coefficients and subtract exponents: (8 x 10^7) / (2 x 10^3) = 4 x 10^(7-3) = 4 x 10^4."
+        },
+        {
+          "label": "Terms and units",
+          "text": "First make the powers of 10 the same."
+        },
+        {
+          "label": "Worked example",
+          "text": "Example: 3 x 10^5 + 2 x 10^4 = 3 x 10^5 + 0.2 x 10^5 = 3.2 x 10^5."
+        },
+        {
+          "label": "Terms and units",
+          "text": "Do not add or subtract exponents when adding or subtracting numbers."
+        },
+        {
+          "label": "Practice",
+          "text": "Rework the source example above. Explain each conversion and include the units at every step."
+        }
+      ]
+    },
+    {
+      "id": "amit-ch1-23",
+      "title": "Significant Figures",
+      "source": "Amit Master Notes",
+      "subtopic_ids": [
+        "1.4.2"
+      ],
+      "source_pages": [
+        3
+      ],
+      "source_section_ids": [
+        "amit-ch1-23",
+        "amit-ch1-24",
+        "amit-ch1-25"
+      ],
+      "teaching_format": "numerical",
+      "text": "Terms and units: All non-zero digits count: 347 has 3 significant figures.\n\nTerms and units: Zeros between non-zero digits count: 1005 has 4.\n\nTerms and units: Leading zeros do not count: 0.0042 has 2.\n\nTerms and units: Trailing zeros after a decimal count: 2.500 has 4.\n\nTerms and units: Trailing zeros in whole numbers can be ambiguous, so scientific notation can clarify precision: 1.5 x 10^3 has 2 significant figures; 1.500 x 10^3 has 4.\n\nTerms and units: Round the final answer to the same number of significant figures as the input with the fewest.\n\nWorked example: Example: 2.5 x 3.42 = 8.55, which rounds to 8.6 (2 significant figures).\n\nTerms and units: Round to the least precise decimal place.\n\nWorked example: Example: 12.11 + 3.2 = 15.31, which rounds to 15.3.\n\nTerms and units: Keep extra digits in intermediate steps and round at the end.\n\nPractice: Rework the source example above. Explain each conversion and include the units at every step.",
+      "blocks": [
+        {
+          "label": "Terms and units",
+          "text": "All non-zero digits count: 347 has 3 significant figures."
+        },
+        {
+          "label": "Terms and units",
+          "text": "Zeros between non-zero digits count: 1005 has 4."
+        },
+        {
+          "label": "Terms and units",
+          "text": "Leading zeros do not count: 0.0042 has 2."
+        },
+        {
+          "label": "Terms and units",
+          "text": "Trailing zeros after a decimal count: 2.500 has 4."
+        },
+        {
+          "label": "Terms and units",
+          "text": "Trailing zeros in whole numbers can be ambiguous, so scientific notation can clarify precision: 1.5 x 10^3 has 2 significant figures; 1.500 x 10^3 has 4."
+        },
+        {
+          "label": "Terms and units",
+          "text": "Round the final answer to the same number of significant figures as the input with the fewest."
+        },
+        {
+          "label": "Worked example",
+          "text": "Example: 2.5 x 3.42 = 8.55, which rounds to 8.6 (2 significant figures)."
+        },
+        {
+          "label": "Terms and units",
+          "text": "Round to the least precise decimal place."
+        },
+        {
+          "label": "Worked example",
+          "text": "Example: 12.11 + 3.2 = 15.31, which rounds to 15.3."
+        },
+        {
+          "label": "Terms and units",
+          "text": "Keep extra digits in intermediate steps and round at the end."
+        },
+        {
+          "label": "Practice",
+          "text": "Rework the source example above. Explain each conversion and include the units at every step."
+        }
+      ]
+    },
+    {
+      "id": "amit-ch1-26",
+      "title": "Dimensional Analysis",
+      "source": "Amit Master Notes",
+      "subtopic_ids": [
+        "1.4.3"
+      ],
+      "source_pages": [
+        3
+      ],
+      "source_section_ids": [
+        "amit-ch1-26"
+      ],
+      "teaching_format": "numerical",
+      "text": "Terms and units: Use a conversion fraction equal to 1, arranged so unwanted units cancel.\n\nWorked example: Example: 2.5 km x (1000 m / 1 km) = 2500 m.\n\nWorked example: Example: 500 mL x (1 L / 1000 mL) = 0.5 L.\n\nTerms and units: Check that the final unit matches the requested quantity.\n\nPractice: Rework the source example above. Explain each conversion and include the units at every step.",
+      "blocks": [
+        {
+          "label": "Terms and units",
+          "text": "Use a conversion fraction equal to 1, arranged so unwanted units cancel."
+        },
+        {
+          "label": "Worked example",
+          "text": "Example: 2.5 km x (1000 m / 1 km) = 2500 m."
+        },
+        {
+          "label": "Worked example",
+          "text": "Example: 500 mL x (1 L / 1000 mL) = 0.5 L."
+        },
+        {
+          "label": "Terms and units",
+          "text": "Check that the final unit matches the requested quantity."
+        },
+        {
+          "label": "Practice",
+          "text": "Rework the source example above. Explain each conversion and include the units at every step."
+        }
+      ]
+    }
+  ],
+  "saved_page": 0,
+  "review_required": [],
+  "source": "Amit Master Notes first; NCERT supplements only for gaps",
+  "proficiency": "know_a_little",
+  "concepts": []
+}

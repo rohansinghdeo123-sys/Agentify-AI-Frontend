@@ -28,3 +28,21 @@ describe("study chemistry text transforms", () => {
     ]);
   });
 });
+
+
+describe("scientific notes notation", () => {
+  it("renders the circled SI prefixes and source-PDF exponent variants", () => {
+    for (const notation of ["10^3", "10^-3", "10^(-6)", "10^{-9}"]) {
+      const parts=tokenizeStudyText(notation);
+      expect(parts).toHaveLength(1);
+      expect(parts[0].kind).toBe("variable_power");
+    }
+    expect(tokenizeStudyText("10⁻³")).toEqual([{kind:"text",value:"10⁻³"}]);
+    expect(tokenizeStudyText("cm^3 mol^(-1) kg m^(-3)").filter(p=>p.kind==="variable_power")).toHaveLength(3);
+  });
+  it("retains values and renders compound ion charges", () => {
+    expect(tokenizeStudyText("SO₄²⁻")).toEqual([{kind:"formula",atoms:[{symbol:"S",subscript:""},{symbol:"O",subscript:"4"}],superscript:"2-"}]);
+    expect(tokenizeStudyText("Fe^{3+}")).toEqual([{kind:"formula",atoms:[{symbol:"Fe",subscript:""}],superscript:"3+"}]);
+    expect(tokenizeStudyText("6.02214076 x 10^23")).toEqual([{kind:"text",value:"6.02214076 × "},{kind:"variable_power",value:"10",superscript:"23"}]);
+  });
+});

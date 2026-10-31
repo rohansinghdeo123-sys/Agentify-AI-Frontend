@@ -28,6 +28,7 @@ function renderChemistryText(value: string) {
         </span>
       );
     }
+    if (part.kind === "variable_subscript") return <span key={pieceIndex}>{part.value}<sub>{part.subscript}</sub></span>;
     if (part.kind === "variable_power") {
       return (
         <span key={pieceIndex}>
