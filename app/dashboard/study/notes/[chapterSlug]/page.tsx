@@ -1,7 +1,8 @@
 "use client";
 import LegacyNotes from "./LegacyNotes";
 import { useAuth } from "@/context/AuthContext";
-import { getChapterNotes, getStudyLabContext, recordStudyRouteHeartbeat, type ChapterNotes } from "@/features/study/api";
+import { getChapterNotes, getStudyLabContext, recordStudyRouteHeartbeat, type ChapterNotes, type NotePage } from "@/features/study/api";
+import NotesChemistryText from "@/components/study/NotesChemistryText";
 import ThemedNotePoints from "@/components/study/ThemedNotePoints";
 import { notePoints } from "@/components/study/notePoints";
 import noteStyles from "@/components/study/topic-notes.module.css";
@@ -38,7 +39,7 @@ function TopicNotesReader() {
     }).catch(() => { if (active) setError("Notes could not load. Please retry."); }).finally(() => {if(active)setLoading(false);});
     return () => {active=false;};
   },[authBusy,userId,getAuthHeaders,chapterSlug,topic]);
-  const pages = notes?.pages || notes?.concepts.map((c) => ({id:c.id,title:c.title,source:undefined as string | undefined, source_pages:undefined as number[] | undefined, teaching_format:undefined as string | undefined,text:[c.definition,c.explanation,...c.key_points.map((p)=>`- ${p}`),...c.formulas,...c.examples].filter(Boolean).join("\n\n")})) || [];
+  const pages: NotePage[] = notes?.pages || notes?.concepts.map((c) => ({id:c.id,title:c.title,source:undefined as string | undefined, source_pages:undefined as number[] | undefined, teaching_format:undefined as string | undefined,text:[c.definition,c.explanation,...c.key_points.map((p)=>`- ${p}`),...c.formulas,...c.examples].filter(Boolean).join("\n\n")})) || [];
   const page = Math.max(0, Math.min(pages.length - 1, requestedPage !== null ? Number(requestedPage) || 0 : savedPage));
   const current = pages[page];
   const navigate = async (next: number) => {
@@ -50,7 +51,7 @@ function TopicNotesReader() {
       const headers = await getAuthHeaders();
       const activeUnit = notes?.active_unit_id || (await getStudyLabContext({headers},userId))?.current_unit_id;
       if (activeUnit) {
-        await recordStudyRouteHeartbeat({headers},userId,{unit_id:activeUnit,notes_page:next,notes_topic:notes?.topic_id || topic});
+        await recordStudyRouteHeartbeat({headers},userId,{unit_id:activeUnit,notes_page:next,notes_topic:notes?.topic_id || topic,...(notes?.content_version ? {notes_version:notes.content_version} : {})});
       }
     } catch {setError("Reading position could not sync. This page remains in the address bar; retry before leaving.");}
   };
@@ -63,6 +64,7 @@ function TopicNotesReader() {
       {notes?.estimated_minutes ? <p>{notes.estimated_minutes.min}–{notes.estimated_minutes.max} min · Topic duration</p> : null}
     </div></header>
     {error ? <p role="alert">{error}</p> : null}
+    {notes?.session_portion ? <p className={noteStyles.sessionPortion}>For today’s {notes.session_portion.allocated_minutes}-minute study portion, focus on pages {notes.session_portion.start_page+1}–{notes.session_portion.end_page+1}.{notes.session_portion.additional_practice_needed ? " Continue the remaining explanation and practice in your next session." : " Allow time for the revision questions."}</p> : null}
     {current ? <>
       <nav aria-label="Reading pages" className={noteStyles.navigation}>
         <button disabled={page===0} onClick={()=>void navigate(page-1)}>Previous</button>
@@ -72,8 +74,10 @@ function TopicNotesReader() {
       </nav>
       <progress aria-label="Reading progress" value={page+1} max={pages.length} className={noteStyles.progress} />
       <article className={noteStyles.card} data-tone={page % 3}>
-        <div className={noteStyles.eyebrow}><span>{current.source || "Concept notes"}</span><span className={noteStyles.badge}>{notePoints(current.text).length} key {notePoints(current.text).length === 1 ? "point" : "points"}</span></div>
-        <h2>{current.title}</h2>{current.source_pages?.length ? <p>{current.source} · PDF page {current.source_pages.join(", ")} · {current.teaching_format || "concept"}</p> : null}<ThemedNotePoints text={current.text} />
+        <div className={noteStyles.eyebrow}><span>{current.source || "Concept notes"}</span><span className={noteStyles.badge}>{current.blocks?.length || notePoints(current.text).length} key {(current.blocks?.length || notePoints(current.text).length) === 1 ? "point" : "points"}</span></div>
+        <h2>{current.title}</h2>{current.source_pages?.length ? <p>{current.source} · PDF page {current.source_pages.join(", ")}</p> : null}<ThemedNotePoints text={current.text} blocks={current.blocks} />
+        {current.questions?.length ? <section className={noteStyles.review} aria-label="Check your understanding"><h3>Check your understanding</h3><ol>{current.questions.map((q,i)=><li key={i}><NotesChemistryText text={q.question} /><details><summary>Check the reasoning</summary><NotesChemistryText text={q.answer} /></details></li>)}</ol></section> : null}
+        {current.transition ? <p className={noteStyles.transition}><NotesChemistryText text={current.transition} /></p> : null}
       </article>
       <p>Reading progress records your position. Demonstrate mastery with a quick check.</p>
       <Link className={noteStyles.continue} href="/dashboard/study?planned=1">Continue to learning and quick check</Link>

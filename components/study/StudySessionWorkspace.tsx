@@ -563,15 +563,21 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
   );
   const authBusy = loading || authLoading;
   const [notesContext, setNotesContext] = useState("");
+  const [notesReference, setNotesReference] = useState<{contentVersion: string; pageNumber: number; subtopicIds: string[]} | null>(null);
   const notesTopic = searchParams.get("notesTopic");
   const notesPage = searchParams.get("notesPage");
   const notesReturn = notesTopic ? `/dashboard/study/notes/${encodeURIComponent(scope.chapterId)}?topic=${encodeURIComponent(notesTopic)}&page=${Number(notesPage) || 0}&planned=1` : "";
   useEffect(() => {
     if (!notesTopic || !userId || authBusy) return;
+    setNotesContext("");
+    setNotesReference(null);
     let active = true;
     void getAuthHeaders().then((headers) => getChapterNotes({headers},scope.chapterId,notesTopic)).then((notes) => {
       const page = notes?.pages?.[Number(notesPage) || 0];
-      if (active && page) setNotesContext(`Current notes reference. Source: ${page.source || "Study notes"}. Source PDF pages: ${(page.source_pages || []).join(", ")}. Teaching format: ${page.teaching_format || "concept"}. Chapter: ${notes!.chapter.name}. Planning topic: ${notes!.topic_title}. Subtopic: ${page.title}. Page: ${Number(notesPage)+1}. Proficiency: ${notes!.proficiency}. Explain using this content first; keep scientific meaning and units unchanged. Discuss other topics only if explicitly requested.\n${page.text}`);
+      if (active && page) {
+        setNotesReference({contentVersion:notes?.content_version || "", pageNumber:page.page_number || Number(notesPage)+1, subtopicIds:page.source_section_ids || []});
+        setNotesContext(`Current notes reference. Source: ${page.source || "Study notes"}. Source PDF pages: ${(page.source_pages || []).join(", ")}. Teaching format: ${page.teaching_format || "concept"}. Chapter: ${notes!.chapter.name}. Planning topic: ${notes!.topic_title}. Subtopic: ${page.title}. Page: ${Number(notesPage)+1}. Proficiency: ${notes!.proficiency}. Explanation preference: ${notes!.explanation_style || "balanced"}. Configured full-topic time: ${notes!.estimated_minutes?.min}–${notes!.estimated_minutes?.max} min; today’s allocated portion: ${notes!.allocated_session_minutes ?? "not specified"} min. Teach only this page and its prerequisites; introduce terminology before using it and solve numericals without skipping steps. Explain using this content first; keep scientific meaning and units unchanged. Discuss other topics only if explicitly requested.\n${page.text}`);
+      }
     }).catch(() => {if(active)setError("Page context could not load. Return to notes and retry.");});
     return () => {active=false;};
   },[notesTopic,notesPage,userId,authBusy,getAuthHeaders,scope.chapterId]);
@@ -840,6 +846,7 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
             weak_signals: mentor.weakSignals,
           },
           learningContext: {
+            ...(notesReference?.contentVersion ? {notes_content_version:notesReference.contentVersion,notes_page_number:notesReference.pageNumber,notes_subtopic_ids:notesReference.subtopicIds} : {}),
             is_follow_up: tutorContext.isFollowUp,
             previous_user_question: tutorContext.previousQuestion,
             previous_ai_answer: tutorContext.previousAnswer,

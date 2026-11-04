@@ -634,12 +634,24 @@ export interface ConceptNote {
   common_mistakes: (string | { mistake?: string; correction?: string; note?: string })[];
 }
 
+export interface NotePage {
+  id: string; title: string; text: string; source?: string; source_pages?: number[];
+  teaching_format?: string; source_concept_id?: string; page_number?: number;
+  blocks?: Array<{kind: string; text: string; level?: string}>;
+  transition?: string; source_section_ids?: string[];
+  questions?: Array<{question: string; answer: string}>;
+}
+
 export interface ChapterNotes {
   active_unit_id?: string | null;
   topic_id?: string;
   topic_title?: string;
   estimated_minutes?: {min: number; max: number};
-  pages?: Array<{id: string; title: string; text: string; source?: string; source_pages?: number[]; teaching_format?: string; source_concept_id?: string}>;
+  pages?: NotePage[];
+  content_version?: string;
+  explanation_style?: string;
+  allocated_session_minutes?: number | null;
+  session_portion?: {start_page: number; end_page: number; allocated_minutes: number; additional_practice_needed: boolean} | null;
   saved_page?: number;
   proficiency?: string;
   review_required?: Array<{reason: string}>;

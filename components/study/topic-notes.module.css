@@ -38,3 +38,13 @@
 .progress::-webkit-progress-bar { background: var(--market-border, #dbe6ec); border-radius: 20px; }
 .progress::-webkit-progress-value { background: var(--notes-accent); border-radius: 20px; }
 .progress::-moz-progress-bar { background: var(--notes-accent); border-radius: 20px; }
+
+.teachingText { white-space: pre-line; }
+.transition { margin-top: 1.3rem; padding-left: 1rem; border-left: 3px solid var(--notes-accent); line-height: 1.7; }
+.review { margin-top: 1.5rem; line-height: 1.8; }
+.review li { margin-bottom: 1rem; padding-left: .3rem; }
+.review summary { color: var(--notes-accent); cursor: pointer; font-weight: 700; }
+.review details { margin-top: .4rem; }
+.sessionPortion { padding: 1rem; border: 1px solid var(--market-border, #dbe6ec); border-radius: 12px; line-height: 1.7; }
+
+.review ol { list-style: decimal; padding-left: 1.5rem; }
