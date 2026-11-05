@@ -45,4 +45,17 @@ describe("scientific notes notation", () => {
     expect(tokenizeStudyText("Fe^{3+}")).toEqual([{kind:"formula",atoms:[{symbol:"Fe",subscript:""}],superscript:"3+"}]);
     expect(tokenizeStudyText("6.02214076 x 10^23")).toEqual([{kind:"text",value:"6.02214076 × "},{kind:"variable_power",value:"10",superscript:"23"}]);
   });
+  it("distinguishes metal charge numbers from molecular-ion atom counts", () => {
+    expect(tokenizeStudyText("Fe3+")).toEqual([{kind:"formula",atoms:[{symbol:"Fe",subscript:""}],superscript:"3+"}]);
+    expect(tokenizeStudyText("NH4+")).toEqual([{kind:"formula",atoms:[{symbol:"N",subscript:""},{symbol:"H",subscript:"4"}],superscript:"+"}]);
+    expect(tokenizeStudyText("H2+")).toEqual([{kind:"formula",atoms:[{symbol:"H",subscript:"2"}],superscript:"+"}]);
+    expect(tokenizeStudyText("Na+ + Cl- → NaCl").filter(p=>p.kind==="formula").map(p=>p.superscript)).toEqual(["+","-",""]);
+  });
+  it("keeps grouped formula counts attached to the group", () => {
+    expect(tokenizeStudyText("Ca(OH)2")).toEqual([{kind:"formula",atoms:[{symbol:"Ca",subscript:""},{symbol:"(",subscript:""},{symbol:"O",subscript:""},{symbol:"H",subscript:""},{symbol:")",subscript:"2"}],superscript:""}]);
+    const ammonium=tokenizeStudyText("(NH4)2SO4");
+    expect(ammonium).toHaveLength(1);
+    expect(ammonium[0].kind).toBe("formula");
+    expect(tokenizeStudyText("CH3-CH3").some(p=>p.kind==="formula" && p.superscript)).toBe(false);
+  });
 });

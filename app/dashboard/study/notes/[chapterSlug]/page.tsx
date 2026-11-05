@@ -1,5 +1,5 @@
 "use client";
-import LegacyNotes from "./LegacyNotes";
+import { LegacyNotesContent } from "./LegacyNotes";
 import { useAuth } from "@/context/AuthContext";
 import { getChapterNotes, getStudyLabContext, recordStudyRouteHeartbeat, type ChapterNotes, type NotePage } from "@/features/study/api";
 import NotesChemistryText from "@/components/study/NotesChemistryText";
@@ -15,8 +15,7 @@ import { useEffect, useState } from "react";
 import styles from "../../home.module.css";
 
 export default function StudyNotesPage() {
-  const {chapterSlug} = useParams<{chapterSlug:string}>();
-  return chapterSlug.includes("some_basic_concepts_of_chemistry") || chapterSlug === "matter" ? <TopicNotesReader /> : <LegacyNotes />;
+  return <TopicNotesReader />;
 }
 
 function TopicNotesReader() {
@@ -30,14 +29,16 @@ function TopicNotesReader() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    if (authBusy || !userId) return;
+    if (authBusy) return;
+    if (!userId) return;
     let active = true;
-    void getAuthHeaders().then((headers) => { if (active) setLoading(true); return getChapterNotes({headers},chapterSlug,topic); }).then((data) => {
+    const abort = new AbortController();
+    void getAuthHeaders().then((headers) => { if (!active) return null; setLoading(true);setError(""); return getChapterNotes({headers},chapterSlug,topic,abort.signal); }).then((data) => {
       if (!active) return;
       setNotes(data);
       setSavedPage(data?.saved_page || 0);
     }).catch(() => { if (active) setError("Notes could not load. Please retry."); }).finally(() => {if(active)setLoading(false);});
-    return () => {active=false;};
+    return () => {active=false;abort.abort();};
   },[authBusy,userId,getAuthHeaders,chapterSlug,topic]);
   const pages: NotePage[] = notes?.pages || notes?.concepts.map((c) => ({id:c.id,title:c.title,source:undefined as string | undefined, source_pages:undefined as number[] | undefined, teaching_format:undefined as string | undefined,text:[c.definition,c.explanation,...c.key_points.map((p)=>`- ${p}`),...c.formulas,...c.examples].filter(Boolean).join("\n\n")})) || [];
   const page = Math.max(0, Math.min(pages.length - 1, requestedPage !== null ? Number(requestedPage) || 0 : savedPage));
@@ -47,6 +48,7 @@ function TopicNotesReader() {
     // Next synchronizes native history with useSearchParams without a server
     // navigation. Paging an already-loaded lesson needs no RSC round trip.
     window.history.replaceState(null, "", `?${query}`);
+    if (notes?.can_save_position === false) return;
     try {
       const headers = await getAuthHeaders();
       const activeUnit = notes?.active_unit_id || (await getStudyLabContext({headers},userId))?.current_unit_id;
@@ -55,9 +57,10 @@ function TopicNotesReader() {
       }
     } catch {setError("Reading position could not sync. This page remains in the address bar; retry before leaving.");}
   };
-  const askHref = current ? `${studySessionHref(createConversationId(),{source:"syllabus",catalogSource:notes?.topic_id?.startsWith("chem11_u01") ? "planning_manifest" : "published",classLevel:notes?.chapter.class_level,subject:notes?.chapter.subject || "",chapterId:chapterSlug,chapterLabel:notes?.chapter.name || chapterSlug,topicId:notes?.topic_id || topic || current.id,topicLabel:notes?.topic_title || current.title},{fresh:true})}&entry=ask_ai&notesPage=${page}&notesTopic=${encodeURIComponent(notes?.topic_id || topic || current.id)}` : "#";
-  if (authBusy || loading) return <LoadingState title="Loading topic notes" detail="Opening your saved reading position." />;
+  const askHref = current ? `${studySessionHref(createConversationId(),{source:"syllabus",catalogSource:notes?.catalog_source || (notes?.topic_id?.startsWith("chem11_") ? "planning_manifest" : "published"),classLevel:notes?.chapter.class_level,subject:notes?.chapter.subject || "",chapterId:chapterSlug,chapterLabel:notes?.chapter.name || chapterSlug,topicId:notes?.topic_id || topic || current.id,topicLabel:notes?.topic_title || current.title},{fresh:true})}&entry=ask_ai&notesPage=${page}&notesTopic=${encodeURIComponent(notes?.topic_id || topic || current.id)}` : "#";
+  if (authBusy || (userId && loading)) return <LoadingState title="Loading topic notes" detail="Opening your saved reading position." />;
   if (!userId) return <p>Please sign in to read notes.</p>;
+  if (notes && !notes.pages) return <LegacyNotesContent notes={notes} topicId={topic} />;
   return <div className={`${styles.notesContainer} ${noteStyles.reader}`}>
     <header className={styles.notesHeader}><Link href="/dashboard/planning/active">Return to Planning</Link><div>
       <p>{notes?.chapter.name}</p><h1>{notes?.topic_title || "Topic notes"}</h1>

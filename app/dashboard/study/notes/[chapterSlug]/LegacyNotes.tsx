@@ -71,6 +71,10 @@ export default function LegacyNotes() {
     );
   }
 
+  return <LegacyNotesContent notes={notes} topicId={topicId} />;
+}
+
+export function LegacyNotesContent({ notes, topicId }: { notes: ChapterNotes; topicId?: string }) {
   return (
     <div className={`${styles.notesContainer} ${noteStyles.reader}`}>
       <header className={styles.notesHeader}>

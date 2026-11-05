@@ -24,12 +24,15 @@ const CHEMICAL_ELEMENT_PATTERN = Array.from(CHEMICAL_ELEMENTS).sort((left, right
 const NUMERIC_SUBSCRIPT_PATTERN = "(?:\\d+|[\\u2080-\\u2089]+)";
 const ATOM_SUBSCRIPT_PATTERN = "(?:\\d*n(?:[+-]\\d+)?|n|\\d+|[\\u2080-\\u2089\\u2099\\u208A\\u208B]+)";
 const ATOM_PATTERN = `(?:${CHEMICAL_ELEMENT_PATTERN})(?:${ATOM_SUBSCRIPT_PATTERN})?`;
+const GROUP_PATTERN = `\\((?:${ATOM_PATTERN})+\\)(?:${NUMERIC_SUBSCRIPT_PATTERN})?`;
+const GROUPED_FORMULA_PATTERN = `(?:${ATOM_PATTERN}|${GROUP_PATTERN})+`;
 const CHARGE_PATTERN = "(?:\\^[+-]?\\d+[+-]?|\\^[+-])?";
 const FORMULA_CANDIDATE = [
   "sp\\d+",
   "[A-Za-z]_\\{?[A-Za-z]\\}?",
   "(?:10|[a-z]{1,4}|L|K)\\^(?:\\{[+\\-0-9]+\\}|\\([+\\-0-9]+\\)|[+\\-]?\\d+)",
   "[a-zA-Z]\\^-?\\d+",
+  `(?:${ATOM_PATTERN})*(?:${GROUP_PATTERN})(?:${ATOM_PATTERN}|${GROUP_PATTERN})*${CHARGE_PATTERN}`,
   `(?:${ATOM_PATTERN}){2,}${CHARGE_PATTERN}`,
   `(?:${CHEMICAL_ELEMENT_PATTERN})${NUMERIC_SUBSCRIPT_PATTERN}${CHARGE_PATTERN}`,
   `(?:${CHEMICAL_ELEMENT_PATTERN})(?:\\^[+-]?\\d+[+-]?|\\^[+-])`,
@@ -75,8 +78,17 @@ function parseStudyTextPart(piece: string): StudyTextPart {
   const superscript = chargeMatch ? chargeMatch[2] : "";
   const atoms: ChemistryAtom[] = [];
   let cursor = 0;
+  let groupDepth = 0;
 
   while (cursor < formula.length) {
+    if (formula[cursor] === "(") {
+      atoms.push({symbol:"(",subscript:""}); groupDepth++; cursor++; continue;
+    }
+    if (formula[cursor] === ")" && groupDepth > 0) {
+      const closing = formula.slice(cursor).match(/^\)(\d+)?/)!;
+      atoms.push({symbol:")",subscript:closing[1] || ""});
+      groupDepth--; cursor += closing[0].length; continue;
+    }
     const match = formula.slice(cursor).match(ATOM_REGEX);
     if (!match || !CHEMICAL_ELEMENTS.has(match[1])) break;
     atoms.push({ symbol: match[1], subscript: match[2] || "" });
@@ -84,7 +96,7 @@ function parseStudyTextPart(piece: string): StudyTextPart {
   }
 
   const hasSubscript = atoms.some((atom) => atom.subscript);
-  if (cursor !== formula.length || !atoms.length || (atoms.length === 1 && !hasSubscript && !superscript)) {
+  if (groupDepth || cursor !== formula.length || !atoms.length || (atoms.length === 1 && !hasSubscript && !superscript)) {
     return { kind: "text", value: piece };
   }
 
@@ -98,6 +110,10 @@ export function normalizeScientificNotation(value: string): string {
     .replace(/([A-Z][A-Za-z0-9₀-₉)]*)([⁰¹²³⁴⁵⁶⁷⁸⁹⁻⁺]+)/g, (_,base:string,power:string) => `${base}^${Array.from(power,c=>powers[c]).join("")}`)
     .replace(/\^([({]?)[−–]/g, "^$1-")
     .replace(/\^\{([+\-]?\d+[+\-]?|[+\-])\}/g, "^$1")
+    // Bare metal-ion notation denotes a charge, not an atom count (Fe3+).
+    // Keep molecular ions such as H2+ distinct; their 2 remains a subscript.
+    .replace(/\b(Li|Na|K|Rb|Cs|Be|Mg|Ca|Sr|Ba|Al|Sc|Ti|V|Cr|Mn|Fe|Co|Ni|Cu|Zn|Ag|Cd|Sn|Hg|Pb)(\d+)([+-])(?![A-Za-z0-9])/g, "$1^$2$3")
+    .replace(new RegExp(`(?<![A-Za-z0-9^])(${GROUPED_FORMULA_PATTERN})([+-])(?![A-Za-z0-9])`, "g"), "$1^$2")
     .replace(/\bmicro \(u\)/g, "micro (µ)")
     .replace(/(\d)\s*x\s*(?=10\^)/g, "$1 × ")
     .replace(/(\d)\s+x\s+(?=\d)/g, "$1 × ")

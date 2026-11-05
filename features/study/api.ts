@@ -644,6 +644,8 @@ export interface NotePage {
 
 export interface ChapterNotes {
   active_unit_id?: string | null;
+  can_save_position?: boolean;
+  catalog_source?: "planning_manifest" | "published";
   topic_id?: string;
   topic_title?: string;
   estimated_minutes?: {min: number; max: number};
