@@ -643,6 +643,9 @@ export interface NotePage {
 }
 
 export interface ChapterNotes {
+  resolution?: "topic_choice" | "lesson";
+  requested_topic_id?: string;
+  topic_options?: Array<{id: string; title: string; estimated_minutes: {min: number; max: number}}>;
   active_unit_id?: string | null;
   can_save_position?: boolean;
   catalog_source?: "planning_manifest" | "published";

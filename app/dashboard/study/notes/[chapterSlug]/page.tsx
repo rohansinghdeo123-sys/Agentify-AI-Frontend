@@ -15,7 +15,23 @@ import { useEffect, useState } from "react";
 import styles from "../../home.module.css";
 
 export default function StudyNotesPage() {
-  return <TopicNotesReader />;
+  const {chapterSlug} = useParams<{chapterSlug:string}>();
+  const params = useSearchParams();
+  const {userId} = useAuth();
+  // A different topic/account must never display the previous request's
+  // lesson while authentication or its new notes request is pending.
+  return <TopicNotesReader key={`${userId}:${chapterSlug}:${params.get("topic") || ""}`} />;
+}
+
+function hasReadableNotes(notes: ChapterNotes | null): notes is ChapterNotes {
+  if (!notes) return false;
+  if (notes.resolution==="topic_choice") return Boolean(notes.topic_options?.length && notes.topic_options.every(option=>option.id && option.title));
+  if (notes.pages?.length) return notes.pages.every(page => page.text?.trim() || page.blocks?.some(block=>block.text?.trim()));
+  return Boolean(notes.concepts?.some(concept => [concept.definition,concept.explanation,...(concept.key_points || []),...(concept.formulas || []),...(concept.examples || [])].some(text=>text?.trim())));
+}
+
+function chapterName(slug: string) {
+  return slug.replace(/^ncert_class_\d+_[a-z]+_chapter_\d+_/, "").split(/[_-]+/).map(word=>word.charAt(0).toUpperCase()+word.slice(1)).join(" ");
 }
 
 function TopicNotesReader() {
@@ -27,21 +43,35 @@ function TopicNotesReader() {
   const [notes, setNotes] = useState<ChapterNotes | null>(null);
   const [savedPage, setSavedPage] = useState(0);
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [attempt, setAttempt] = useState(0);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     if (authBusy) return;
     if (!userId) return;
     let active = true;
     const abort = new AbortController();
-    void getAuthHeaders().then((headers) => { if (!active) return null; setLoading(true);setError(""); return getChapterNotes({headers},chapterSlug,topic,abort.signal); }).then((data) => {
+    void getAuthHeaders().then((headers) => { if (!active) return null; setLoading(true);setLoadError(""); return getChapterNotes({headers},chapterSlug,topic,abort.signal); }).then((data) => {
       if (!active) return;
+      if (!hasReadableNotes(data)) {
+        setNotes(null);
+        setLoadError("We could not find readable notes for this selected topic. Retry to reconnect, or reopen the topic from Planning.");
+        return;
+      }
       setNotes(data);
       setSavedPage(data?.saved_page || 0);
-    }).catch(() => { if (active) setError("Notes could not load. Please retry."); }).finally(() => {if(active)setLoading(false);});
+    }).catch(() => { if (active) {setNotes(null);setLoadError("Your notes could not be loaded. Check your connection and retry.");} }).finally(() => {if(active)setLoading(false);});
     return () => {active=false;abort.abort();};
-  },[authBusy,userId,getAuthHeaders,chapterSlug,topic]);
+  },[authBusy,userId,getAuthHeaders,chapterSlug,topic,attempt]);
+  useEffect(()=>{
+    if (!loading) {
+      const scroller = document.getElementById("main-content");
+      if (scroller) { scroller.scrollTop = 0; scroller.scrollLeft = 0; }
+    }
+  },[loading]);
   const pages: NotePage[] = notes?.pages || notes?.concepts.map((c) => ({id:c.id,title:c.title,source:undefined as string | undefined, source_pages:undefined as number[] | undefined, teaching_format:undefined as string | undefined,text:[c.definition,c.explanation,...c.key_points.map((p)=>`- ${p}`),...c.formulas,...c.examples].filter(Boolean).join("\n\n")})) || [];
-  const page = Math.max(0, Math.min(pages.length - 1, requestedPage !== null ? Number(requestedPage) || 0 : savedPage));
+  const requestedIndex = Number(requestedPage !== null ? requestedPage : savedPage);
+  const page = Math.max(0, Math.min(pages.length - 1, Number.isFinite(requestedIndex) ? Math.floor(requestedIndex) : 0));
   const current = pages[page];
   const navigate = async (next: number) => {
     const query = new URLSearchParams(params.toString()); query.set("page",String(next));
@@ -60,7 +90,22 @@ function TopicNotesReader() {
   const askHref = current ? `${studySessionHref(createConversationId(),{source:"syllabus",catalogSource:notes?.catalog_source || (notes?.topic_id?.startsWith("chem11_") ? "planning_manifest" : "published"),classLevel:notes?.chapter.class_level,subject:notes?.chapter.subject || "",chapterId:chapterSlug,chapterLabel:notes?.chapter.name || chapterSlug,topicId:notes?.topic_id || topic || current.id,topicLabel:notes?.topic_title || current.title},{fresh:true})}&entry=ask_ai&notesPage=${page}&notesTopic=${encodeURIComponent(notes?.topic_id || topic || current.id)}` : "#";
   if (authBusy || (userId && loading)) return <LoadingState title="Loading topic notes" detail="Opening your saved reading position." />;
   if (!userId) return <p>Please sign in to read notes.</p>;
-  if (notes && !notes.pages) return <LegacyNotesContent notes={notes} topicId={topic} />;
+  if (loadError) return <div className={`${styles.notesContainer} ${noteStyles.reader}`}>
+    <header className={styles.notesHeader}><Link href="/dashboard/planning/active">Return to Planning</Link><div><p>{chapterName(chapterSlug)}</p><h1>Notes could not open</h1></div></header>
+    <section className={noteStyles.card} role="alert"><h2>Let’s get your topic notes back</h2><p>{loadError}</p>
+      <div className={noteStyles.navigation} aria-label="Notes recovery"><button onClick={()=>{setLoading(true);setAttempt(value=>value+1);}}>Retry loading notes</button><Link href="/dashboard/planning/active">Choose a topic in Planning</Link></div>
+    </section>
+  </div>;
+  if (notes?.resolution==="topic_choice") return <div className={`${styles.notesContainer} ${noteStyles.reader}`}>
+    <header className={styles.notesHeader}><Link href="/dashboard/planning/active">Return to Planning</Link><div><p>{notes.chapter.name}</p><h1>Choose a learning topic</h1></div></header>
+    <section className={noteStyles.card} aria-label="Available learning topics"><p>This section covers several learning topics. Choose one to open its notes.</p>
+      <ul className={noteStyles.topicChoices}>{notes.topic_options?.map(option=>{
+        const query = new URLSearchParams(params.toString()); query.set("topic",option.id); query.delete("page");
+        return <li key={option.id}><Link prefetch={false} className={noteStyles.topicChoice} href={`?${query}`}><strong>{option.title}</strong><span>{option.estimated_minutes.min}–{option.estimated_minutes.max} min</span><span aria-hidden="true">→</span></Link></li>;
+      })}</ul>
+    </section>
+  </div>;
+  if (notes && !notes.pages?.length) return <LegacyNotesContent notes={notes} topicId={topic} />;
   return <div className={`${styles.notesContainer} ${noteStyles.reader}`}>
     <header className={styles.notesHeader}><Link href="/dashboard/planning/active">Return to Planning</Link><div>
       <p>{notes?.chapter.name}</p><h1>{notes?.topic_title || "Topic notes"}</h1>
