@@ -129,3 +129,18 @@ export function tokenizeStudyText(value: string): StudyTextPart[] {
     .filter(Boolean)
     .map((piece) => (EXACT_TOKEN_REGEX.test(piece) ? parseStudyTextPart(piece) : { kind: "text", value: piece }));
 }
+
+/** Markdown text nodes share the notes reader's scientific parser. Math/code
+ * nodes are left to KaTeX/the code renderer by the caller. */
+export function scientificDisplayText(value: string): string {
+  const sub = Object.fromEntries(Array.from("0123456789n+-",(c,i)=>[c,"₀₁₂₃₄₅₆₇₈₉ₙ₊₋"[i]]));
+  const sup = Object.fromEntries(Array.from("0123456789+-",(c,i)=>[c,"⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻"[i]]));
+  const script = (text:string,map:Record<string,string>)=>Array.from(text,c=>map[c] || c).join("");
+  return tokenizeStudyText(value).map(part=>{
+    if (part.kind==="formula") return part.atoms.map(a=>a.symbol+script(a.subscript,sub)).join("")+script(part.superscript,sup);
+    if (part.kind==="variable_power") return part.value+script(part.superscript,sup);
+    if (part.kind==="hybridization") return "sp"+script(part.superscript,sup);
+    if (part.kind==="variable_subscript") return `${part.value}_${part.subscript}`;
+    return part.value;
+  }).join("");
+}

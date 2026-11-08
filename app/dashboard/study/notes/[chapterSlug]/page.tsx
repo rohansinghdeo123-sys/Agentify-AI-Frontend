@@ -9,9 +9,12 @@ import noteStyles from "@/components/study/topic-notes.module.css";
 import { LoadingState } from "@/components/ui/Polished";
 import { createConversationId } from "@/features/study/conversationUtils";
 import { studySessionHref } from "@/features/study/routes";
+import type { StudyScope } from "@/features/study/types";
+import { NoteLearningText, notesSourceLabel, NotesSourceBadge, PatternInterrupt } from "@/components/study/NoteLearningBlocks";
+import { notesCompletedPageIds, notesPageIndex } from "@/features/study/notesReaderState";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import styles from "../../home.module.css";
 
 export default function StudyNotesPage() {
@@ -20,13 +23,14 @@ export default function StudyNotesPage() {
   const {userId} = useAuth();
   // A different topic/account must never display the previous request's
   // lesson while authentication or its new notes request is pending.
-  return <TopicNotesReader key={`${userId}:${chapterSlug}:${params.get("topic") || ""}`} />;
+  return <TopicNotesReader key={`${userId}:${chapterSlug}:${params.get("topic") || ""}:${params.get("classLevel") || ""}:${params.get("subject") || ""}`} />;
 }
 
 function hasReadableNotes(notes: ChapterNotes | null): notes is ChapterNotes {
   if (!notes) return false;
+  if (notes.resolution==="review_required") return true;
   if (notes.resolution==="topic_choice") return Boolean(notes.topic_options?.length && notes.topic_options.every(option=>option.id && option.title));
-  if (notes.pages?.length) return notes.pages.every(page => page.text?.trim() || page.blocks?.some(block=>block.text?.trim()));
+  if (notes.pages?.length) return new Set(notes.pages.map(page=>page.id)).size===notes.pages.length && notes.pages.every(page => page.id && (page.text?.trim() || page.blocks?.some(block=>block.text?.trim()) || page.interrupts?.some(interrupt=>interrupt.question?.trim() || interrupt.activity?.trim()) || page.questions?.some(question=>question.question?.trim())));
   return Boolean(notes.concepts?.some(concept => [concept.definition,concept.explanation,...(concept.key_points || []),...(concept.formulas || []),...(concept.examples || [])].some(text=>text?.trim())));
 }
 
@@ -39,9 +43,11 @@ function TopicNotesReader() {
   const params = useSearchParams();
   const topic = params.get("topic") || undefined;
   const requestedPage = params.get("page");
+  const requestScope = useRef({classLevel:params.get("classLevel") || undefined,subject:params.get("subject") || undefined,contentVersion:params.get("notesVersion") || undefined});
+  const navigation = useRef({id:"",sequence:0});
   const {userId, getAuthHeaders, loading: authBusy} = useAuth();
   const [notes, setNotes] = useState<ChapterNotes | null>(null);
-  const [savedPage, setSavedPage] = useState(0);
+  const [completedPages, setCompletedPages] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [loadError, setLoadError] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -51,7 +57,7 @@ function TopicNotesReader() {
     if (!userId) return;
     let active = true;
     const abort = new AbortController();
-    void getAuthHeaders().then((headers) => { if (!active) return null; setLoading(true);setLoadError(""); return getChapterNotes({headers},chapterSlug,topic,abort.signal); }).then((data) => {
+    void getAuthHeaders().then((headers) => { if (!active) return null; setLoading(true);setLoadError(""); return getChapterNotes({headers},chapterSlug,topic,abort.signal,requestScope.current); }).then((data) => {
       if (!active) return;
       if (!hasReadableNotes(data)) {
         setNotes(null);
@@ -59,7 +65,7 @@ function TopicNotesReader() {
         return;
       }
       setNotes(data);
-      setSavedPage(data?.saved_page || 0);
+      setCompletedPages(notesCompletedPageIds(data));
     }).catch(() => { if (active) {setNotes(null);setLoadError("Your notes could not be loaded. Check your connection and retry.");} }).finally(() => {if(active)setLoading(false);});
     return () => {active=false;abort.abort();};
   },[authBusy,userId,getAuthHeaders,chapterSlug,topic,attempt]);
@@ -70,24 +76,54 @@ function TopicNotesReader() {
     }
   },[loading]);
   const pages: NotePage[] = notes?.pages || notes?.concepts.map((c) => ({id:c.id,title:c.title,source:undefined as string | undefined, source_pages:undefined as number[] | undefined, teaching_format:undefined as string | undefined,text:[c.definition,c.explanation,...c.key_points.map((p)=>`- ${p}`),...c.formulas,...c.examples].filter(Boolean).join("\n\n")})) || [];
-  const requestedIndex = Number(requestedPage !== null ? requestedPage : savedPage);
-  const page = Math.max(0, Math.min(pages.length - 1, Number.isFinite(requestedIndex) ? Math.floor(requestedIndex) : 0));
+  const page = notesPageIndex(notes,{page:requestedPage,pageId:params.get("pageId"),version:params.get("notesVersion")});
   const current = pages[page];
+  const tracksCompletedPages = notes?.completed_page_ids !== undefined;
+  const saveReadingPosition = async (next: number, completed: string[]) => {
+    if (notes?.can_save_position === false) return;
+    navigation.current.id ||= createConversationId();
+    const sequence = ++navigation.current.sequence;
+    const headers = await getAuthHeaders();
+    const activeUnit = notes?.active_unit_id || (await getStudyLabContext({headers},userId))?.current_unit_id;
+    if (activeUnit) {
+      await recordStudyRouteHeartbeat({headers},userId,{unit_id:activeUnit,notes_page:next,notes_topic:notes?.topic_id || topic,
+        ...(notes?.content_version ? {notes_version:notes.content_version} : {}),
+        ...(tracksCompletedPages ? {notes_page_id:pages[next]?.id,notes_total_pages:pages.length,notes_completed_page_ids:completed,notes_navigation_id:navigation.current.id,notes_navigation_seq:sequence} : {}),
+      });
+    }
+  };
   const navigate = async (next: number) => {
+    const completed = tracksCompletedPages && next>page && current ? [...new Set([...completedPages,current.id])] : completedPages;
+    setCompletedPages(completed);
     const query = new URLSearchParams(params.toString()); query.set("page",String(next));
+    if (tracksCompletedPages && pages[next]) {
+      query.set("pageId",pages[next].id);
+      if (notes?.content_version) query.set("notesVersion",notes.content_version);
+    }
     // Next synchronizes native history with useSearchParams without a server
     // navigation. Paging an already-loaded lesson needs no RSC round trip.
     window.history.replaceState(null, "", `?${query}`);
-    if (notes?.can_save_position === false) return;
     try {
-      const headers = await getAuthHeaders();
-      const activeUnit = notes?.active_unit_id || (await getStudyLabContext({headers},userId))?.current_unit_id;
-      if (activeUnit) {
-        await recordStudyRouteHeartbeat({headers},userId,{unit_id:activeUnit,notes_page:next,notes_topic:notes?.topic_id || topic,...(notes?.content_version ? {notes_version:notes.content_version} : {})});
-      }
+      await saveReadingPosition(next,completed);
+      setError("");
     } catch {setError("Reading position could not sync. This page remains in the address bar; retry before leaving.");}
   };
-  const askHref = current ? `${studySessionHref(createConversationId(),{source:"syllabus",catalogSource:notes?.catalog_source || (notes?.topic_id?.startsWith("chem11_") ? "planning_manifest" : "published"),classLevel:notes?.chapter.class_level,subject:notes?.chapter.subject || "",chapterId:chapterSlug,chapterLabel:notes?.chapter.name || chapterSlug,topicId:notes?.topic_id || topic || current.id,topicLabel:notes?.topic_title || current.title},{fresh:true})}&entry=ask_ai&notesPage=${page}&notesTopic=${encodeURIComponent(notes?.topic_id || topic || current.id)}` : "#";
+  const markPageRead = async () => {
+    if (!current) return;
+    const completed = [...new Set([...completedPages,current.id])];
+    setCompletedPages(completed);
+    try { await saveReadingPosition(page,completed);setError(""); }
+    catch {setError("Reading progress could not sync. Please retry before leaving.");}
+  };
+  const retryProgress = async () => {
+    try {await saveReadingPosition(page,completedPages);setError("");}
+    catch {setError("Reading progress still could not sync. Keep this page open and retry.");}
+  };
+  const studyScope: StudyScope = {source:"syllabus",catalogSource:notes?.catalog_source || "published",classLevel:notes?.chapter.class_level,subject:notes?.chapter.subject || "",chapterId:chapterSlug,chapterLabel:notes?.chapter.name || chapterSlug,topicId:notes?.topic_id || topic || current?.id || "",topicLabel:notes?.topic_title || current?.title || ""};
+  const askHref = current ? `${studySessionHref(createConversationId(),studyScope,{fresh:true})}&entry=ask_ai&notesPage=${page}&notesPageId=${encodeURIComponent(current.id)}&notesVersion=${encodeURIComponent(notes?.content_version || "")}&notesTopic=${encodeURIComponent(notes?.topic_id || topic || current.id)}` : "#";
+  const continueHref = notes?.topic_id===notes?.active_unit_id && notes?.can_save_position!==false
+    ? "/dashboard/study?planned=1&fromNotes=1"
+    : `${studySessionHref(createConversationId(),studyScope,{fresh:true})}&entry=learn`;
   if (authBusy || (userId && loading)) return <LoadingState title="Loading topic notes" detail="Opening your saved reading position." />;
   if (!userId) return <p>Please sign in to read notes.</p>;
   if (loadError) return <div className={`${styles.notesContainer} ${noteStyles.reader}`}>
@@ -100,9 +136,16 @@ function TopicNotesReader() {
     <header className={styles.notesHeader}><Link href="/dashboard/planning/active">Return to Planning</Link><div><p>{notes.chapter.name}</p><h1>Choose a learning topic</h1></div></header>
     <section className={noteStyles.card} aria-label="Available learning topics"><p>This section covers several learning topics. Choose one to open its notes.</p>
       <ul className={noteStyles.topicChoices}>{notes.topic_options?.map(option=>{
-        const query = new URLSearchParams(params.toString()); query.set("topic",option.id); query.delete("page");
+        const query = new URLSearchParams(params.toString()); query.set("topic",option.id); query.delete("page");query.delete("pageId");query.delete("notesVersion");
         return <li key={option.id}><Link prefetch={false} className={noteStyles.topicChoice} href={`?${query}`}><strong>{option.title}</strong><span>{option.estimated_minutes.min}–{option.estimated_minutes.max} min</span><span aria-hidden="true">→</span></Link></li>;
       })}</ul>
+    </section>
+  </div>;
+  if (notes?.resolution==="review_required") return <div className={`${styles.notesContainer} ${noteStyles.reader}`}>
+    <header className={styles.notesHeader}><Link href="/dashboard/planning/active">Return to Planning</Link><div><p>{notes.chapter.name}</p><h1>{notes.topic_title || "Source review needed"}</h1></div></header>
+    <section className={noteStyles.sourceReview} aria-label="Source review needed"><h2>This topic needs a source review</h2><p>Verified teaching content is not ready for this topic. Missing or conflicting source information needs review before the notes can be shown safely.</p>
+      {notes.review_required?.length ? <ul>{notes.review_required.map((item,index)=><li key={index}><NoteLearningText text={item.reason} /></li>)}</ul> : null}
+      <div className={noteStyles.navigation}><button onClick={()=>{setLoading(true);setAttempt(value=>value+1);}}>Retry loading notes</button><Link href="/dashboard/planning/active">Choose a topic in Planning</Link></div>
     </section>
   </div>;
   if (notes && !notes.pages?.length) return <LegacyNotesContent notes={notes} topicId={topic} />;
@@ -110,8 +153,10 @@ function TopicNotesReader() {
     <header className={styles.notesHeader}><Link href="/dashboard/planning/active">Return to Planning</Link><div>
       <p>{notes?.chapter.name}</p><h1>{notes?.topic_title || "Topic notes"}</h1>
       {notes?.estimated_minutes ? <p>{notes.estimated_minutes.min}–{notes.estimated_minutes.max} min · Topic duration</p> : null}
+      {notes?.proficiency ? <p>{({new_to_it:"Learning for the first time",know_a_little:"Know a little",know_the_basics:"Know the basics",mostly_confident:"Mostly confident"} as Record<string,string>)[notes.proficiency] || notes.proficiency.replaceAll("_"," ")}{notes.learning_depth ? ` · ${notes.learning_depth.replaceAll("_"," ")}` : ""}</p> : null}
     </div></header>
-    {error ? <p role="alert">{error}</p> : null}
+    {error ? <div className={noteStyles.sessionPortion} role="alert"><p>{error}</p><button className={noteStyles.markRead} onClick={()=>void retryProgress()}>Retry saving progress</button></div> : null}
+    {notes?.progress_rebased ? <p className={noteStyles.sessionPortion} role="status">These notes have been updated. Your reading position has been matched where possible, and page completion follows the updated notes.</p> : null}
     {notes?.session_portion ? <p className={noteStyles.sessionPortion}>For today’s {notes.session_portion.allocated_minutes}-minute study portion, focus on pages {notes.session_portion.start_page+1}–{notes.session_portion.end_page+1}.{notes.session_portion.additional_practice_needed ? " Continue the remaining explanation and practice in your next session." : " Allow time for the revision questions."}</p> : null}
     {current ? <>
       <nav aria-label="Reading pages" className={noteStyles.navigation}>
@@ -120,16 +165,20 @@ function TopicNotesReader() {
         <button disabled={page===pages.length-1} onClick={()=>void navigate(page+1)}>Next</button>
         <Link href={askHref}>Ask AI about this page</Link>
       </nav>
-      <progress aria-label="Reading progress" value={page+1} max={pages.length} className={noteStyles.progress} />
+      <progress aria-label="Reading progress" value={tracksCompletedPages ? completedPages.length : page+1} max={pages.length} className={noteStyles.progress} />
+      {tracksCompletedPages ? <p className={noteStyles.readingSummary}>{completedPages.length} of {pages.length} pages read</p> : null}
       <article className={noteStyles.card} data-tone={page % 3}>
-        <div className={noteStyles.eyebrow}><span>{current.source || "Concept notes"}</span><span className={noteStyles.badge}>{current.blocks?.length || notePoints(current.text).length} key {(current.blocks?.length || notePoints(current.text).length) === 1 ? "point" : "points"}</span></div>
-        <h2>{current.title}</h2>{current.source_pages?.length ? <p>{current.source} · PDF page {current.source_pages.join(", ")}</p> : null}<ThemedNotePoints text={current.text} blocks={current.blocks} />
+        <div className={noteStyles.eyebrow}><span>{notesSourceLabel(current.source_type) || current.source || "Concept notes"}</span><span className={noteStyles.badge}>{current.blocks?.length || notePoints(current.text).length} key {(current.blocks?.length || notePoints(current.text).length) === 1 ? "point" : "points"}</span></div>
+        <div className={noteStyles.sourceBadges}>{[...new Set([...(current.source_types || []),...(current.provenance || current.source_refs || []).flatMap(reference=>reference.source_type ? [reference.source_type] : [])])].map(type=><NotesSourceBadge key={type} type={type} />)}</div>
+        <h2>{current.title}</h2>{current.source_pages?.length ? <p>{notesSourceLabel(current.source_type) || current.source || "Source"} · PDF page {current.source_pages.join(", ")}</p> : null}<ThemedNotePoints text={current.text} blocks={current.blocks} />
+        {current.interrupts?.map((interrupt,i)=><PatternInterrupt key={`${current.id}-${i}`} interrupt={interrupt} />)}
         {current.questions?.length ? <section className={noteStyles.review} aria-label="Check your understanding"><h3>Check your understanding</h3><ol>{current.questions.map((q,i)=><li key={i}><NotesChemistryText text={q.question} /><details><summary>Check the reasoning</summary><NotesChemistryText text={q.answer} /></details></li>)}</ol></section> : null}
         {current.transition ? <p className={noteStyles.transition}><NotesChemistryText text={current.transition} /></p> : null}
       </article>
+      {tracksCompletedPages ? <button type="button" className={noteStyles.markRead} disabled={completedPages.includes(current.id)} onClick={()=>void markPageRead()}>{completedPages.includes(current.id) ? "Page marked read" : "Mark page read"}</button> : null}
       <p>Reading progress records your position. Demonstrate mastery with a quick check.</p>
-      <Link className={noteStyles.continue} href="/dashboard/study?planned=1">Continue to learning and quick check</Link>
+      <Link className={noteStyles.continue} href={continueHref}>Continue to learning and quick check</Link>
     </> : <p>No verified notes are mapped to this topic yet.</p>}
-    {notes?.review_required?.length ? <details><summary>Source material awaiting review</summary><p>Mixed summaries and exercises are excluded until their topic boundaries and scientific content are verified.</p><ul>{Array.from(new Set(notes.review_required.map(r=>r.reason))).map(r=><li key={r}>{r}</li>)}</ul></details> : null}
+    {notes?.review_required?.length ? <details className={noteStyles.sourceReview}><summary>Source material awaiting review</summary><p>Some source points need review. Conflicting information is not silently combined with the lesson.</p><ul>{Array.from(new Set(notes.review_required.map(r=>r.reason))).map(r=><li key={r}><NoteLearningText text={r} /></li>)}</ul></details> : null}
   </div>;
 }

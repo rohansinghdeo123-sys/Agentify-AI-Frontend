@@ -634,16 +634,62 @@ export interface ConceptNote {
   common_mistakes: (string | { mistake?: string; correction?: string; note?: string })[];
 }
 
+export type NotesSourceType = "MASTER_NOTES" | "NCERT_FALLBACK";
+
+export interface NoteSourceReference {
+  source_type?: NotesSourceType;
+  document_id?: string | number;
+  document_title?: string;
+  title?: string;
+  section_id?: string;
+  source_pages?: number[];
+  pages?: number[];
+}
+
+export interface NoteInterrupt {
+  type: string;
+  heading: string;
+  question?: string;
+  activity?: string;
+  hint?: string;
+  answer?: string;
+  explanation?: string;
+  source_section_ids?: string[];
+  subtopic_ids?: string[];
+}
+
+export interface NoteTeachingBlock {
+  kind: string;
+  text: string;
+  expanded_text?: string;
+  presentation?: "source_preview";
+  label?: string;
+  level?: string;
+  source_type?: NotesSourceType;
+  source_refs?: NoteSourceReference[];
+  interrupt_type?: string;
+  heading?: string;
+  question?: string;
+  activity?: string;
+  hint?: string;
+  answer?: string;
+}
+
 export interface NotePage {
   id: string; title: string; text: string; source?: string; source_pages?: number[];
   teaching_format?: string; source_concept_id?: string; page_number?: number;
-  blocks?: Array<{kind: string; text: string; level?: string}>;
+  blocks?: NoteTeachingBlock[];
+  source_type?: NotesSourceType;
+  source_types?: NotesSourceType[];
+  source_refs?: NoteSourceReference[];
+  provenance?: NoteSourceReference[];
+  interrupts?: NoteInterrupt[];
   transition?: string; source_section_ids?: string[];
   questions?: Array<{question: string; answer: string}>;
 }
 
 export interface ChapterNotes {
-  resolution?: "topic_choice" | "lesson";
+  resolution?: "topic_choice" | "lesson" | "review_required";
   requested_topic_id?: string;
   topic_options?: Array<{id: string; title: string; estimated_minutes: {min: number; max: number}}>;
   active_unit_id?: string | null;
@@ -654,6 +700,14 @@ export interface ChapterNotes {
   estimated_minutes?: {min: number; max: number};
   pages?: NotePage[];
   content_version?: string;
+  source_fingerprint?: string;
+  source_type?: NotesSourceType;
+  source_types?: NotesSourceType[];
+  source_provenance?: NoteSourceReference[];
+  learning_depth?: string;
+  completed_page_ids?: string[];
+  saved_page_id?: string | null;
+  progress_rebased?: boolean;
   explanation_style?: string;
   allocated_session_minutes?: number | null;
   session_portion?: {start_page: number; end_page: number; allocated_minutes: number; additional_practice_needed: boolean} | null;
@@ -675,12 +729,16 @@ export async function getChapterNotes(
   chapterSlug: string,
   topicId?: string,
   signal?: AbortSignal,
+  scope?: {classLevel?: string; subject?: string; contentVersion?: string},
 ): Promise<ChapterNotes | null> {
   try {
     const url = new URL(`${apiBase(context.backendURL)}/notes/${encodeURIComponent(chapterSlug)}`);
     if (topicId) {
       url.searchParams.append("topic_id", topicId);
     }
+    if (scope?.classLevel) url.searchParams.set("class_level",scope.classLevel);
+    if (scope?.subject) url.searchParams.set("subject",scope.subject);
+    if (scope?.contentVersion) url.searchParams.set("content_version",scope.contentVersion);
     
     return await apiJson<ChapterNotes>(url.toString(), {
       headers: context.headers,

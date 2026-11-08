@@ -2,9 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   normalizeSubscriptGlyphs,
   tokenizeStudyText,
+  scientificDisplayText,
 } from "@/lib/studyChemistry";
 
 describe("study chemistry text transforms", () => {
+  it("normalizes Markdown prose without changing values, grouped formulas or charge meaning", () => {
+    expect(scientificDisplayText("2H2O, Ca(OH)2, Fe3+, H2+, SO4^2-; 6.022 x 10^23 mol^(-1)."))
+      .toBe("2H₂O, Ca(OH)₂, Fe³⁺, H₂⁺, SO₄²⁻; 6.022 × 10²³ mol⁻¹.");
+    expect(scientificDisplayText("C6H12O6 and 0.250 L = 250 mL")).toBe("C₆H₁₂O₆ and 0.250 L = 250 mL");
+  });
   it("normalizes unicode subscript glyphs for consistent parsing", () => {
     expect(normalizeSubscriptGlyphs("C\u2086H\u2081\u2082O\u2086")).toBe("C6H12O6");
     expect(normalizeSubscriptGlyphs("C\u2099H\u2082\u2099\u208A\u2082")).toBe("CnH2n+2");

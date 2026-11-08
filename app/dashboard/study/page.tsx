@@ -10,6 +10,7 @@ import {
   legacyStudyHandoff,
   openStudyScope,
   studySessionHref,
+  studyNotesHref,
   syllabusStudyScope,
 } from "@/features/study/routes";
 import {
@@ -22,7 +23,7 @@ import type { StudyLabContext } from "@/features/planning/contracts";
 import { useCatalog } from "@/lib/catalog";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./home.module.css";
 
 function conversationHref(conversation: StudyConversation) {
@@ -133,6 +134,10 @@ export default function StudyHomePage() {
       if (!scope) throw new Error("No learning unit");
       const savedId = context.last_position.conversation_id;
       const resume = typeof savedId === "string" && Boolean(savedId);
+      if (!resume && searchParams.get("fromNotes") !== "1") {
+        router.push(studyNotesHref(scope.chapterId,scope.topicId,{planned:true,classLevel:scope.classLevel,subject:scope.subject}));
+        return;
+      }
       const id = resume ? savedId : createConversationId();
       await recordStudyRouteHeartbeat(
         { headers: await getAuthHeaders() }, context.user_id,
@@ -144,7 +149,15 @@ export default function StudyHomePage() {
       setStudyLabError("Your session could not be opened. Please try again.");
       setStudyLabOpening(false);
     }
-  }, [getAuthHeaders, router, studyLab, studyLabOpening]);
+  }, [getAuthHeaders, router, studyLab, studyLabOpening,searchParams]);
+
+  const continuedFromNotes = useRef(false);
+  useEffect(() => {
+    if (searchParams.get("fromNotes") === "1" && studyLab && !continuedFromNotes.current) {
+      continuedFromNotes.current = true;
+      void startPlannedStudyRoute();
+    }
+  }, [searchParams,studyLab,startPlannedStudyRoute]);
 
   const selectedChapter = chapters.find((chapter) => chapter.value === chapterId)
     || (settled ? chapters.find((chapter) => chapter.value === requestedChapter) || chapters[0] : undefined);
@@ -159,6 +172,10 @@ export default function StudyHomePage() {
   const firstName = profile?.name?.split(" ")[0] || "Student";
 
   const startSession = (intent: "learn" | "clarify" | "practice") => {
+    if (intent==="learn" && selectedChapter && selectedTopic) {
+      router.push(studyNotesHref(selectedChapter.value,selectedTopic.value,{classLevel:selectedChapter.classLevel,subject:selectedChapter.subject}));
+      return;
+    }
     const syllabusGrounded = intent !== "clarify";
     const scope = syllabusGrounded && selectedChapter && selectedTopic
       ? syllabusStudyScope(selectedChapter, selectedTopic, source === "published" ? "published" : "starter")
@@ -274,14 +291,6 @@ export default function StudyHomePage() {
                   {(selectedChapter?.topics || []).map((topic) => <option key={topic.value} value={topic.value}>{topic.label}</option>)}
                 </select>
               </label>
-              
-              <Link
-                href={selectedChapter && selectedTopic ? `/dashboard/study/notes/${encodeURIComponent(selectedChapter.value)}?topic=${encodeURIComponent(selectedTopic.value)}` : "#"}
-                className={styles.readNotesBtn}
-                style={{ pointerEvents: selectedChapter && selectedTopic ? "auto" : "none", opacity: selectedChapter && selectedTopic ? 1 : 0.5 }}
-              >
-                Read Notes
-              </Link>
               
               <button
                 type="button"

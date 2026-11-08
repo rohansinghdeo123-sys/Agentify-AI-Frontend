@@ -7,8 +7,20 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
+import { scientificDisplayText } from "@/lib/studyChemistry";
 
-const remarkPlugins = [remarkGfm, remarkMath];
+type MarkdownNode = {type:string;value?:string;children?:MarkdownNode[]};
+function remarkScientificText() {
+  return (tree:MarkdownNode) => {
+    const visit = (node:MarkdownNode) => {
+      if (["code","inlineCode","math","inlineMath"].includes(node.type)) return;
+      if (node.type==="text" && node.value) node.value=scientificDisplayText(node.value);
+      node.children?.forEach(visit);
+    };
+    visit(tree);
+  };
+}
+const remarkPlugins = [remarkGfm, remarkMath, remarkScientificText];
 const rehypePlugins = [rehypeKatex];
 
 // The tutor model emits inline math as \( ... \) and display math as \[ ... \],

@@ -2,22 +2,22 @@ export const PLANNING_PROFICIENCY_OPTIONS = [
   {
     value: "new_to_it",
     label: "New to It",
-    description: "I haven’t studied this chapter before.",
+    description: "Most detailed notes",
   },
   {
     value: "know_a_little",
     label: "Know a Little",
-    description: "I’ve seen it, but I’m not confident.",
+    description: "Moderately detailed notes",
   },
   {
     value: "know_the_basics",
     label: "Know the Basics",
-    description: "I understand the fundamentals but need stronger practice.",
+    description: "Concise, concept-focused notes",
   },
   {
     value: "mostly_confident",
     label: "Mostly Confident",
-    description: "I mainly need revision, practice and gap-finding.",
+    description: "Shortest notes; revision and mastery",
   },
 ] as const;
 

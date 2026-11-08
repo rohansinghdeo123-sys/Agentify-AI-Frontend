@@ -3,7 +3,7 @@
 import { AppIcon } from "@/components/ui/Polished";
 import { planningMcqHref } from "@/features/exam/mcq/planningScope";
 import { createConversationId } from "@/features/study/conversationUtils";
-import { studySessionHref } from "@/features/study/routes";
+import { studyNotesHref, studySessionHref } from "@/features/study/routes";
 import type { StudyScope } from "@/features/study/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -381,8 +381,7 @@ export default function PlanningActive() {
 
   const openStudy = (unit: PlanningLearningUnit, intent: "learn" | "ask") => {
     if (intent === "learn") {
-      if (roadmap.curriculum.key !== "ncert_class_11_chemistry_chapter_01") { router.push("/dashboard/study?planned=1"); return; }
-      router.push(`/dashboard/study/notes/${encodeURIComponent(roadmap.chapter_slug)}?topic=${encodeURIComponent(unit.id)}&planned=1`);
+      router.push(studyNotesHref(roadmap.chapter_slug,unit.id,{planned:true,classLevel:roadmap.class_level,subject:scope.subject}));
       return;
     }
     const catalogSource = roadmap.curriculum.source_reference.authority
@@ -401,6 +400,16 @@ export default function PlanningActive() {
     };
     const destination = studySessionHref(createConversationId(), studyScope, { fresh: true });
     router.push(`${destination}&entry=${intent === "ask" ? "ask_ai" : "planning"}`);
+  };
+
+  const openTodayNotes = () => {
+    const currentId = sharedRoute?.current_step.current_unit_id;
+    const currentChapter = sharedRoute?.chapters.find(chapter=>chapter.learning_units.some(unit=>unit.id===currentId));
+    if (currentChapter && currentId) {
+      router.push(studyNotesHref(currentChapter.chapter_slug,currentId,{planned:true,classLevel:sharedRoute.class_level,subject:sharedRoute.subject}));
+    } else if (firstRouteUnit) {
+      openStudy(firstRouteUnit,"learn");
+    }
   };
 
   return (
@@ -519,7 +528,7 @@ export default function PlanningActive() {
                 ))}
               </ol>
               {firstRouteUnit ? (
-                <button type="button" className={`${styles.primaryButton} ${styles.todayRouteAction}`} onClick={() => openStudy(getPlanningUnit(roadmap, sharedRoute?.current_step.current_unit_id || "") || firstRouteUnit, "learn")}>
+                <button type="button" className={`${styles.primaryButton} ${styles.todayRouteAction}`} onClick={openTodayNotes}>
                   <AppIcon name="study" /> Start today’s route <AppIcon name="arrowRight" />
                 </button>
               ) : null}

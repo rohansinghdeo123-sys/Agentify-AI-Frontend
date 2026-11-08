@@ -1,11 +1,7 @@
 import { expect, test } from "@playwright/test";
 import fixture from "./fixtures/planned-learning.json";
+import notes from "./fixtures/teacher-opening-notes.json";
 import { installWorkspaceMocks, WORKSPACE_TEST_BACKEND } from "./helpers/mockWorkspace";
-
-test.beforeAll(async ({ request }) => {
-  await request.get("/dashboard/study?planned=1", { timeout: 120000 });
-  await request.get("/dashboard/study/session/compile-fixture?fresh=1", { timeout: 120000 });
-});
 
 test("planned notes, saved session, quick check and return to Planning", async ({ page }) => {
   await installWorkspaceMocks(page, "light");
@@ -15,6 +11,7 @@ test("planned notes, saved session, quick check and return to Planning", async (
   page.on("pageerror", (e) => errors.push(e.message));
   const headers = { "access-control-allow-origin": "*", "access-control-allow-headers": "Authorization, Content-Type" };
   await page.route(`${WORKSPACE_TEST_BACKEND}/coach/study-lab/context/**`, (route) => route.fulfill({ json: context, headers }));
+  await page.route(`${WORKSPACE_TEST_BACKEND}/notes/**`,route=>route.fulfill({json:notes,headers}));
   await page.route(`${WORKSPACE_TEST_BACKEND}/planning/route/**`, async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (route.request().method() === "OPTIONS") return route.fulfill({ headers });
@@ -37,6 +34,8 @@ test("planned notes, saved session, quick check and return to Planning", async (
   await expect(page.getByText(context.key_notes[0], { exact: true })).toBeVisible();
   await expect(page.getByText(`Today's route · ${context.step_label}`, { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Start learning", exact: true }).first().click();
+  await expect(page.getByText("Page 1 of 10",{exact:true})).toBeVisible();
+  await page.getByRole("link",{name:"Continue to learning and quick check"}).click();
   await expect(page.getByRole("textbox", { name: "Message your AI tutor" })).toBeVisible({ timeout: 45000 });
   const firstURL = page.url();
   await expect.poll(() => Object.keys(context.last_position)).toContain("conversation_id");

@@ -6,6 +6,20 @@ export const STUDY_ROUTES = {
   history: "/dashboard/study/history",
 } as const;
 
+export function studyNotesHref(chapter: string, topic: string, options?: {
+  planned?: boolean; classLevel?: string; subject?: string; page?: number;
+  pageId?: string; contentVersion?: string;
+}) {
+  const params = new URLSearchParams({topic});
+  if (options?.planned) params.set("planned","1");
+  if (options?.classLevel) params.set("classLevel",options.classLevel);
+  if (options?.subject) params.set("subject",options.subject);
+  if (options?.page !== undefined) params.set("page",String(options.page));
+  if (options?.pageId) params.set("pageId",options.pageId);
+  if (options?.contentVersion) params.set("notesVersion",options.contentVersion);
+  return `/dashboard/study/notes/${encodeURIComponent(chapter)}?${params}`;
+}
+
 type SearchParamsReader = {
   get(name: string): string | null;
 };

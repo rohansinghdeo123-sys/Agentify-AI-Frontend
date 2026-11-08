@@ -33,7 +33,9 @@ import {
   readStudyScope,
   studyHistoryHref,
   studySessionHref,
+  studyNotesHref,
 } from "@/features/study/routes";
+import { notesPageIndex } from "@/features/study/notesReaderState";
 import {
   DATA_GROUNDED_TUTOR_GUARDRAIL,
   MATERIAL_NOT_FOUND_MESSAGE,
@@ -563,24 +565,34 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
   );
   const authBusy = loading || authLoading;
   const [notesContext, setNotesContext] = useState("");
-  const [notesReference, setNotesReference] = useState<{contentVersion: string; pageNumber: number; subtopicIds: string[]; proficiency: string; explanationStyle: string} | null>(null);
+  const [notesReference, setNotesReference] = useState<{contentVersion: string; pageNumber: number; pageId: string; sourceFingerprint: string; subtopicIds: string[]; proficiency: string; explanationStyle: string} | null>(null);
   const notesTopic = searchParams.get("notesTopic");
   const notesPage = searchParams.get("notesPage");
-  const notesReturn = notesTopic ? `/dashboard/study/notes/${encodeURIComponent(scope.chapterId)}?topic=${encodeURIComponent(notesTopic)}&page=${Number(notesPage) || 0}&planned=1` : "";
+  const notesPageId = searchParams.get("notesPageId");
+  const notesVersion = searchParams.get("notesVersion");
+  const notesReturn = notesTopic ? studyNotesHref(scope.chapterId,notesTopic,{planned:true,classLevel:scope.classLevel,subject:scope.subject,
+    page:notesReference ? notesReference.pageNumber-1 : Math.max(0,Math.floor(Number(notesPage) || 0)),
+    pageId:notesReference?.pageId || notesPageId || undefined,contentVersion:notesReference?.contentVersion || notesVersion || undefined}) : "";
   useEffect(() => {
     if (!notesTopic || !userId || authBusy) return;
     setNotesContext("");
     setNotesReference(null);
     let active = true;
-    void getAuthHeaders().then((headers) => getChapterNotes({headers},scope.chapterId,notesTopic)).then((notes) => {
-      const page = notes?.pages?.[Number(notesPage) || 0];
+    const abort = new AbortController();
+    void getAuthHeaders().then((headers) => active ? getChapterNotes({headers},scope.chapterId,notesTopic,abort.signal,{classLevel:scope.classLevel,subject:scope.subject,contentVersion:notesVersion || undefined}) : null).then((notes) => {
+      const index = notesPageIndex(notes,{page:notesPage,pageId:notesPageId,version:notesVersion});
+      const page = notes?.pages?.[index];
       if (active && page) {
-        setNotesReference({contentVersion:notes?.content_version || "", pageNumber:page.page_number || Number(notesPage)+1, subtopicIds:page.source_section_ids || [], proficiency:notes?.proficiency || "new_to_it", explanationStyle:notes?.explanation_style || "balanced"});
-        setNotesContext(`Current notes reference. Source: ${page.source || "Study notes"}. Source PDF pages: ${(page.source_pages || []).join(", ")}. Teaching format: ${page.teaching_format || "concept"}. Chapter: ${notes!.chapter.name}. Planning topic: ${notes!.topic_title}. Subtopic: ${page.title}. Page: ${Number(notesPage)+1}. Proficiency: ${notes!.proficiency}. Explanation preference: ${notes!.explanation_style || "balanced"}. Configured full-topic time: ${notes!.estimated_minutes?.min}–${notes!.estimated_minutes?.max} min; today’s allocated portion: ${notes!.allocated_session_minutes ?? "not specified"} min. Teach only this page and its prerequisites; introduce terminology before using it and solve numericals without skipping steps. Explain using this content first; keep scientific meaning and units unchanged. Discuss other topics only if explicitly requested.\n${page.text}`);
+        setNotesReference({contentVersion:notes?.content_version || "", pageNumber:index+1,pageId:page.id,sourceFingerprint:notes?.source_fingerprint || "", subtopicIds:page.source_section_ids || [], proficiency:notes?.proficiency || "new_to_it", explanationStyle:notes?.explanation_style || "balanced"});
+        const teaching = page.blocks?.length ? page.blocks.map(block=>`[${block.source_type || page.source_type || page.source || "Retrieved source"}] ${block.expanded_text || block.text}`).join("\n\n") : page.text;
+        const activities = (page.interrupts || []).map(interrupt=>`${interrupt.heading}: ${interrupt.question || interrupt.activity || ""}${interrupt.answer ? `\nReasoning: ${interrupt.answer}` : ""}`).join("\n\n");
+        setNotesContext(`Current notes reference. Source: ${page.source_type || page.source || "Study notes"}. Retrieved source references: ${JSON.stringify(page.provenance || page.source_refs || [])}. Source PDF pages: ${(page.source_pages || []).join(", ")}. Teaching format: ${page.teaching_format || "concept"}. Class: ${notes!.chapter.class_level}. Subject: ${notes!.chapter.subject}. Chapter: ${notes!.chapter.name}. Planning topic: ${notes!.topic_title}. Subtopic: ${page.title}. Page: ${index+1}. Proficiency: ${notes!.proficiency}. Explanation preference: ${notes!.explanation_style || "balanced"}. Configured full-topic time: ${notes!.estimated_minutes?.min}–${notes!.estimated_minutes?.max} min; today’s allocated portion: ${notes!.allocated_session_minutes ?? "not specified"} min. Teach only this page and its prerequisites. Use retrieved master-notes content as primary; distinguish any retrieved supplementary NCERT content. Preserve formulas, units and conditions, and do not attribute claims to an unretrieved source.\n${teaching}\n${activities}`);
+      } else if (active) {
+        setError("This notes page is no longer available. Return to notes to open the updated material.");
       }
     }).catch(() => {if(active)setError("Page context could not load. Return to notes and retry.");});
-    return () => {active=false;};
-  },[notesTopic,notesPage,userId,authBusy,getAuthHeaders,scope.chapterId]);
+    return () => {active=false;abort.abort();};
+  },[notesTopic,notesPage,notesPageId,notesVersion,userId,authBusy,getAuthHeaders,scope.chapterId,scope.classLevel,scope.subject]);
   const [coachName, setCoachName] = useState("Aria");
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [input, setInput] = useState("");
@@ -846,7 +858,7 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
             weak_signals: mentor.weakSignals,
           },
           learningContext: {
-            ...(notesReference?.contentVersion ? {notes_content_version:notesReference.contentVersion,notes_page_number:notesReference.pageNumber,notes_subtopic_ids:notesReference.subtopicIds,notes_proficiency:notesReference.proficiency,notes_explanation_style:notesReference.explanationStyle} : {}),
+            ...(notesReference?.contentVersion ? {notes_content_version:notesReference.contentVersion,notes_page_number:notesReference.pageNumber,notes_page_id:notesReference.pageId,notes_source_fingerprint:notesReference.sourceFingerprint,notes_subtopic_ids:notesReference.subtopicIds,notes_proficiency:notesReference.proficiency,notes_explanation_style:notesReference.explanationStyle} : {}),
             is_follow_up: tutorContext.isFollowUp,
             previous_user_question: tutorContext.previousQuestion,
             previous_ai_answer: tutorContext.previousAnswer,

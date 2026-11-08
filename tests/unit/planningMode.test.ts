@@ -350,10 +350,10 @@ describe("NCERT-ordered Planning roadmap", () => {
 
   it("offers exactly the four student-friendly proficiency choices", () => {
     expect(PLANNING_PROFICIENCY_OPTIONS).toEqual([
-      { value: "new_to_it", label: "New to It", description: "I haven’t studied this chapter before." },
-      { value: "know_a_little", label: "Know a Little", description: "I’ve seen it, but I’m not confident." },
-      { value: "know_the_basics", label: "Know the Basics", description: "I understand the fundamentals but need stronger practice." },
-      { value: "mostly_confident", label: "Mostly Confident", description: "I mainly need revision, practice and gap-finding." },
+      { value: "new_to_it", label: "New to It", description: "Most detailed notes" },
+      { value: "know_a_little", label: "Know a Little", description: "Moderately detailed notes" },
+      { value: "know_the_basics", label: "Know the Basics", description: "Concise, concept-focused notes" },
+      { value: "mostly_confident", label: "Mostly Confident", description: "Shortest notes; revision and mastery" },
     ]);
   });
 
