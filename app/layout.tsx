@@ -64,11 +64,12 @@ export default function RootLayout({
         >
           Skip to main content
         </a>
-        <AuthProvider>
-          <div className="min-h-0 w-full flex-1">
+        {/* Keep the streamed server shell stable while authentication restores. */}
+        <div className="min-h-0 w-full flex-1">
+          <AuthProvider>
             {children}
-          </div>
-        </AuthProvider>
+          </AuthProvider>
+        </div>
       </body>
     </html>
   );
