@@ -8,6 +8,7 @@ const testPublicEnv = {
   NEXT_TELEMETRY_DISABLED: "1",
   NEXT_PUBLIC_FIREBASE_API_KEY: "test-api-key",
   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "agentifyai.test.firebaseapp.com",
+  NEXT_PUBLIC_FIREBASE_BRANDED_AUTH_DOMAIN: "agentifyai.test.firebaseapp.com",
   NEXT_PUBLIC_FIREBASE_PROJECT_ID: "agentifyai-test",
   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "agentifyai-test.appspot.com",
   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "123456789",

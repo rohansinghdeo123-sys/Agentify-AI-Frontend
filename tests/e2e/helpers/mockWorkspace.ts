@@ -111,6 +111,10 @@ export async function installWorkspaceMocks(
 ) {
   const state = options.state ?? "empty";
   const unhandledRequests: string[] = [];
+  // This fixture restores a synthetic persisted session. Popup/redirect RPC
+  // is outside its transport contract; loading Google's live iframe can run
+  // an unrelated remote app (or mutate the document during hydration).
+  await page.route("https://apis.google.com/js/api.js*",route=>route.abort("blockedbyclient"));
   const issuedAt = Math.floor(Date.now() / 1000);
   const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
   const idToken = `${encode({ alg: "RS256", typ: "JWT" })}.${encode({

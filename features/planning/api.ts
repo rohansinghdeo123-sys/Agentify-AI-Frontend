@@ -1,4 +1,5 @@
 import { ApiRequestError, apiJson } from "@/lib/apiClient";
+import { normalizeClassLevel } from "@/lib/syllabusIdentity";
 import {
   normalizePlanningPortfolio,
   normalizePlanningRoadmap,
@@ -162,8 +163,7 @@ function normalizeCatalogIdentity(value: string) {
 }
 
 function normalizePlanningClass(value: string) {
-  const identity = normalizeCatalogIdentity(value).replace(/^class_/, "");
-  return identity === "xi" ? "11" : identity;
+  return normalizeClassLevel(value);
 }
 
 function planningClassLabel(value: string) {

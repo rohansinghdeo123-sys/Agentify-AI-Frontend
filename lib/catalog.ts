@@ -12,6 +12,7 @@
 
 import { useAuth } from "@/context/AuthContext";
 import { apiJson } from "@/lib/apiClient";
+import { normalizeClassLevel } from "@/lib/syllabusIdentity";
 import { useEffect, useState } from "react";
 
 export type CatalogTopic = { label: string; value: string; memberIds?: string[] };
@@ -118,29 +119,23 @@ type BackendCatalog = {
   }>;
 };
 
-function normalizeClassLevel(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^class_/, "")
-    .replace(/^_+|_+$/g, "");
-}
-
 export function catalogCacheKey(userId: string, classLevel: string) {
-  // Bumped to v3 to force fresh data after the Chapter 1 seeding
-  return `catalog:v3:${encodeURIComponent(userId)}:${normalizeClassLevel(classLevel) || "unspecified"}`;
+  // Refresh catalogs cached before Roman/numeric class labels were unified.
+  return `catalog:v4:${encodeURIComponent(userId)}:${normalizeClassLevel(classLevel) || "unspecified"}`;
 }
 
-function mapBackendCatalog(payload: BackendCatalog, preferredClassLevel: string): CatalogChapter[] {
+export function mapBackendCatalog(payload: BackendCatalog, preferredClassLevel: string): CatalogChapter[] {
   const subjects = Array.isArray(payload?.subjects) ? payload.subjects : [];
   if (!subjects.length) return [];
   const normalizedPreferredClass = normalizeClassLevel(preferredClassLevel);
-  const preferred =
-    subjects.find(
+  const matching = subjects.filter(
       (group) => group.class_level && normalizeClassLevel(group.class_level) === normalizedPreferredClass,
-    ) ||
-    subjects[0];
+    );
+  // A class can publish Chemistry, Physics and Mathematics simultaneously.
+  // Selecting its first subject group would hide every other subject's notes.
+  const fallbackClass=normalizeClassLevel(String(subjects[0].class_level || ""));
+  const selected=matching.length ? matching : subjects.filter(group=>normalizeClassLevel(String(group.class_level || ""))===fallbackClass);
+  return selected.flatMap(preferred=>{
   const subject = String(preferred.subject || "");
   const classLevel = String(preferred.class_level || preferredClassLevel || "");
   const chapters = (preferred.chapters || [])
@@ -164,6 +159,7 @@ function mapBackendCatalog(payload: BackendCatalog, preferredClassLevel: string)
     }))
     .filter((chapter) => chapter.value && chapter.topics.length);
   return chapters;
+  });
 }
 
 export function useCatalog(): {
