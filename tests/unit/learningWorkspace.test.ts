@@ -29,13 +29,13 @@ function session(sessionType: string, topic = "Chemical Bonding"): SessionRecord
 }
 
 function planningState({
-  proficiency = "know_a_little",
+  proficiency = "new_to_it",
   status = "recommended",
   needsReview = 0,
   mastered = 0,
   total = 10,
 }: {
-  proficiency?: "new_to_it" | "know_a_little" | "know_the_basics" | "mostly_confident";
+  proficiency?: "new_to_it" | "know_the_basics" | "mostly_confident";
   status?: PlanningUnitStatus;
   needsReview?: number;
   mastered?: number;

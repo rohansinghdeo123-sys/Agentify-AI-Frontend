@@ -594,14 +594,20 @@ export async function completeStudyLabUnit(
   }
 }
 
+export interface StudyRouteHeartbeatAck {
+  saved: boolean;
+  notes_outcome?: "continue" | "time_up" | "sequence_read";
+  next_notes?: {chapter_slug: string; topic_id: string};
+}
+
 export async function recordStudyRouteHeartbeat(
   context: StudyApiContext,
   userId: string,
   lastPosition: Record<string, unknown>,
   signal?: AbortSignal,
-): Promise<void> {
+): Promise<StudyRouteHeartbeatAck> {
   try {
-    await apiJson<unknown>(
+    return await apiJson<StudyRouteHeartbeatAck>(
       `${apiBase(context.backendURL)}/planning/route/heartbeat/${encodeURIComponent(userId)}?compact=true`,
       {
         method: "POST",
@@ -634,7 +640,7 @@ export interface ConceptNote {
   common_mistakes: (string | { mistake?: string; correction?: string; note?: string })[];
 }
 
-export type NotesSourceType = "MASTER_NOTES" | "NCERT_FALLBACK";
+export type NotesSourceType = "NCERT";
 
 export interface NoteSourceReference {
   source_type?: NotesSourceType;
@@ -689,6 +695,8 @@ export interface NotePage {
 }
 
 export interface ChapterNotes {
+  study_session?: {ends_at: string; remaining_seconds: number} | null;
+  topic_read?: boolean;
   resolution?: "topic_choice" | "lesson" | "review_required";
   requested_topic_id?: string;
   topic_options?: Array<{id: string; title: string; estimated_minutes: {min: number; max: number}}>;
@@ -729,7 +737,7 @@ export async function getChapterNotes(
   chapterSlug: string,
   topicId?: string,
   signal?: AbortSignal,
-  scope?: {classLevel?: string; subject?: string; contentVersion?: string},
+  scope?: {classLevel?: string; subject?: string; contentVersion?: string; planned?: boolean; startSession?: boolean},
 ): Promise<ChapterNotes | null> {
   try {
     const url = new URL(`${apiBase(context.backendURL)}/notes/${encodeURIComponent(chapterSlug)}`);
@@ -739,6 +747,8 @@ export async function getChapterNotes(
     if (scope?.classLevel) url.searchParams.set("class_level",scope.classLevel);
     if (scope?.subject) url.searchParams.set("subject",scope.subject);
     if (scope?.contentVersion) url.searchParams.set("content_version",scope.contentVersion);
+    if (scope?.planned) url.searchParams.set("planned","true");
+    if (scope?.startSession) url.searchParams.set("start_session","true");
     
     return await apiJson<ChapterNotes>(url.toString(), {
       headers: context.headers,

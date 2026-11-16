@@ -60,10 +60,10 @@ test("Study Lab keeps Chemistry, Physics and Mathematics visible together for on
 function fixtureFor(scope:typeof subjects[number]) {
   const pages:NotePage[] = scope.content.map(([title,text],index)=>({
     id:`${scope.topic}-page-${index+1}`,page_number:index+1,title,text,
-    source_types:[index===scope.content.length-1 ? "NCERT_FALLBACK" : "MASTER_NOTES"],
+    source_types:["NCERT"],
     source_section_ids:[`${scope.topic}_outcome_${index+1}`],
     blocks:[{kind:index===scope.content.length-1 ? "conditions" : "explanation",text,
-      source_type:index===scope.content.length-1 ? "NCERT_FALLBACK" : "MASTER_NOTES"}],
+      source_type:"NCERT"}],
   }));
   const notes:ChapterNotes={resolution:"lesson",catalog_source:"published",chapter:{slug:scope.chapter,name:scope.chapterName,
     class_level:scope.classLevel,subject:scope.subject,chapter_number:scope.subject==="Physics" ? 3 : 4},
@@ -155,7 +155,7 @@ for (const scope of subjects) {
     await page.reload();
     await expect(page.getByText(`Page ${pages.length} of ${pages.length}`,{exact:true})).toBeVisible();
     await expect(page.getByText(`${pages.length} of ${pages.length} pages read`,{exact:true})).toBeVisible();
-    await expect(page.getByText("Supplementary NCERT",{exact:true}).first()).toBeVisible();
+    await expect(page.getByText("NCERT",{exact:true}).first()).toBeVisible();
     await page.getByRole("link",{name:"Ask AI about this page"}).click();
     await page.getByRole("textbox",{name:"Message your AI tutor"}).fill("Why is the condition on this page important?");
     await page.getByRole("button",{name:"Send message"}).click();

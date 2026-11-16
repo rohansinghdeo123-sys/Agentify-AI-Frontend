@@ -84,9 +84,6 @@ function timeRange(range: { min: number; max: number }) {
 
 function todayRouteTimeLabel(route: PlanningDailyRoute) {
   const recommended = `${route.total_minutes} min scheduled`;
-  if (route.source === "student_choice" && route.budget_minutes === null) {
-    return `${recommended} · no time ceiling`;
-  }
   if (route.budget_minutes !== null && route.source !== "default_focus") {
     return `${recommended} · ${route.budget_minutes} min available`;
   }
@@ -381,7 +378,7 @@ export default function PlanningActive() {
 
   const openStudy = (unit: PlanningLearningUnit, intent: "learn" | "ask") => {
     if (intent === "learn") {
-      router.push(studyNotesHref(roadmap.chapter_slug,unit.id,{planned:true,classLevel:roadmap.class_level,subject:scope.subject}));
+      router.push(studyNotesHref(roadmap.chapter_slug,unit.id,{planned:true,startSession:true,classLevel:roadmap.class_level,subject:scope.subject}));
       return;
     }
     const catalogSource = roadmap.curriculum.source_reference.authority
@@ -406,7 +403,7 @@ export default function PlanningActive() {
     const currentId = sharedRoute?.current_step.current_unit_id;
     const currentChapter = sharedRoute?.chapters.find(chapter=>chapter.learning_units.some(unit=>unit.id===currentId));
     if (currentChapter && currentId) {
-      router.push(studyNotesHref(currentChapter.chapter_slug,currentId,{planned:true,classLevel:sharedRoute.class_level,subject:sharedRoute.subject}));
+      router.push(studyNotesHref(currentChapter.chapter_slug,currentId,{planned:true,startSession:true,classLevel:sharedRoute.class_level,subject:sharedRoute.subject}));
     } else if (firstRouteUnit) {
       openStudy(firstRouteUnit,"learn");
     }

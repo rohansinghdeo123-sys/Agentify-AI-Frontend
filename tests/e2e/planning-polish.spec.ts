@@ -14,7 +14,7 @@ for (const theme of ["light", "dark"] as const) {
     await chapter.focus();
     await page.keyboard.press("Space");
     await expect(chapter).toBeChecked();
-    await page.getByRole("combobox", { name: "How well do you know Some Basic Concepts of Chemistry?" }).selectOption("know_a_little");
+    await page.getByRole("combobox", { name: "How well do you know Some Basic Concepts of Chemistry?" }).selectOption("new_to_it");
     await page.getByRole("button", { name: "15 min", exact: true }).click();
     await expect(page.getByRole("button", { name: "15 min", exact: true })).toHaveAttribute("aria-pressed", "true");
     await page.getByRole("button", { name: "Build My Roadmap" }).click();

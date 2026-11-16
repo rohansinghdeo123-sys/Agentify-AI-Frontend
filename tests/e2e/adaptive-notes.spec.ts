@@ -5,14 +5,14 @@ import { installWorkspaceMocks, WORKSPACE_TEST_BACKEND, WORKSPACE_TEST_USER_ID }
 
 const headers = {"access-control-allow-origin":"*","access-control-allow-headers":"Authorization, Content-Type"};
 const pages: NotePage[] = [
-  {id:"water-observe",page_number:1,title:"What changes when water freezes?",text:"Water can change its state while remaining the same substance.",source_type:"MASTER_NOTES",source_section_ids:["physical_states"],
-    blocks:[{kind:"explanation",text:"Cooling water can change liquid water to ice. Its molecules remain H2O: a change of state does not turn it into CO2.",source_type:"MASTER_NOTES"}],
+  {id:"water-observe",page_number:1,title:"What changes when water freezes?",text:"Water can change its state while remaining the same substance.",source_type:"NCERT",source_section_ids:["physical_states"],
+    blocks:[{kind:"explanation",text:"Cooling water can change liquid water to ice. Its molecules remain H2O: a change of state does not turn it into CO2.",source_type:"NCERT"}],
     interrupts:[{type:"predict_what_happens",heading:"Predict the molecule",question:"Will freezing change H2O into CO2?",hint:"Think about physical state and chemical composition separately.",answer:"No. H2O remains H2O; freezing changes its physical state."}]},
-  {id:"water-explain",page_number:2,title:"Separate physical state from composition",text:"State and composition answer different questions.",source_type:"MASTER_NOTES",source_types:["MASTER_NOTES","NCERT_FALLBACK"],source_section_ids:["physical_states","physical_changes"],
-    blocks:[{kind:"definition",text:"A physical change changes a physical property while preserving chemical composition.",source_type:"MASTER_NOTES"},
-      {kind:"explanation",text:"In a closed container, melting changes the arrangement of water molecules while preserving their identity.",expanded_text:"The molecules remain H2O before and after melting; their arrangement and freedom of movement change.",source_type:"NCERT_FALLBACK"}]},
-  {id:"water-check",page_number:3,title:"Use the idea in a new situation",text:"Apply the distinction rather than memorising a label.",source_type:"MASTER_NOTES",source_section_ids:["physical_changes"],
-    blocks:[{kind:"takeaway",text:"Check whether the substance keeps its composition; a change in shape or state alone is not evidence of a new substance.",source_type:"MASTER_NOTES"}],
+  {id:"water-explain",page_number:2,title:"Separate physical state from composition",text:"State and composition answer different questions.",source_type:"NCERT",source_types:["NCERT"],source_section_ids:["physical_states","physical_changes"],
+    blocks:[{kind:"definition",text:"A physical change changes a physical property while preserving chemical composition.",source_type:"NCERT"},
+      {kind:"explanation",text:"In a closed container, melting changes the arrangement of water molecules while preserving their identity.",expanded_text:"The molecules remain H2O before and after melting; their arrangement and freedom of movement change.",source_type:"NCERT"}]},
+  {id:"water-check",page_number:3,title:"Use the idea in a new situation",text:"Apply the distinction rather than memorising a label.",source_type:"NCERT",source_section_ids:["physical_changes"],
+    blocks:[{kind:"takeaway",text:"Check whether the substance keeps its composition; a change in shape or state alone is not evidence of a new substance.",source_type:"NCERT"}],
     questions:[{question:"Does cutting ice into smaller pieces create a new compound?",answer:"No. The pieces retain the composition H2O."}]},
 ];
 const lesson: ChapterNotes = {
@@ -24,7 +24,39 @@ const lesson: ChapterNotes = {
 };
 const url = `/dashboard/study/notes/${lesson.chapter.slug}?topic=${lesson.topic_id}&classLevel=Class+8&subject=Science`;
 
-test("dynamic master-first notes complete actual pages and return from a page-scoped tutor",async({page},testInfo)=>{
+test("finishing timed notes opens the next topic with the same deadline", async ({page}) => {
+  await installWorkspaceMocks(page);
+  const deadline = new Date(Date.now() + 900_000).toISOString();
+  const nextTopic = "changes_in_matter";
+  await page.route(`${WORKSPACE_TEST_BACKEND}/notes/**`, route => {
+    const topic = new URL(route.request().url()).searchParams.get("topic_id");
+    return route.fulfill({headers,json:{
+      ...lesson, topic_id:topic, active_unit_id:topic,
+      topic_title:topic === nextTopic ? "Changes in matter" : lesson.topic_title,
+      pages:[pages[0]], study_session:{ends_at:deadline,remaining_seconds:900},
+    }});
+  });
+  await page.route(`${WORKSPACE_TEST_BACKEND}/planning/route/heartbeat/**`, route => {
+    if (route.request().method() === "OPTIONS") return route.fulfill({headers});
+    const position = route.request().postDataJSON().last_position;
+    expect(position.finish_notes).toBe(true);
+    expect(position.notes_completed_page_ids).toEqual([pages[0].id]);
+    const json = position.notes_topic === nextTopic
+      ? {saved:true,notes_outcome:"time_up"}
+      : {saved:true,notes_outcome:"continue",next_notes:{chapter_slug:lesson.chapter.slug,topic_id:nextTopic}};
+    return route.fulfill({headers,json});
+  });
+  await page.goto(`${url}&planned=1&startSession=1`);
+  await expect(page.getByRole("timer")).toContainText("remaining");
+  await page.getByRole("button",{name:"Finish topic"}).click();
+  await expect(page.getByRole("heading",{name:"Changes in matter",exact:true})).toBeVisible();
+  await expect(page.getByRole("timer")).toContainText("remaining");
+  await page.getByRole("button",{name:"Finish topic"}).click();
+  await expect(page.getByRole("status")).toContainText("Study time is up");
+  await expect(page).toHaveURL(new RegExp(nextTopic));
+});
+
+test("dynamic NCERT notes complete actual pages and return from a page-scoped tutor",async({page},testInfo)=>{
   await installWorkspaceMocks(page);
   let state = structuredClone(lesson);
   let writes = 0;
@@ -66,7 +98,7 @@ test("dynamic master-first notes complete actual pages and return from a page-sc
   await page.getByRole("button",{name:"Next",exact:true}).click();
   await expect(page.getByText("Page 2 of 3",{exact:true})).toBeVisible();
   await expect.poll(()=>state.completed_page_ids).toEqual([pages[0].id]);
-  await expect(page.getByText("Supplementary NCERT",{exact:true}).first()).toBeVisible();
+  await expect(page.getByText("NCERT",{exact:true}).first()).toBeVisible();
   await page.getByText("See the full reasoning",{exact:true}).click();
   await expect(page.getByText("The molecules remain H2O before and after melting; their arrangement and freedom of movement change.",{exact:false})).toBeVisible();
   await page.getByText("Source material awaiting review",{exact:true}).click();
@@ -153,7 +185,7 @@ test("notes can contain more than ten pages and save their last actual page",asy
 test("advanced worked previews reveal complete solutions and Markdown keeps scientific notation",async({page})=>{
   await installWorkspaceMocks(page);
   const calculation = {...lesson,pages:[{...pages[0],text:"A source-backed worked example",blocks:[
-    {kind:"worked_example",source_type:"MASTER_NOTES",presentation:"source_preview",text:"Given m = 60 g and V = 20 cm^3, find density.",
+    {kind:"worked_example",source_type:"NCERT",presentation:"source_preview",text:"Given m = 60 g and V = 20 cm^3, find density.",
       expanded_text:"Given m = 60 g and V = 20 cm^3, find density. Use density = mass / volume. Substitute: 60 / 20 = 3 g cm^(-3). Water is H2O; the amount formula is $n = m/M$."},
   ]}],saved_page_id:pages[0].id};
   await page.route(`${WORKSPACE_TEST_BACKEND}/notes/**`,route=>route.fulfill({headers,json:calculation}));

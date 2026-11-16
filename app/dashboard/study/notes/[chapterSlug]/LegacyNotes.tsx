@@ -57,7 +57,7 @@ export default function LegacyNotes() {
   }, [authBusy, chapterSlug, getAuthHeaders, userId, topicId]);
 
   if (authBusy || loading) {
-    return <LoadingState title="Loading master notes…" detail="Formatting your study material." />;
+    return <LoadingState title="Loading notes…" detail="Formatting your study material." />;
   }
 
   if (error || !notes) {
@@ -84,7 +84,7 @@ export function LegacyNotesContent({ notes, topicId }: { notes: ChapterNotes; to
         <div>
           <p>{notes.chapter.class_level} • {notes.chapter.subject}</p>
           <h1>Chapter {notes.chapter.chapter_number}: {notes.chapter.name}</h1>
-          <span>{topicId ? "Focused Section" : "Full Chapter Master Notes"}</span>
+          <span>{topicId ? "Focused Section" : "Full Chapter Notes"}</span>
         </div>
       </header>
 

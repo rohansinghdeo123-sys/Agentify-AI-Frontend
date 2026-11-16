@@ -396,7 +396,6 @@ const STUDY_TIME_BUDGETS: Record<PlanningStudyTime, number | null> = {
   "30": 30,
   "60": 60,
   "120_plus": 120,
-  no_limit: null,
 };
 
 function validSessionDuration(value: number | undefined) {

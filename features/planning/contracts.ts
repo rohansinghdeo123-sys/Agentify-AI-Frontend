@@ -5,11 +5,6 @@ export const PLANNING_PROFICIENCY_OPTIONS = [
     description: "Most detailed notes",
   },
   {
-    value: "know_a_little",
-    label: "Know a Little",
-    description: "Moderately detailed notes",
-  },
-  {
     value: "know_the_basics",
     label: "Know the Basics",
     description: "Concise, concept-focused notes",
@@ -25,8 +20,7 @@ export const PLANNING_STUDY_TIME_OPTIONS = [
   { value: "15", label: "15 min" },
   { value: "30", label: "30 min" },
   { value: "60", label: "1 hour" },
-  { value: "120_plus", label: "2+ hours" },
-  { value: "no_limit", label: "No limit" },
+  { value: "120_plus", label: "2 hours" },
 ] as const;
 
 export type PlanningChapterProficiency = (typeof PLANNING_PROFICIENCY_OPTIONS)[number]["value"];
@@ -575,8 +569,9 @@ function legacyPlanningProficiency(value: unknown): PlanningChapterProficiency |
   if (isPlanningChapterProficiency(normalized)) return normalized;
   return {
     new: "new_to_it",
-    weak_basics: "know_a_little",
-    some_idea: "know_a_little",
+    weak_basics: "new_to_it",
+    know_a_little: "new_to_it",
+    some_idea: "new_to_it",
     know_basics: "know_the_basics",
     fast_track: "mostly_confident",
     quick_revision: "mostly_confident",
@@ -598,6 +593,7 @@ function planningProficiencyFromRecord(value: Record<string, unknown>): Planning
 function planningStudyTimeFromRecord(value: Record<string, unknown>): PlanningStudyTime | "" {
   const explicit = value.studyTimeToday ?? value.study_time_today;
   if (isPlanningStudyTime(explicit)) return explicit;
+  if (explicit === "no_limit") return "30";
   const duration = value.sessionDurationMinutes ?? value.session_duration_minutes;
   if (duration === 15 || duration === "15") return "15";
   if (duration === 30 || duration === "30") return "30";
@@ -682,7 +678,6 @@ export function isPlanningRoadmap(value: unknown): value is PlanningRoadmap {
     "30": 30,
     "60": 60,
     "120_plus": 120,
-    no_limit: null,
   };
   const expectedSource = studyTime !== null
     ? "student_choice"
@@ -933,7 +928,6 @@ export function isPlanningPortfolio(value: unknown): value is PlanningPortfolio 
     "30": 30,
     "60": 60,
     "120_plus": 120,
-    no_limit: null,
   };
   const studyTime = value.study_time_today as PlanningStudyTime | null;
   const sessionDuration = value.session_duration_minutes as number | null;
@@ -1195,6 +1189,8 @@ export interface StudyRouteNextAction {
 }
 
 export interface StudyRouteState {
+  study_session?: {ends_at: string; remaining_seconds: number};
+  read_unit_ids?: string[];
   portfolio?: PlanningPortfolio;
   completed_unit_ids?: string[];
   user_id: string;
@@ -1424,6 +1420,12 @@ export function normalizeStudyRouteState(value: unknown): StudyRouteState | null
 
   return {
     portfolio: normalizePlanningPortfolio(value.portfolio) ?? undefined,
+    study_session: isRecord(value.study_session)
+      && typeof value.study_session.ends_at === "string"
+      && typeof value.study_session.remaining_seconds === "number"
+      ? {ends_at:value.study_session.ends_at, remaining_seconds:value.study_session.remaining_seconds}
+      : undefined,
+    read_unit_ids: Array.isArray(value.read_unit_ids) ? value.read_unit_ids.filter(nonEmptyString) : [],
     completed_unit_ids: Array.isArray(value.completed_unit_ids) ? value.completed_unit_ids.filter(nonEmptyString) : [],
     user_id: value.user_id,
     route_date: value.route_date,

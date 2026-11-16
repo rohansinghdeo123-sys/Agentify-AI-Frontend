@@ -107,7 +107,6 @@ function roadmap({
     "30": 30,
     "60": 60,
     "120_plus": 120,
-    no_limit: null,
   };
   const routeSource = studyTimeToday !== null
     ? "student_choice" as const
@@ -351,7 +350,6 @@ describe("NCERT-ordered Planning roadmap", () => {
   it("offers exactly the four student-friendly proficiency choices", () => {
     expect(PLANNING_PROFICIENCY_OPTIONS).toEqual([
       { value: "new_to_it", label: "New to It", description: "Most detailed notes" },
-      { value: "know_a_little", label: "Know a Little", description: "Moderately detailed notes" },
       { value: "know_the_basics", label: "Know the Basics", description: "Concise, concept-focused notes" },
       { value: "mostly_confident", label: "Mostly Confident", description: "Shortest notes; revision and mastery" },
     ]);
@@ -362,8 +360,7 @@ describe("NCERT-ordered Planning roadmap", () => {
       { value: "15", label: "15 min" },
       { value: "30", label: "30 min" },
       { value: "60", label: "1 hour" },
-      { value: "120_plus", label: "2+ hours" },
-      { value: "no_limit", label: "No limit" },
+      { value: "120_plus", label: "2 hours" },
     ]);
   });
 
@@ -1281,7 +1278,7 @@ describe("NCERT-ordered Planning roadmap", () => {
     expect(active).toContain("Start today’s route");
     expect(active).toContain("min scheduled");
     expect(active).toContain("min available");
-    expect(active).toContain("no time ceiling");
+    expect(active).not.toContain("no time ceiling");
     expect(active).toContain("item.reason");
     expect(active).toContain('item.role === "main_focus" ? "Main focus" : "Quick check"');
     expect(active).not.toContain('item.role === "main_focus" ? "Complete"');

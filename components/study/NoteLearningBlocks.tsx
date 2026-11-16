@@ -8,7 +8,7 @@ export function NoteLearningText({text}:{text:string}) {
 }
 
 export function notesSourceLabel(type?: NotesSourceType) {
-  return type==="MASTER_NOTES" ? "Master notes" : type==="NCERT_FALLBACK" ? "Supplementary NCERT" : "";
+  return type ? "NCERT" : "";
 }
 
 export function NotesSourceBadge({type}:{type?:NotesSourceType}) {

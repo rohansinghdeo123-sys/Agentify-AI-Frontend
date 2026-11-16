@@ -59,7 +59,7 @@
 
 .sourceBadges { display: flex; flex-wrap: wrap; gap: .4rem; }
 .sourceBadge { display: inline-flex; width: fit-content; padding: .2rem .55rem; margin: .25rem .3rem .45rem 0; border-radius: 20px; font-size: .73rem; font-weight: 750; line-height: 1.5; background: color-mix(in srgb, var(--notes-accent) 12%, transparent); color: var(--notes-accent); }
-.sourceBadge[data-source="NCERT_FALLBACK"] { color: var(--market-text, #6d4e16); background: color-mix(in srgb, #c6983e 17%, transparent); }
+.sourceBadge[data-source="NCERT"] { color: var(--market-text, #6d4e16); background: color-mix(in srgb, #c6983e 17%, transparent); }
 .interrupt { padding: 1rem 1.2rem; margin-top: 1rem; border: 1px solid color-mix(in srgb, var(--notes-accent) 30%, transparent); border-left: 4px solid var(--notes-accent); border-radius: 14px; background: color-mix(in srgb, var(--notes-accent) 7%, var(--market-surface-strong, #fff)); line-height: 1.7; }
 .interrupt h3 { margin: .3rem 0 .6rem; font-size: 1.05rem; font-weight: 750; }
 .interrupt details, .expandedReasoning details { margin-top: .7rem; }

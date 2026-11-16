@@ -135,7 +135,7 @@ export default function StudyHomePage() {
       const savedId = context.last_position.conversation_id;
       const resume = typeof savedId === "string" && Boolean(savedId);
       if (!resume && searchParams.get("fromNotes") !== "1") {
-        router.push(studyNotesHref(scope.chapterId,scope.topicId,{planned:true,classLevel:scope.classLevel,subject:scope.subject}));
+        router.push(studyNotesHref(scope.chapterId,scope.topicId,{planned:true,startSession:true,classLevel:scope.classLevel,subject:scope.subject}));
         return;
       }
       const id = resume ? savedId : createConversationId();

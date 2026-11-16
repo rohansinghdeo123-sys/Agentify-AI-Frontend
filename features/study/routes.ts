@@ -7,11 +7,12 @@ export const STUDY_ROUTES = {
 } as const;
 
 export function studyNotesHref(chapter: string, topic: string, options?: {
-  planned?: boolean; classLevel?: string; subject?: string; page?: number;
+  planned?: boolean; startSession?: boolean; classLevel?: string; subject?: string; page?: number;
   pageId?: string; contentVersion?: string;
 }) {
   const params = new URLSearchParams({topic});
   if (options?.planned) params.set("planned","1");
+  if (options?.startSession) params.set("startSession","1");
   if (options?.classLevel) params.set("classLevel",options.classLevel);
   if (options?.subject) params.set("subject",options.subject);
   if (options?.page !== undefined) params.set("page",String(options.page));

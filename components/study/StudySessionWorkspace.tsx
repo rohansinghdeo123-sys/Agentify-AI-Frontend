@@ -586,7 +586,7 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
         setNotesReference({contentVersion:notes?.content_version || "", pageNumber:index+1,pageId:page.id,sourceFingerprint:notes?.source_fingerprint || "", subtopicIds:page.source_section_ids || [], proficiency:notes?.proficiency || "new_to_it", explanationStyle:notes?.explanation_style || "balanced"});
         const teaching = page.blocks?.length ? page.blocks.map(block=>`[${block.source_type || page.source_type || page.source || "Retrieved source"}] ${block.expanded_text || block.text}`).join("\n\n") : page.text;
         const activities = (page.interrupts || []).map(interrupt=>`${interrupt.heading}: ${interrupt.question || interrupt.activity || ""}${interrupt.answer ? `\nReasoning: ${interrupt.answer}` : ""}`).join("\n\n");
-        setNotesContext(`Current notes reference. Source: ${page.source_type || page.source || "Study notes"}. Retrieved source references: ${JSON.stringify(page.provenance || page.source_refs || [])}. Source PDF pages: ${(page.source_pages || []).join(", ")}. Teaching format: ${page.teaching_format || "concept"}. Class: ${notes!.chapter.class_level}. Subject: ${notes!.chapter.subject}. Chapter: ${notes!.chapter.name}. Planning topic: ${notes!.topic_title}. Subtopic: ${page.title}. Page: ${index+1}. Proficiency: ${notes!.proficiency}. Explanation preference: ${notes!.explanation_style || "balanced"}. Configured full-topic time: ${notes!.estimated_minutes?.min}–${notes!.estimated_minutes?.max} min; today’s allocated portion: ${notes!.allocated_session_minutes ?? "not specified"} min. Teach only this page and its prerequisites. Use retrieved master-notes content as primary; distinguish any retrieved supplementary NCERT content. Preserve formulas, units and conditions, and do not attribute claims to an unretrieved source.\n${teaching}\n${activities}`);
+        setNotesContext(`Current notes reference. Source: ${page.source_type || page.source || "Study notes"}. Retrieved source references: ${JSON.stringify(page.provenance || page.source_refs || [])}. Source PDF pages: ${(page.source_pages || []).join(", ")}. Teaching format: ${page.teaching_format || "concept"}. Class: ${notes!.chapter.class_level}. Subject: ${notes!.chapter.subject}. Chapter: ${notes!.chapter.name}. Planning topic: ${notes!.topic_title}. Subtopic: ${page.title}. Page: ${index+1}. Proficiency: ${notes!.proficiency}. Explanation preference: ${notes!.explanation_style || "balanced"}. Configured full-topic time: ${notes!.estimated_minutes?.min}–${notes!.estimated_minutes?.max} min; today’s allocated portion: ${notes!.allocated_session_minutes ?? "not specified"} min. Teach only this page and its prerequisites. Use the retrieved NCERT material. Preserve formulas, units and conditions, and do not attribute claims to an unretrieved source.\n${teaching}\n${activities}`);
       } else if (active) {
         setError("This notes page is no longer available. Return to notes to open the updated material.");
       }
@@ -941,6 +941,16 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
           lastPosition: { page: "session_complete", conversation_id: conversationId },
         },
       );
+      const route = result.route;
+      const nextId = route.current_step.current_unit_id;
+      const nextChapter = route.chapters.find(chapter=>chapter.learning_units.some(unit=>unit.id===nextId));
+      if (route.study_session && !result.next_action.done_for_today && nextChapter &&
+          nextId !== studyLabContext.current_unit_id) {
+        router.replace(studyNotesHref(nextChapter.chapter_slug,nextId,{
+          planned:true,classLevel:route.class_level,subject:route.subject,
+        }));
+        return;
+      }
       setCompletionResult(result);
     } catch (completionError) {
       setError(studyErrorMessage(completionError));
@@ -1249,7 +1259,9 @@ function StudySessionRoom({ conversationId }: { conversationId: string }) {
             </div>
             {completionResult.next_action.done_for_today ? (
               <p className={styles.stepHandoffNote}>
-                That&apos;s today&apos;s route finished. Come back tomorrow for the next step.
+                {completionResult.route.study_session?.remaining_seconds === 0
+                  ? "Study time is up. Your progress is saved."
+                  : "You’ve reached the end of this study sequence."}
               </p>
             ) : (
               <>

@@ -8,12 +8,12 @@ import { notePoints } from "@/components/study/notePoints";
 import noteStyles from "@/components/study/topic-notes.module.css";
 import { LoadingState } from "@/components/ui/Polished";
 import { createConversationId } from "@/features/study/conversationUtils";
-import { studySessionHref } from "@/features/study/routes";
+import { studyNotesHref, studySessionHref } from "@/features/study/routes";
 import type { StudyScope } from "@/features/study/types";
 import { NoteLearningText, notesSourceLabel, NotesSourceBadge, PatternInterrupt } from "@/components/study/NoteLearningBlocks";
 import { notesCompletedPageIds, notesPageIndex } from "@/features/study/notesReaderState";
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import styles from "../../home.module.css";
 
@@ -39,11 +39,12 @@ function chapterName(slug: string) {
 }
 
 function TopicNotesReader() {
+  const router = useRouter();
   const { chapterSlug } = useParams<{chapterSlug: string}>();
   const params = useSearchParams();
   const topic = params.get("topic") || undefined;
   const requestedPage = params.get("page");
-  const requestScope = useRef({classLevel:params.get("classLevel") || undefined,subject:params.get("subject") || undefined,contentVersion:params.get("notesVersion") || undefined});
+  const requestScope = useRef({classLevel:params.get("classLevel") || undefined,subject:params.get("subject") || undefined,contentVersion:params.get("notesVersion") || undefined,planned:params.get("planned")==="1",startSession:params.get("startSession")==="1"});
   const navigation = useRef({id:"",sequence:0});
   const {userId, getAuthHeaders, loading: authBusy} = useAuth();
   const [notes, setNotes] = useState<ChapterNotes | null>(null);
@@ -52,6 +53,10 @@ function TopicNotesReader() {
   const [loadError, setLoadError] = useState("");
   const [attempt, setAttempt] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [remaining, setRemaining] = useState<number | null>(null);
+  const [finishing, setFinishing] = useState(false);
+  const [finishOutcome, setFinishOutcome] = useState<"time_up" | "sequence_read">();
+  const finishInFlight = useRef(false);
   useEffect(() => {
     if (authBusy) return;
     if (!userId) return;
@@ -66,6 +71,12 @@ function TopicNotesReader() {
       }
       setNotes(data);
       setCompletedPages(notesCompletedPageIds(data));
+      if (requestScope.current.startSession && data.study_session) {
+        requestScope.current.startSession = false;
+        const url = new URL(window.location.href);
+        url.searchParams.delete("startSession");
+        window.history.replaceState(null, "", url);
+      }
     }).catch(() => { if (active) {setNotes(null);setLoadError("Your notes could not be loaded. Check your connection and retry.");} }).finally(() => {if(active)setLoading(false);});
     return () => {active=false;abort.abort();};
   },[authBusy,userId,getAuthHeaders,chapterSlug,topic,attempt]);
@@ -75,21 +86,56 @@ function TopicNotesReader() {
       if (scroller) { scroller.scrollTop = 0; scroller.scrollLeft = 0; }
     }
   },[loading]);
+  const deadline = notes?.study_session?.ends_at;
+  useEffect(() => {
+    if (!deadline) return;
+    const tick = () => setRemaining(Math.max(0, Math.ceil((Date.parse(deadline) - Date.now()) / 1000)));
+    tick();
+    const interval = window.setInterval(tick, 1000);
+    return () => window.clearInterval(interval);
+  }, [deadline]);
   const pages: NotePage[] = notes?.pages || notes?.concepts.map((c) => ({id:c.id,title:c.title,source:undefined as string | undefined, source_pages:undefined as number[] | undefined, teaching_format:undefined as string | undefined,text:[c.definition,c.explanation,...c.key_points.map((p)=>`- ${p}`),...c.formulas,...c.examples].filter(Boolean).join("\n\n")})) || [];
   const page = notesPageIndex(notes,{page:requestedPage,pageId:params.get("pageId"),version:params.get("notesVersion")});
   const current = pages[page];
   const tracksCompletedPages = notes?.completed_page_ids !== undefined;
-  const saveReadingPosition = async (next: number, completed: string[]) => {
+  const saveReadingPosition = async (next: number, completed: string[], finishNotes = false) => {
     if (notes?.can_save_position === false) return;
     navigation.current.id ||= createConversationId();
     const sequence = ++navigation.current.sequence;
     const headers = await getAuthHeaders();
     const activeUnit = notes?.active_unit_id || (await getStudyLabContext({headers},userId))?.current_unit_id;
     if (activeUnit) {
-      await recordStudyRouteHeartbeat({headers},userId,{unit_id:activeUnit,notes_page:next,notes_topic:notes?.topic_id || topic,
+      return await recordStudyRouteHeartbeat({headers},userId,{unit_id:activeUnit,notes_page:next,notes_topic:notes?.topic_id || topic,
+        ...(finishNotes ? {finish_notes:true} : {}),
         ...(notes?.content_version ? {notes_version:notes.content_version} : {}),
         ...(tracksCompletedPages ? {notes_page_id:pages[next]?.id,notes_total_pages:pages.length,notes_completed_page_ids:completed,notes_navigation_id:navigation.current.id,notes_navigation_seq:sequence} : {}),
       });
+    }
+  };
+  const timedTopic = Boolean(notes?.study_session && notes?.topic_id === notes?.active_unit_id);
+  const finishTopic = async (completed: string[]) => {
+    if (finishInFlight.current) return;
+    finishInFlight.current = true;
+    setFinishing(true);
+    try {
+      const result = await saveReadingPosition(page, completed, true);
+      if (result?.next_notes && result.notes_outcome === "continue") {
+        router.replace(studyNotesHref(result.next_notes.chapter_slug, result.next_notes.topic_id, {
+          planned:true,classLevel:notes?.chapter.class_level,subject:notes?.chapter.subject,
+        }));
+        return;
+      }
+      if (result?.notes_outcome === "time_up" || result?.notes_outcome === "sequence_read") {
+        setFinishOutcome(result.notes_outcome);
+        setError("");
+      } else {
+        setError("Your next topic could not open. Retry to continue.");
+      }
+    } catch {
+      setError("Your topic could not be saved. Retry to continue.");
+    } finally {
+      finishInFlight.current = false;
+      setFinishing(false);
     }
   };
   const navigate = async (next: number) => {
@@ -112,10 +158,18 @@ function TopicNotesReader() {
     if (!current) return;
     const completed = [...new Set([...completedPages,current.id])];
     setCompletedPages(completed);
+    if (timedTopic && completed.length === pages.length) {
+      await finishTopic(completed);
+      return;
+    }
     try { await saveReadingPosition(page,completed);setError(""); }
     catch {setError("Reading progress could not sync. Please retry before leaving.");}
   };
   const retryProgress = async () => {
+    if (timedTopic && completedPages.length === pages.length && !finishOutcome) {
+      await finishTopic(completedPages);
+      return;
+    }
     try {await saveReadingPosition(page,completedPages);setError("");}
     catch {setError("Reading progress still could not sync. Keep this page open and retry.");}
   };
@@ -153,16 +207,20 @@ function TopicNotesReader() {
     <header className={styles.notesHeader}><Link href="/dashboard/planning/active">Return to Planning</Link><div>
       <p>{notes?.chapter.name}</p><h1>{notes?.topic_title || "Topic notes"}</h1>
       {notes?.estimated_minutes ? <p>{notes.estimated_minutes.min}–{notes.estimated_minutes.max} min · Topic duration</p> : null}
-      {notes?.proficiency ? <p>{({new_to_it:"Learning for the first time",know_a_little:"Know a little",know_the_basics:"Know the basics",mostly_confident:"Mostly confident"} as Record<string,string>)[notes.proficiency] || notes.proficiency.replaceAll("_"," ")}{notes.learning_depth ? ` · ${notes.learning_depth.replaceAll("_"," ")}` : ""}</p> : null}
+      {notes?.topic_read ? <p>Topic read</p> : null}
+      {notes?.proficiency ? <p>{({new_to_it:"Learning for the first time",know_the_basics:"Know the basics",mostly_confident:"Mostly confident"} as Record<string,string>)[notes.proficiency] || "Learning for the first time"}{notes.learning_depth ? ` · ${notes.learning_depth.replaceAll("_"," ")}` : ""}</p> : null}
     </div></header>
     {error ? <div className={noteStyles.sessionPortion} role="alert"><p>{error}</p><button className={noteStyles.markRead} onClick={()=>void retryProgress()}>Retry saving progress</button></div> : null}
     {notes?.progress_rebased ? <p className={noteStyles.sessionPortion} role="status">These notes have been updated. Your reading position has been matched where possible, and page completion follows the updated notes.</p> : null}
-    {notes?.session_portion ? <p className={noteStyles.sessionPortion}>For today’s {notes.session_portion.allocated_minutes}-minute study portion, focus on pages {notes.session_portion.start_page+1}–{notes.session_portion.end_page+1}.{notes.session_portion.additional_practice_needed ? " Continue the remaining explanation and practice in your next session." : " Allow time for the revision questions."}</p> : null}
+    {finishOutcome === "sequence_read" ? <p role="status" className={noteStyles.sessionPortion}>You’ve read all the topics in this sequence.</p> :
+      remaining === 0 || finishOutcome === "time_up" ? <p role="status" className={noteStyles.sessionPortion}>Study time is up. Your place is saved.</p> :
+      remaining !== null ? <p role="timer" className={noteStyles.sessionPortion}>{Math.floor(remaining/60)}:{String(remaining%60).padStart(2,"0")} remaining</p> : null}
     {current ? <>
       <nav aria-label="Reading pages" className={noteStyles.navigation}>
-        <button disabled={page===0} onClick={()=>void navigate(page-1)}>Previous</button>
+        <button disabled={finishing || page===0} onClick={()=>void navigate(page-1)}>Previous</button>
         <span>Page {page+1} of {pages.length}</span>
-        <button disabled={page===pages.length-1} onClick={()=>void navigate(page+1)}>Next</button>
+        {timedTopic && !finishOutcome && page===pages.length-1 ? <button disabled={finishing || completedPages.length - Number(completedPages.includes(current.id)) !== pages.length-1} onClick={()=>void markPageRead()}>{finishing ? "Opening next topic…" : "Finish topic"}</button> :
+          <button disabled={finishing || page===pages.length-1 || remaining===0} onClick={()=>void navigate(page+1)}>Next</button>}
         <Link href={askHref}>Ask AI about this page</Link>
       </nav>
       <progress aria-label="Reading progress" value={tracksCompletedPages ? completedPages.length : page+1} max={pages.length} className={noteStyles.progress} />
@@ -175,9 +233,9 @@ function TopicNotesReader() {
         {current.questions?.length ? <section className={noteStyles.review} aria-label="Check your understanding"><h3>Check your understanding</h3><ol>{current.questions.map((q,i)=><li key={i}><NotesChemistryText text={q.question} /><details><summary>Check the reasoning</summary><NotesChemistryText text={q.answer} /></details></li>)}</ol></section> : null}
         {current.transition ? <p className={noteStyles.transition}><NotesChemistryText text={current.transition} /></p> : null}
       </article>
-      {tracksCompletedPages ? <button type="button" className={noteStyles.markRead} disabled={completedPages.includes(current.id)} onClick={()=>void markPageRead()}>{completedPages.includes(current.id) ? "Page marked read" : "Mark page read"}</button> : null}
+      {tracksCompletedPages ? <button type="button" className={noteStyles.markRead} disabled={finishing || completedPages.includes(current.id)} onClick={()=>void markPageRead()}>{completedPages.includes(current.id) ? "Page marked read" : "Mark page read"}</button> : null}
       <p>Reading progress records your position. Demonstrate mastery with a quick check.</p>
-      <Link className={noteStyles.continue} href={continueHref}>Continue to learning and quick check</Link>
+      {remaining !== 0 && finishOutcome !== "time_up" ? <Link className={noteStyles.continue} href={continueHref}>Continue to learning and quick check</Link> : null}
     </> : <p>No verified notes are mapped to this topic yet.</p>}
     {notes?.review_required?.length ? <details className={noteStyles.sourceReview}><summary>Source material awaiting review</summary><p>Some source points need review. Conflicting information is not silently combined with the lesson.</p><ul>{Array.from(new Set(notes.review_required.map(r=>r.reason))).map(r=><li key={r}><NoteLearningText text={r} /></li>)}</ul></details> : null}
   </div>;
