@@ -1,4 +1,4 @@
-import type { FormEvent, ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { AppIcon } from "@/components/ui/Polished";
 import { exportReport, type Agent, type Run, type RunKind, type Schedule, type Snapshot } from "./api";
 import { Heading, MetricsTable, Portrait, Status, runSummary, time, title } from "./OverviewViews";
@@ -30,6 +30,41 @@ function Evidence({ data, label = "Evidence" }: { data: unknown; label?: string 
 export function RunDetail({ run, agents, allowExport = false, showRun, children }: {
   run: Run | null; agents: Agent[]; allowExport?: boolean; showRun: (id: string) => void; children?: ReactNode;
 }) {
+  const [speaking, setSpeaking] = useState<string | number | null>(null);
+  const [speechError, setSpeechError] = useState("");
+  const utterance = useRef<SpeechSynthesisUtterance | null>(null);
+  const [canSpeak] = useState(() => typeof window !== "undefined" && "speechSynthesis" in window);
+  useEffect(() => () => {
+    if (utterance.current) window.speechSynthesis.cancel();
+  }, []);
+
+  function readAloud(id: string | number, text: string) {
+    const synth = window.speechSynthesis;
+    const wasSpeaking = speaking === id;
+    const previous = utterance.current;
+    utterance.current = null;
+    if (previous) synth.cancel();
+    setSpeaking(null);
+    setSpeechError("");
+    if (wasSpeaking) return;
+    const next = new SpeechSynthesisUtterance(text);
+    next.lang = "en-IN";
+    utterance.current = next;
+    next.onstart = () => { if (utterance.current === next) setSpeaking(id); };
+    next.onend = () => {
+      if (utterance.current !== next) return;
+      utterance.current = null;
+      setSpeaking(null);
+    };
+    next.onerror = () => {
+      if (utterance.current !== next) return;
+      utterance.current = null;
+      setSpeaking(null);
+      setSpeechError("Voice playback is unavailable. You can read the response below.");
+    };
+    synth.speak(next);
+  }
+
   if (!run) return <p className={styles.empty}>Open saved work or start a new request.</p>;
   return <>
     <div className={styles.blockHead}>
@@ -41,16 +76,22 @@ export function RunDetail({ run, agents, allowExport = false, showRun, children 
         </>}
       </div>
     </div>
-    {runSummary(run) && <p className={styles.muted}>{runSummary(run)}</p>}
+    {(run.kind !== "direct" || !run.messages?.length) && runSummary(run) && <p className={styles.muted}>{runSummary(run)}</p>}
+    {speechError && <p role="status" className={styles.muted}>{speechError}</p>}
     {run.parent_run_id && <button type="button" className={styles.button} onClick={() => showRun(run.parent_run_id!)}>Open previous request</button>}
     <ul className={styles.thread} aria-label="Run messages">
       {run.messages?.map(message => {
         const agent = agents.find(item => item.id === message.agent_id);
         return <li key={message.id} className={styles.message}>
-          <header><div className={styles.person}>{agent && <Portrait agent={agent} small />}
-            <span><strong>{agent?.name || (message.agent_id ? title(message.agent_id) : "Executive / system")}</strong><br /><small className={styles.muted}>{message.kind === "analysis" ? "AI analysis · hypothesis" : title(message.kind)}</small></span>
+          <header><div className={styles.person}>{agent && <Portrait agent={agent} small motion={speaking === message.id ? "speaking" : undefined} />}
+            <span><strong>{agent?.name || (message.agent_id ? title(message.agent_id) : "Executive / system")}</strong><br /><small className={styles.muted}>{message.kind === "analysis" ? "AI analysis · hypothesis" : message.kind === "reply" ? "AI conversation" : title(message.kind)}</small></span>
           </div><time>{time(message.created_at)}</time></header>
           <p>{message.text}</p>
+          {canSpeak && agent && ["reply","finding","summary"].includes(message.kind) &&
+            <button type="button" className={styles.voiceButton} onClick={() => readAloud(message.id, message.text)} aria-pressed={speaking === message.id}
+              aria-label={speaking === message.id ? "Stop voice playback" : `Listen to ${agent.name}`}>
+              {speaking === message.id ? "Stop listening" : "Listen"}
+            </button>}
           <Evidence data={message.evidence} />
         </li>;
       })}
@@ -61,16 +102,30 @@ export function RunDetail({ run, agents, allowExport = false, showRun, children 
   </>;
 }
 
-export function Collaboration({ agents, kind, setKind, selectedIds, setSelectedIds, prompt, setPrompt, run, busy, onSend, history, showRun }: {
+export function Collaboration({ agents, kind, setKind, selectedIds, setSelectedIds, prompt, setPrompt, run, busy, onSend, history, showRun, onReport, onTalk }: {
   agents: Agent[]; kind: "direct" | "meeting" | "standup"; setKind: (kind: "direct" | "meeting" | "standup") => void;
   selectedIds: string[]; setSelectedIds: (ids: string[]) => void; prompt: string; setPrompt: (value: string) => void;
   run: Run | null; busy: boolean; onSend: (event: FormEvent) => void; history: ReactNode; showRun: (id: string) => void;
+  onReport: (agent: Agent) => void;
+  onTalk: (agent: Agent) => void;
 }) {
+  const agent = kind === "direct" ? agents.find(item => item.id === selectedIds[0]) : undefined;
+  const awaiting = Boolean(agent && run?.kind === "direct" && run.participant_ids[0] === agent.id &&
+    ["queued","running"].includes(run.status));
   return <>
     <Heading detail="Send an evidence request, convene specific roles, or record a team standup.">Collaboration Hub</Heading>
     <div className={styles.conversation}>
       <aside className={styles.panel}><h2>Saved conversations</h2>{history}</aside>
       <section className={styles.panel} aria-label="Executive conversation">
+        {agent && <header className={styles.conversationAgent}>
+          <Portrait agent={agent} motion={awaiting && run?.status === "running" ? "working" : undefined} />
+          <div>
+            <h2>Chat with {agent.name}</h2>
+            <p>{agent.role}</p>
+            {awaiting && <p role="status"><Status value={run!.status} /></p>}
+            <button type="button" className={styles.button} onClick={() => onReport(agent)}>Open agent report</button>
+          </div>
+        </header>}
         <form onSubmit={onSend}>
           <div className={styles.formRow}>
             <label className={styles.field}>Request type
@@ -78,7 +133,10 @@ export function Collaboration({ agents, kind, setKind, selectedIds, setSelectedI
                 <option value="direct">Direct conversation</option><option value="meeting">Team meeting</option><option value="standup">Daily standup</option>
               </select>
             </label>
-            {kind === "direct" && <label className={styles.field}>Agent<select required value={selectedIds[0] || ""} onChange={event => setSelectedIds([event.target.value])}>
+            {kind === "direct" && <label className={styles.field}>Agent<select required value={selectedIds[0] || ""} onChange={event => {
+              const selected = agents.find(item => item.id === event.target.value);
+              if (selected) onTalk(selected);
+            }}>
               <option value="" disabled>Select a role</option>{agents.map(agent => <option key={agent.id} value={agent.id}>{agent.name} · {agent.role}</option>)}
             </select></label>}
           </div>
@@ -88,14 +146,18 @@ export function Collaboration({ agents, kind, setKind, selectedIds, setSelectedI
             ))}</div><p className={styles.subtle}>Leave unselected to let the service select participants.</p>
           </fieldset>}
           <label className={styles.field}>{kind === "direct" ? "Question" : "Topic"}
-            <textarea required value={prompt} maxLength={600} onChange={event => setPrompt(event.target.value)} placeholder={kind === "direct" ? "What did you accomplish today?" : "What should the team review?"} />
+            <textarea id="agent-hq-question" required value={prompt} maxLength={600} onChange={event => setPrompt(event.target.value)} placeholder={kind === "direct" ? "Say hello or ask about recent work" : "What should the team review?"} />
           </label>
-          <button type="submit" className={`${styles.button} ${styles.primary} mt-3`} disabled={busy || !prompt.trim()}>
-            <AppIcon name="send" />{busy ? "Submitting…" : kind === "direct" ? "Send request" : kind === "meeting" ? "Start meeting" : "Run standup"}
+          {agent && !prompt && !awaiting && <div className={`${styles.actions} mt-3`}>
+            <button type="button" className={styles.button} onClick={() => setPrompt("Hi!")}>Say hello</button>
+            <button type="button" className={styles.button} onClick={() => setPrompt("Give me your activity report for the past 7 days.")}>7-day activity report</button>
+          </div>}
+          <button type="submit" className={`${styles.button} ${styles.primary} mt-3`} disabled={busy || awaiting || !prompt.trim()}>
+            <AppIcon name="send" />{busy ? "Sending…" : awaiting ? "Waiting for reply…" : kind === "direct" ? "Send message" : kind === "meeting" ? "Start meeting" : "Run standup"}
           </button>
         </form>
         <hr className="my-5 border-[color:var(--agentify-border)]" />
-        <RunDetail run={run} agents={agents} showRun={showRun} />
+        <RunDetail key={run?.id} run={run} agents={agents} showRun={showRun} />
       </section>
     </div>
   </>;

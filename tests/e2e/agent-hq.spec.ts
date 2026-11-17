@@ -19,6 +19,12 @@ const headers = {"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers
 test("executive views use recorded activity and persist requests", async ({page}, testInfo) => {
   const theme = testInfo.project.name === "mobile-chrome" ? "dark" : "light";
   await installWorkspaceMocks(page,theme,{founder:true});
+  await page.addInitScript(() => {
+    window.speechSynthesis.speak = (utterance) => {
+      utterance.dispatchEvent(new Event("start"));
+    };
+    window.speechSynthesis.cancel = () => {};
+  });
   const activity = {id:"turn-4",agent_id:"coach",operation:"study_turn",status:"failed",created_at:recordedAt,latency_ms:1400,source:"runtime"};
   const snapshot: Snapshot = {
     agents,generated_at:recordedAt,days:1,metrics,activity:[activity],
@@ -61,8 +67,12 @@ test("executive views use recorded activity and persist requests", async ({page}
     return json({detail:"Unexpected fixture route"},404);
   });
 
-  await page.goto(routePath);
+  await page.goto("/dashboard/internal/admin");
+  await expect(page).toHaveURL(new RegExp(`${routePath}$`));
   await expect(page.getByRole("heading", {name:"Workforce Command Center"})).toBeVisible();
+  const face = page.getByRole("button",{name:"View Study Coach, Study Lab Coach"}).locator('span[aria-hidden="true"] > span').first();
+  await expect(face).toHaveCSS("background-image", /portraits.webp/);
+  await expect(face).toHaveCSS("animation-name", /portrait-presence$/);
   await expect(page.getByText("Review coach failures")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(testInfo.project.use.viewport?.width || 1280);
   await page.screenshot({path:testInfo.outputPath("command-center.png"),fullPage:true});
@@ -72,22 +82,33 @@ test("executive views use recorded activity and persist requests", async ({page}
   await expect(page.getByRole("heading",{name:"AI Organization",exact:true})).toBeVisible();
   await expect(page.getByText("Rohan Singh Deo")).toBeVisible();
   await expect(page.getByText("Amit",{exact:true})).toBeVisible();
-  await page.getByRole("button",{name:"Ask agent",exact:true}).click();
+  await page.getByRole("button",{name:"Command Center",exact:true}).click();
+  await page.getByRole("button",{name:"Chat with Study Coach",exact:true}).click();
+  await expect(page.getByRole("heading",{name:"Chat with Study Coach",exact:true})).toBeVisible();
   await page.getByLabel("Question",{exact:true}).fill("Which study runs failed?");
-  await page.getByRole("button",{name:"Send request",exact:true}).click();
+  await page.getByRole("button",{name:"Send message",exact:true}).click();
   await expect(page.getByText("One of three observed study runs failed.")).toBeVisible();
-  await page.getByRole("button",{name:"Executive Reports",exact:true}).click();
+  await page.getByRole("button",{name:"Listen to Study Coach",exact:true}).click();
+  await expect(page.getByRole("button",{name:"Stop voice playback",exact:true})).toBeVisible();
+  await expect(page.locator('[data-motion="speaking"]')).toBeVisible();
+  await page.getByRole("button",{name:"Command Center",exact:true}).click();
+  await page.getByRole("button",{name:"Report for Study Coach",exact:true}).click();
   await page.getByLabel("Through date (UTC)").fill("2026-11-15");
   await page.getByRole("button",{name:"Generate report",exact:true}).click();
   await expect(page.getByRole("button",{name:"Export JSON"})).toBeVisible();
   expect(runs[0].ending_on).toBe("2026-11-15");
+  expect(runs[0].participant_ids).toEqual(["coach"]);
   await page.getByRole("button",{name:"Performance & Observability",exact:true}).click();
   await page.getByRole("button",{name:"Trace",exact:true}).click();
   await expect(page.getByRole("heading",{name:"Trace detail"})).toBeVisible();
   await page.reload();
   await page.getByRole("button",{name:"Collaboration Hub",exact:true}).click();
   await page.getByRole("button",{name:/Which study runs failed/}).click();
+  await expect(page.getByRole("heading",{name:"Chat with Study Coach",exact:true})).toBeVisible();
   await expect(page.getByText("One of three observed study runs failed.")).toBeVisible();
+  await page.getByLabel("Question",{exact:true}).fill("Can you explain a bit more?");
+  await page.getByRole("button",{name:"Send message",exact:true}).click();
+  await expect.poll(() => runs[0].parent_run_id).toBe("fixture-run-0");
 });
 
 test("non-founders cannot see the executive workspace", async ({page}) => {

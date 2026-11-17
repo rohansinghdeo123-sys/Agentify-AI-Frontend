@@ -26,12 +26,13 @@ export function Status({ value }: { value: string }) {
   return <span className={styles.status} data-tone={tone}>{value === "unknown" ? "Status unknown" : title(value)}</span>;
 }
 
-export function Portrait({ agent, small = false }: {agent: Agent; small?: boolean}) {
+export function Portrait({ agent, small = false, motion }: {agent: Agent; small?: boolean; motion?: "working" | "speaking"}) {
   const initials = agent.name.split(/\s+/).slice(0, 2).map(word => word[0]).join("");
   const index = portraitIds.indexOf(agent.id);
   const workflow = workflowPortraitIds.indexOf(agent.id);
-  return <span className={`${styles.portrait} ${small ? styles.portraitSmall : ""}`} aria-hidden="true">
+  return <span className={`${styles.portrait} ${small ? styles.portraitSmall : ""}`} data-motion={motion ?? (agent.status === "working" ? "working" : undefined)} aria-hidden="true">
     {index >= 0 ? <span className={styles.portraitAsset} style={{backgroundPosition: `${(index % 4) / 3 * 100}% ${Math.floor(index / 4) / 2 * 100}%`}} /> : workflow >= 0 ? <span className={`${styles.portraitAsset} ${styles.workflowPortrait}`} style={{backgroundPosition:`${workflow % 2 * 100}% ${Math.floor(workflow / 2) * 100}%`}} /> : <abbr>{initials}</abbr>}
+    {motion === "speaking" && <span className={styles.waveform}><i /><i /><i /><i /></span>}
   </span>;
 }
 
@@ -39,16 +40,25 @@ export function Heading({ children, detail }: { children: ReactNode; detail: str
   return <header className={styles.heading}><h1>{children}</h1><p>{detail}</p></header>;
 }
 
-export function Roster({ agents, onSelect, selected }: { agents: Agent[]; onSelect: (id: string) => void; selected?: string }) {
+export function Roster({ agents, onSelect, selected, onTalk, onReport }: {
+  agents: Agent[]; onSelect: (id: string) => void; selected?: string;
+  onTalk?: (agent: Agent) => void; onReport?: (agent: Agent) => void;
+}) {
   if (!agents.length) return <p className={styles.empty}>No registered roles in this team.</p>;
   return <div className={styles.roster}>{agents.map(agent => (
-    <button className={styles.agent} type="button" key={agent.id} onClick={() => onSelect(agent.id)} data-selected={selected === agent.id}
+    <article className={styles.agentCard} key={agent.id}>
+    <button className={styles.agent} type="button" onClick={() => onSelect(agent.id)} data-selected={selected === agent.id}
       aria-label={`View ${agent.name}, ${agent.role}`}>
       <Portrait agent={agent} />
       <span className={styles.agentText}>
         <strong>{agent.name}</strong><small>{agent.role}</small><Status value={agent.status} />
       </span>
     </button>
+    {(onTalk || onReport) && <div className={styles.agentActions}>
+      {onTalk && <button type="button" className={styles.button} onClick={() => onTalk(agent)} aria-label={`Chat with ${agent.name}`}>Chat</button>}
+      {onReport && <button type="button" className={styles.button} onClick={() => onReport(agent)} aria-label={`Report for ${agent.name}`}>Report</button>}
+    </div>}
+    </article>
   ))}</div>;
 }
 
@@ -103,8 +113,9 @@ export function Recommendations({ items, agents, busy, onDecision }: {
   ))}</ul>;
 }
 
-export function CommandCenter({ snapshot, connected, openOrganization, openStandup, showRun, showTrace, briefing, busy, onDecision }: {
+export function CommandCenter({ snapshot, connected, openOrganization, openStandup, onTalk, onReport, showRun, showTrace, briefing, busy, onDecision }: {
   snapshot: Snapshot; connected: boolean; openOrganization: (id?: string) => void; openStandup: () => void;
+  onTalk: (agent: Agent) => void; onReport: (agent: Agent) => void;
   showRun: (id: string) => void; showTrace: (id: string) => void; briefing?: Run; busy: string | null; onDecision: (id: string, decision: Decision) => void;
 }) {
   const {agents, metrics, recommendations, activity} = snapshot;
@@ -122,16 +133,16 @@ export function CommandCenter({ snapshot, connected, openOrganization, openStand
         <p>Snapshot as of {time(snapshot.generated_at)} IST</p>
       </div>
     </header>
+    <section aria-labelledby="hq-roster">
+      <div className={styles.blockHead}><div><h2 id="hq-roster">Meet your agents</h2><p>Start a conversation, open a profile, or request an activity report.</p></div>
+        <button type="button" className={styles.button} onClick={() => openOrganization()}>Organization <AppIcon name="arrowRight" /></button>
+      </div>
+      <Roster agents={agents.filter(agent => portraitIds.slice(0, 6).includes(agent.id)).length ? agents.filter(agent => portraitIds.slice(0, 6).includes(agent.id)) : agents.slice(0, 6)} onSelect={openOrganization} onTalk={onTalk} onReport={onReport} />
+    </section>
     <MetricStrip entries={[
       ["Recorded work", count(metrics.recorded), periodLabel(snapshot.days)], ["In progress", count(metrics.active), "Recorded active operations"],
       ["Completed / failed", `${count(metrics.completed)} / ${count(metrics.failed)}`, "Recorded outcomes"], ["Measured p95", latency(metrics.p95_latency_ms), `${count(snapshot.coverage.latency_sample_size)} measured samples`],
     ]} />
-    <section aria-labelledby="hq-roster">
-      <div className={styles.blockHead}><div><h2 id="hq-roster">AI workforce</h2><p>Open a profile to see its responsibilities and recent work.</p></div>
-        <button type="button" className={styles.button} onClick={() => openOrganization()}>Organization <AppIcon name="arrowRight" /></button>
-      </div>
-      <Roster agents={agents.filter(agent => portraitIds.slice(0, 6).includes(agent.id)).length ? agents.filter(agent => portraitIds.slice(0, 6).includes(agent.id)) : agents.slice(0, 6)} onSelect={openOrganization} />
-    </section>
     <div className={styles.split}>
       <section className={styles.panel}><h2>Executive briefing</h2>
         {briefing ? <><p>{briefing.topic} · {time(briefing.created_at)} IST</p><p>{runSummary(briefing)}</p>

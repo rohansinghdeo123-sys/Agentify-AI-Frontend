@@ -187,7 +187,13 @@ function Workspace({ getHeaders }: { getHeaders: ReturnType<typeof useAuth>["get
     if (destination) setView(destination);
     currentScope.current = {...currentScope.current, activeRun:id};
     void api.run(id).then(value => {
-      if (currentScope.current.activeRun === id) setRun(value);
+      if (currentScope.current.activeRun !== id) return;
+      setRun(value);
+      if (value.kind === "direct") {
+        setKind("direct");
+        setParticipants(value.participant_ids);
+        setPrompt("");
+      }
     }).catch((caught: unknown) => {
       if (currentScope.current.activeRun === id) setError(errorText(caught));
     });
@@ -206,6 +212,12 @@ function Workspace({ getHeaders }: { getHeaders: ReturnType<typeof useAuth>["get
     setPrompt("");
     setParticipants([agent.id]);
     setView("collaboration");
+    window.requestAnimationFrame(() => document.getElementById("agent-hq-question")?.focus());
+  }
+
+  function openReport(agent: Agent) {
+    setReportAgent(agent.id);
+    setView("reports");
   }
 
   function startStandup() {
@@ -350,7 +362,7 @@ function Workspace({ getHeaders }: { getHeaders: ReturnType<typeof useAuth>["get
         <p className={styles.brand}><span className={styles.brandMark}><AppIcon name="spark" /></span>Agent HQ</p>
         <nav className={styles.nav} aria-label="Agent HQ sections">{VIEWS.map(item => <button key={item.id} type="button"
           aria-current={view === item.id ? "page" : undefined} onClick={() => setView(item.id)}><AppIcon name={item.icon} />{item.title}</button>)}</nav>
-        <Link className={styles.back} href="/dashboard/internal/admin"><AppIcon name="arrowRight" />Admin console</Link>
+        <Link className={styles.back} href="/dashboard/internal/admin/evidence"><AppIcon name="arrowRight" />Admin diagnostics</Link>
       </aside>
       <div className={styles.content}>
         <div className={styles.top}>
@@ -377,13 +389,14 @@ function Workspace({ getHeaders }: { getHeaders: ReturnType<typeof useAuth>["get
         {snapshot && <>
           {snapshot.days !== days && refreshing && <p className={styles.notice} role="status">Loading the selected reporting period…</p>}
           {view === "command" && <CommandCenter snapshot={snapshot} connected={connected} openOrganization={openAgent} openStandup={startStandup}
+            onTalk={talk} onReport={openReport}
             showRun={showRun} showTrace={showTrace} briefing={runs.find(item => item.kind === "standup" && item.status === "completed")} busy={decisionBusy} onDecision={(id, status) => void decide(id,status)} />}
           {view === "organization" && <Organization snapshot={snapshot} selected={selectedAgent} onSelect={setSelectedAgent}
-            onReport={agent => { setReportAgent(agent.id); setView("reports"); }} onTalk={talk} />}
+            onReport={openReport} onTalk={talk} />}
           {view === "collaboration" && <><Collaboration agents={snapshot.agents} kind={kind} setKind={value => {
             setKind(value); setParticipants([]); setPrompt(value === "standup" ? "Conduct today's AI team standup." : "");
           }} selectedIds={participants} setSelectedIds={setParticipants} prompt={prompt} setPrompt={setPrompt}
-            run={run} busy={submission} onSend={send} showRun={showRun} history={history(false)} />
+            run={run} busy={submission} onSend={send} showRun={showRun} history={history(false)} onReport={openReport} onTalk={talk} />
             <section className={`${styles.panel} mt-4`}><h2>Recorded workflow handoffs</h2><Handoffs items={snapshot.handoffs || []} agents={snapshot.agents} /></section>
           </>}
           {view === "reports" && <>

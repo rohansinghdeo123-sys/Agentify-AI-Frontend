@@ -8,7 +8,7 @@ function source(path: string) {
 
 describe("founder admin console", () => {
   it("uses backend-verified founder authorization instead of a client-only email gate", () => {
-    const page = source("app/dashboard/internal/admin/page.tsx");
+    const page = source("app/dashboard/internal/admin/evidence/page.tsx");
     const auth = source("context/AuthContext.tsx");
 
     expect(page).toContain("isFounderAdmin");
@@ -20,7 +20,7 @@ describe("founder admin console", () => {
 
   it("respects the selected theme and keeps operational text readable", () => {
     const files = [
-      source("app/dashboard/internal/admin/page.tsx"),
+      source("app/dashboard/internal/admin/evidence/page.tsx"),
       source("components/admin/HealthBadge.tsx"),
       source("components/admin/DataIngestionReport.tsx"),
     ];
@@ -34,7 +34,7 @@ describe("founder admin console", () => {
   });
 
   it("keeps the console focused on agent operations and curriculum evidence", () => {
-    const page = source("app/dashboard/internal/admin/page.tsx");
+    const page = source("app/dashboard/internal/admin/evidence/page.tsx");
     const report = source("components/admin/DataIngestionReport.tsx");
 
     expect(page).toContain('id="agent-operations"');
@@ -63,7 +63,7 @@ describe("founder admin console", () => {
   });
 
   it("uses semantic actions, announces loading, and gives narrow headers room to wrap", () => {
-    const page = source("app/dashboard/internal/admin/page.tsx");
+    const page = source("app/dashboard/internal/admin/evidence/page.tsx");
 
     expect(page).toContain('primary ? "ds-button-primary"');
     expect(page).not.toContain("--ds-accent-cyan");
@@ -91,7 +91,7 @@ describe("founder admin console", () => {
   });
 
   it("keeps expanded evidence surfaces stable and their labels readable without changing other pages", () => {
-    const page = source("app/dashboard/internal/admin/page.tsx");
+    const page = source("app/dashboard/internal/admin/evidence/page.tsx");
     const css = source("app/dashboard/internal/admin/admin.module.css");
     expect(page).toContain("cn(styles.console,");
     expect(css).toContain("--agentify-hover-bg: var(--ds-bg-secondary)");

@@ -178,6 +178,29 @@
 .portraitAsset { position: absolute; inset: 0; background-image: url("/agent-hq/portraits.webp"); background-repeat: no-repeat; background-size: 400% 300%; }
 
 .workflowPortrait { background-image: url("/agent-hq/workflow-portraits.webp"); background-size: 200% 200%; }
+.agentCard { min-width: 0; display: flex; flex-direction: column; }
+.agentCard .agent { flex: 1; width: 100%; }
+.agentActions { display: flex; gap: 6px; margin-top: 7px; }
+.agentActions > button { flex: 1; min-width: 0; padding-inline: 5px; }
+.conversationAgent { display: grid; grid-template-columns: minmax(95px, 145px) 1fr; align-items: center; gap: 14px; margin-bottom: 14px; }
+.conversationAgent .portrait { aspect-ratio: 1; border-radius: 10px; }
+.conversationAgent p { color: var(--hq-muted); margin: 3px 0 8px; }
+.voiceButton { min-height: 36px; padding: 0 10px; margin-top: 8px; border: 1px solid var(--hq-line); border-radius: 8px; font-size: 12px; }
+.waveform { position: absolute; inset: auto 0 1px; display: flex; justify-content: center; gap: 2px; background: #0b1724c9; padding: 3px; z-index: 1; }
+.waveform i { width: 2px; height: 8px; background: #9fffe8; border-radius: 2px; }
+@media (prefers-reduced-motion: no-preference) {
+  .agent .portraitAsset, .conversationAgent .portraitAsset { animation: portrait-presence 7s ease-in-out infinite; }
+  .agentCard:nth-child(even) .portraitAsset { animation-delay: -3s; }
+  .portrait[data-motion="working"] { box-shadow: inset 0 0 0 2px var(--hq-accent); }
+  .portrait[data-motion="working"]::after { inset: 0; height: auto; background: none; border: 2px solid #5bd0b7; border-radius: inherit; animation: portrait-working 1.5s ease-in-out infinite; }
+  .waveform i { animation: portrait-speaking .65s ease-in-out infinite alternate; }
+  .waveform i:nth-child(2) { animation-delay: -.42s; }
+  .waveform i:nth-child(3) { animation-delay: -.22s; }
+  .waveform i:nth-child(4) { animation-delay: -.5s; }
+}
+@keyframes portrait-presence { 0%, 100% { transform: scale(1.025); } 50% { transform: scale(1.075) translateY(-1%); } }
+@keyframes portrait-working { 50% { opacity: .35; } }
+@keyframes portrait-speaking { from { transform: scaleY(.35); } to { transform: scaleY(1); } }
 .trend { display: grid; gap: 8px; margin-top: 14px; }
 .trend li { display: grid; grid-template-columns: 44px minmax(0, 1fr) 126px; align-items: center; gap: 8px; font-size: 12px; color: var(--hq-muted); }
 .trendTrack { display: block; height: 8px; border-radius: 4px; background: var(--ds-bg-subtle); overflow: hidden; }
