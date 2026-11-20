@@ -606,6 +606,7 @@ export async function recordStudyRouteHeartbeat(
   lastPosition: Record<string, unknown>,
   signal?: AbortSignal,
 ): Promise<StudyRouteHeartbeatAck> {
+  const finishingNotes = lastPosition.finish_notes === true;
   try {
     return await apiJson<StudyRouteHeartbeatAck>(
       `${apiBase(context.backendURL)}/planning/route/heartbeat/${encodeURIComponent(userId)}?compact=true`,
@@ -615,8 +616,8 @@ export async function recordStudyRouteHeartbeat(
         headers: context.headers,
         body: JSON.stringify({ last_position: lastPosition }),
         forceFresh: true,
-        retries: 0,
-        timeoutMs: 6000,
+        retries: finishingNotes ? 1 : 0,
+        timeoutMs: finishingNotes ? 12000 : 6000,
         signal,
       },
     );

@@ -360,7 +360,7 @@ describe("NCERT-ordered Planning roadmap", () => {
       { value: "15", label: "15 min" },
       { value: "30", label: "30 min" },
       { value: "60", label: "1 hour" },
-      { value: "120_plus", label: "2 hours" },
+      { value: "120_plus", label: "2+ hours" },
     ]);
   });
 

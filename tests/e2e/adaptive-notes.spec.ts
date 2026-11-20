@@ -24,10 +24,11 @@ const lesson: ChapterNotes = {
 };
 const url = `/dashboard/study/notes/${lesson.chapter.slug}?topic=${lesson.topic_id}&classLevel=Class+8&subject=Science`;
 
-test("finishing timed notes opens the next topic with the same deadline", async ({page}) => {
+test("one Finish topic click retries a transient failure and opens the next topic", async ({page}) => {
   await installWorkspaceMocks(page);
   const deadline = new Date(Date.now() + 900_000).toISOString();
   const nextTopic = "changes_in_matter";
+  let finishAttempts = 0;
   await page.route(`${WORKSPACE_TEST_BACKEND}/notes/**`, route => {
     const topic = new URL(route.request().url()).searchParams.get("topic_id");
     return route.fulfill({headers,json:{
@@ -41,6 +42,9 @@ test("finishing timed notes opens the next topic with the same deadline", async 
     const position = route.request().postDataJSON().last_position;
     expect(position.finish_notes).toBe(true);
     expect(position.notes_completed_page_ids).toEqual([pages[0].id]);
+    if (position.notes_topic !== nextTopic && ++finishAttempts === 1) {
+      return route.fulfill({headers,status:503,json:{detail:"Temporarily unavailable"}});
+    }
     const json = position.notes_topic === nextTopic
       ? {saved:true,notes_outcome:"time_up"}
       : {saved:true,notes_outcome:"continue",next_notes:{chapter_slug:lesson.chapter.slug,topic_id:nextTopic}};
@@ -50,6 +54,7 @@ test("finishing timed notes opens the next topic with the same deadline", async 
   await expect(page.getByRole("timer")).toContainText("remaining");
   await page.getByRole("button",{name:"Finish topic"}).click();
   await expect(page.getByRole("heading",{name:"Changes in matter",exact:true})).toBeVisible();
+  expect(finishAttempts).toBe(2);
   await expect(page.getByRole("timer")).toContainText("remaining");
   await page.getByRole("button",{name:"Finish topic"}).click();
   await expect(page.getByRole("status")).toContainText("Study time is up");

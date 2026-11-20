@@ -14,7 +14,7 @@ import { NoteLearningText, notesSourceLabel, NotesSourceBadge, PatternInterrupt 
 import { notesCompletedPageIds, notesPageIndex } from "@/features/study/notesReaderState";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import styles from "../../home.module.css";
 
 export default function StudyNotesPage() {
@@ -54,7 +54,9 @@ function TopicNotesReader() {
   const [attempt, setAttempt] = useState(0);
   const [loading, setLoading] = useState(true);
   const [remaining, setRemaining] = useState<number | null>(null);
-  const [finishing, setFinishing] = useState(false);
+  const [submittingFinish, setSubmittingFinish] = useState(false);
+  const [openingNextTopic, startTopicTransition] = useTransition();
+  const finishing = submittingFinish || openingNextTopic;
   const [finishOutcome, setFinishOutcome] = useState<"time_up" | "sequence_read">();
   const finishInFlight = useRef(false);
   useEffect(() => {
@@ -114,15 +116,16 @@ function TopicNotesReader() {
   };
   const timedTopic = Boolean(notes?.study_session && notes?.topic_id === notes?.active_unit_id);
   const finishTopic = async (completed: string[]) => {
-    if (finishInFlight.current) return;
+    if (finishInFlight.current || openingNextTopic) return;
     finishInFlight.current = true;
-    setFinishing(true);
+    setSubmittingFinish(true);
     try {
       const result = await saveReadingPosition(page, completed, true);
       if (result?.next_notes && result.notes_outcome === "continue") {
-        router.replace(studyNotesHref(result.next_notes.chapter_slug, result.next_notes.topic_id, {
+        const next = studyNotesHref(result.next_notes.chapter_slug, result.next_notes.topic_id, {
           planned:true,classLevel:notes?.chapter.class_level,subject:notes?.chapter.subject,
-        }));
+        });
+        startTopicTransition(() => router.replace(next));
         return;
       }
       if (result?.notes_outcome === "time_up" || result?.notes_outcome === "sequence_read") {
@@ -135,7 +138,7 @@ function TopicNotesReader() {
       setError("Your topic could not be saved. Retry to continue.");
     } finally {
       finishInFlight.current = false;
-      setFinishing(false);
+      setSubmittingFinish(false);
     }
   };
   const navigate = async (next: number) => {

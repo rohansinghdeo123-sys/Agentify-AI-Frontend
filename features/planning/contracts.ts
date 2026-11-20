@@ -20,7 +20,7 @@ export const PLANNING_STUDY_TIME_OPTIONS = [
   { value: "15", label: "15 min" },
   { value: "30", label: "30 min" },
   { value: "60", label: "1 hour" },
-  { value: "120_plus", label: "2 hours" },
+  { value: "120_plus", label: "2+ hours" },
 ] as const;
 
 export type PlanningChapterProficiency = (typeof PLANNING_PROFICIENCY_OPTIONS)[number]["value"];
