@@ -10,7 +10,7 @@ function pagePoint(side: number, u: number, v: number, level: number, extra = 0)
   const z = (v - .5) * (DEPTH + extra) + .20 * Math.sin(Math.PI * u);
   const curl = 1.59 * (1 - Math.exp(-u * 6.1)) * Math.pow(1 - u, .9) + .19 * u;
   const curlBack = .18 * Math.sin(v * Math.PI) * Math.sin(u * Math.PI);
-  return new T.Vector3(x, level + curl + curlBack, z).add(base);
+  return new T.Vector3(x, level + curl + curlBack, z);
 }
 
 function sheet(side: number, level: number, extra = 0) {
@@ -86,6 +86,7 @@ function edge(side: number, type: "front" | "back" | "outside", low: number, hig
 export function book(parent: T.Object3D, p: Palette) {
   const group = new T.Group();
   group.name = "Open book";
+  group.position.copy(base);
   parent.add(group);
   const page = new T.MeshStandardMaterial({ map: pageInk(), roughness: .90, side: T.DoubleSide });
   const sheets = [p.parchment, p.paper, p.bronze, p.parchment].map((material) => {
@@ -98,18 +99,42 @@ export function book(parent: T.Object3D, p: Palette) {
   const trim = p.gold.clone();
   trim.side = T.DoubleSide;
 
-  for (const side of [-1, 1]) {
-    mesh(group, sheet(side, -.15, .46), cover);
-    mesh(group, sheet(side, -.045, .44), cover);
-    mesh(group, sheet(side, .57), page);
+  const leftHinge = new T.Group();
+  group.add(leftHinge);
+  const left = new T.Group(), right = new T.Group(), leaf = new T.Group();
+  leftHinge.add(left);
+  group.add(right, leaf);
+  for (const [side, stack] of [[-1, left], [1, right]] as const) {
+    mesh(stack, sheet(side, -.15, .46), cover);
+    mesh(stack, sheet(side, -.045, .44), cover);
+    mesh(stack, sheet(side, side === -1 ? .535 : .57), page);
     for (const kind of ["front", "back", "outside"] as const) {
-      mesh(group, edge(side, kind, -.16, -.02, .46), cover);
-      mesh(group, edge(side, kind, -.006, .028, .4), trim);
+      mesh(stack, edge(side, kind, -.16, -.02, .46), cover);
+      mesh(stack, edge(side, kind, -.006, .028, .4), trim);
       for (let layer = 0; layer < 25; layer++) {
         const current = .035 + .0214 * layer;
-        mesh(group, edge(side, kind, current, current + .022), sheets[layer % sheets.length]);
+        mesh(stack, edge(side, kind, current, current + .022), sheets[layer % sheets.length]);
       }
     }
   }
-  return group;
+  mesh(leaf, sheet(-1, .57), page);
+  const crest = new T.Mesh(new T.TorusGeometry(.86, .037, 5, 44), trim);
+  crest.position.set(-5.2, -.18 + 1.07, 0);
+  crest.rotation.x = Math.PI / 2;
+  left.add(crest);
+
+  return {
+    group,
+    batches: [left, right, leaf],
+    unfold(progress: number, pageTurn: number) {
+      leftHinge.rotation.z = -Math.PI * (1 - progress);
+      leftHinge.position.y = .68 * (1 - progress);
+      left.scale.y = T.MathUtils.lerp(.24, 1, progress);
+      right.scale.y = T.MathUtils.lerp(.32, 1, progress);
+      leaf.rotation.z = -Math.PI * (1 - pageTurn);
+      leaf.position.y = .74 * (1 - pageTurn);
+      leaf.scale.y = T.MathUtils.lerp(.24, 1, pageTurn);
+      leaf.visible = pageTurn > .04 || progress === 1;
+    },
+  };
 }

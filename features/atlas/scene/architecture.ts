@@ -61,6 +61,7 @@ const portalVertex = `
 const portalFragment = `
   varying vec2 vUv;
   uniform vec3 accent;
+  uniform float energy;
   void main() {
     vec2 d=(vUv-.5)*2.;
     float radius=length(d);
@@ -68,8 +69,10 @@ const portalFragment = `
     float glow=pow(clamp(radius,0.,1.), 5.);
     float ribbon=pow(.5+.5*sin(5.*a+9.*radius), 4.);
     float rim=smoothstep(.67, .99, radius);
-    vec3 color=mix(vec3(.019,.11,.105),accent*.58,rim*.66+glow*.13*ribbon);
-    gl_FragColor=vec4(color,1.);
+    vec3 color=mix(vec3(.019,.11,.105),accent*.76,rim*.66+glow*.13*ribbon);
+    color+=vec3(.31,.23,.072)*energy*smoothstep(.45,.98,radius);
+    gl_FragColor=sRGBTransferEOTF(vec4(color,1.));
+    #include <colorspace_fragment>
   }
 `;
 
@@ -123,8 +126,10 @@ function portal(group: T.Object3D, p: Palette, id: Destination, point: Point, ac
   frame.scale.setScalar(scale);
   frame.name = id + " portal";
   group.add(frame);
+  const energy = { value: 0 };
   mesh(frame, new T.CircleGeometry(.79, 64), new T.ShaderMaterial({
-    vertexShader: portalVertex, fragmentShader: portalFragment, uniforms: { accent: { value: new T.Color(accent) } },
+    vertexShader: portalVertex, fragmentShader: portalFragment,
+    uniforms: { accent: { value: new T.Color(accent).convertLinearToSRGB() }, energy },
     side: T.DoubleSide,
   }));
   ring(frame, p.bronze, .84, .091, [0, 0, .017]);
@@ -138,6 +143,7 @@ function portal(group: T.Object3D, p: Palette, id: Destination, point: Point, ac
   icon.position.z = .089;
   frame.add(icon);
   glyph(icon, p, id);
+  return energy;
 }
 
 function dome(group: T.Object3D, p: Palette, origin: Point, size: number, roof: T.Material, ribs = 10) {
@@ -173,7 +179,7 @@ function planning(group: T.Object3D, p: Palette, accent: number) {
   for (const x of [-1.37, 1.37]) box(group, p.stone, [.56, .24, 2.01], [x, 2.351, .02]);
   arch(group, p.stone, .96, .195, 1.12, .31, [0, 1.44, .37]);
   arch(group, p.gold, .995, .044, 1.04, .045, [0, 1.44, .693]);
-  portal(group, p, "planning", [0, 1.39, .72], accent);
+  const glow = portal(group, p, "planning", [0, 1.39, .72], accent);
   const orbit = new T.Group();
   orbit.position.set(0, 2.75, -.17);
   group.add(orbit);
@@ -185,6 +191,7 @@ function planning(group: T.Object3D, p: Palette, accent: number) {
     banner(group, p, [side * 1.37, 2.12, 1.01], .36, 1.14);
     lantern(group, p, [side * 1.54, .30, 1.31]);
   }
+  return glow;
 }
 
 function library(group: T.Object3D, p: Palette, accent: number) {
@@ -233,9 +240,10 @@ function library(group: T.Object3D, p: Palette, accent: number) {
   for (const xx of [.36, 2.38]) pillar(group, p, xx, .93, 1.75);
   arch(group, p.stone, .91, .26, .79, .42, [1.35, 1.45, .80]);
   arch(group, p.gold, .915, .043, .795, .05, [1.35, 1.45, 1.223]);
-  portal(group, p, "study", [1.35, 1.39, 1.281], accent, 1.02);
+  const glow = portal(group, p, "study", [1.35, 1.39, 1.281], accent, 1.02);
   dome(group, p, [1.35, 2.46, .20], 1.11, p.turquoise, 8);
   banner(group, p, [-2.16, 2.02, 1.15], .39, 1.32);
+  return glow;
 }
 
 function memory(group: T.Object3D, p: Palette, accent: number) {
@@ -249,7 +257,7 @@ function memory(group: T.Object3D, p: Palette, accent: number) {
   arch(group, p.stone, 1.081, .31, 1.17, .62, [0, 1.52, .44]);
   arch(group, p.gold, 1.12, .047, 1.17, .05, [0, 1.52, 1.066]);
   arch(group, p.plum, 1.28, .09, 1.16, .12, [0, 1.52, .89]);
-  portal(group, p, "revision", [0, 1.44, 1.132], accent, 1.15);
+  const glow = portal(group, p, "revision", [0, 1.44, 1.132], accent, 1.15);
   dome(group, p, [0, 2.18, -.36], 1.24, p.plum, 12);
   const crystal = emissive(0xd5b7ff, 0x8765e8, .53);
   for (const [x, y, z, scale] of [[0,3.04,1,.31],[-1.68,2.70,.73,.19],[1.68,2.73,.73,.19],[-2.17,.72,.16,.16],[2.03,.63,-.15,.14]]) {
@@ -257,6 +265,7 @@ function memory(group: T.Object3D, p: Palette, accent: number) {
     gem.scale.y = 1.58;
     gem.rotation.y = x;
   }
+  return glow;
 }
 
 function temple(group: T.Object3D, p: Palette, accent: number, starMaterial: T.Material) {
@@ -272,7 +281,7 @@ function temple(group: T.Object3D, p: Palette, accent: number, starMaterial: T.M
   rod(group, p.gold, new T.Vector3(0, 3.84, 1.136), new T.Vector3(2.03, 2.988, 1.136), .037);
   arch(group, p.stone, 1.073, .245, 1.32, .71, [0, 1.55, .13]);
   arch(group, p.gold, 1.102, .044, 1.22, .05, [0, 1.55, .861]);
-  portal(group, p, "exam", [0, 1.52, .925], accent, 1.20);
+  const glow = portal(group, p, "exam", [0, 1.52, .925], accent, 1.20);
   star(group, starMaterial, .31, [0, 4.19, 1.104]);
   for (const side of [-1, 1]) {
     banner(group, p, [side * 1.65, 2.57, 1.01], .37, 1.66);
@@ -281,6 +290,7 @@ function temple(group: T.Object3D, p: Palette, accent: number, starMaterial: T.M
     mesh(group, new T.OctahedronGeometry(.065), p.lamp, [side * 2.22, 3.28, -1.11]).scale.y = 1.8;
     for (const x of [1.4, 2.07]) lantern(group, p, [side * x, .32, 1.59], 1.18);
   }
+  return glow;
 }
 
 export function buildings(parent: T.Object3D, p: Palette) {
@@ -294,8 +304,8 @@ export function buildings(parent: T.Object3D, p: Palette) {
     group.position.set(...destination.site);
     group.name = destination.title;
     parent.add(group);
-    render[destination.id](group, p, destination.accent, starMaterial);
-    return group;
+    const glow = render[destination.id](group, p, destination.accent, starMaterial);
+    return { group, glow };
   });
 }
 

@@ -232,7 +232,9 @@ html[data-motion="reduced"] *, html[data-motion="reduced"] *::before, html[data-
 .dashboard-shell[data-journey-map] .market-utility-link {
   justify-content: center;
   min-width: 2.75rem;
-  padding: .35rem;
+  padding: .35rem .62rem;
+  color: #f2faf4;
+  transition: background-color var(--ds-duration-fast) ease, transform var(--ds-duration-fast) ease;
 }
 
 .dashboard-shell[data-journey-map] .market-utility-link svg { width: 1.1rem; height: 1.1rem; color: #c9f3e7; }
@@ -246,6 +248,16 @@ html[data-motion="reduced"] *, html[data-motion="reduced"] *::before, html[data-
 
 [data-theme="light"] .dashboard-shell[data-journey-map] .market-utility-link svg {
   color: var(--ds-accent-teal);
+}
+
+[data-theme="light"] .dashboard-shell[data-journey-map] .market-utility-link {
+  color: var(--ds-text-primary);
+}
+
+@media (max-width: 590px) {
+  .dashboard-shell[data-journey-map] .market-floating-brand-copy,
+  .dashboard-shell[data-journey-map] .market-utility-link span { display: none; }
+  .dashboard-shell[data-journey-map] .market-utility-link { padding-inline: .4rem; }
 }
 
 [data-theme="light"] .dashboard-shell[data-journey-map] .market-utility-link:hover {

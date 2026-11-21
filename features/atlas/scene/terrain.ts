@@ -76,13 +76,16 @@ const WATER_VERTEX = `
 
 const WATER_FRAGMENT = `
   varying vec2 vUv;
+  uniform float time;
   void main() {
-    float stripe = pow(0.5 + 0.5*sin(vUv.x*108. + vUv.y*13. + sin(vUv.y*13.)*1.2), 5.);
-    float currents = pow(0.5 + 0.5*sin(vUv.x*62. - sin(vUv.y*6.5)*1.1), 3.);
+    float flow = vUv.y + time * .46;
+    float stripe = pow(0.5 + 0.5*sin(vUv.x*108. + flow*13. + sin(flow*13.)*1.2), 5.);
+    float currents = pow(0.5 + 0.5*sin(vUv.x*62. - sin(flow*6.5)*1.1), 3.);
     vec3 color = mix(vec3(.08,.44,.46), vec3(.59,.94,.89), .21+stripe*.50+currents*.25);
     float outline = smoothstep(0.,.18,vUv.x)*smoothstep(0.,.18,1.-vUv.x);
     float alpha = outline * (.50 + stripe*.43) * smoothstep(0.,.27,vUv.y);
-    gl_FragColor = vec4(color, alpha);
+    gl_FragColor = sRGBTransferEOTF(vec4(color, alpha));
+    #include <colorspace_fragment>
   }
 `;
 
@@ -128,8 +131,8 @@ function tree(parent: T.Object3D, p: Palette, foliage: Foliage[], origin: Point,
   }
 }
 
-function plant(parent: T.Object3D, items: Foliage[]) {
-  const geometry = new T.IcosahedronGeometry(1, 2);
+function plant(parent: T.Object3D, items: Foliage[], compact: boolean) {
+  const geometry = new T.IcosahedronGeometry(1, compact ? 1 : 2);
   const positions = geometry.getAttribute("position");
   for (let i = 0; i < positions.count; i++) {
     const x = positions.getX(i), y = positions.getY(i), z = positions.getZ(i);
@@ -150,7 +153,7 @@ function plant(parent: T.Object3D, items: Foliage[]) {
   parent.add(canopy);
 }
 
-export function terrain(parent: T.Object3D, p: Palette) {
+export function terrain(parent: T.Object3D, p: Palette, compact: boolean) {
   const group = new T.Group();
   group.name = "Floating islands and forest";
   parent.add(group);
@@ -159,6 +162,7 @@ export function terrain(parent: T.Object3D, p: Palette) {
   });
   const water = new T.ShaderMaterial({
     vertexShader: WATER_VERTEX, fragmentShader: WATER_FRAGMENT,
+    uniforms: { time: { value: 0 } },
     side: T.DoubleSide, transparent: true, depthWrite: false,
   });
   const crowns: Foliage[] = [];
@@ -217,6 +221,6 @@ export function terrain(parent: T.Object3D, p: Palette) {
     taperedRock(group, rough, [x, y, z], [size, size * 1.28, size * .78], 119 + i);
     tree(group, p, crowns, [x, y, z], size * .77, 258 + i);
   }
-  plant(group, crowns);
-  return group;
+  plant(group, crowns, compact);
+  return { group, waterTime: water.uniforms.time };
 }

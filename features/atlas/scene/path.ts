@@ -74,6 +74,10 @@ export function pathway(parent: T.Object3D, p: Palette) {
   paving.roughness = .49;
   paving.side = T.DoubleSide;
   mesh(group, ribbon(curve, -.64, .64, .023), paving);
+  const trailGeometry = ribbon(curve, -.079, .079, .039);
+  const trail = mesh(group, trailGeometry, new T.MeshBasicMaterial({ color: 0xffdf93, side: T.DoubleSide }));
+  const spark = mesh(group, new T.OctahedronGeometry(.115), p.lamp);
+  trail.visible = spark.visible = false;
   const under = p.bronze.clone();
   under.side = T.DoubleSide;
   mesh(group, ribbon(curve, -.68, .68, -.15), under);
@@ -135,5 +139,13 @@ export function pathway(parent: T.Object3D, p: Palette) {
     for (const side of [-1, 1]) rod(group, p.goldLight, start.clone().addScaledVector(across, side).add(new T.Vector3(0, .075, 0)),
       end.clone().addScaledVector(across, side).add(new T.Vector3(0, .075, 0)), .026);
   }
-  return group;
+  return {
+    group,
+    lightRoute(progress: number) {
+      trail.visible = progress > 0;
+      spark.visible = progress > 0 && progress < 1;
+      trailGeometry.setDrawRange(0, Math.round(164 * progress) * 6);
+      curve.getPointAt(progress, spark.position).y += .21;
+    },
+  };
 }

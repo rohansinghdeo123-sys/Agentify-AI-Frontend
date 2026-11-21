@@ -47,21 +47,19 @@ export default function AppShell({
               className="market-floating-brand-logo"
               label=""
             />
-            {!isLanding && (
-              <span className="market-floating-brand-copy">
-                <strong>Agentify<span>AI</span></strong>
-              </span>
-            )}
+            <span className="market-floating-brand-copy">
+              <strong>Agentify<span>AI</span></strong>
+            </span>
           </Link>
 
           <nav className="market-utility-navigation" aria-label="Learning insights">
             <Link href="/dashboard/analytics" className="market-utility-link" aria-label="Analytics" title={isLanding ? "Analytics" : undefined} aria-current={isAnalytics ? "page" : undefined}>
               <AppIcon name="analytics" />
-              {!isLanding && <span>Analytics</span>}
+              <span>Analytics</span>
             </Link>
             <Link href="/dashboard/rankings" className="market-utility-link" aria-label="Global Rankings" title={isLanding ? "Global Rankings" : undefined} aria-current={isRankings ? "page" : undefined}>
               <AppIcon name="trophy" />
-              {!isLanding && <span className="market-rankings-label">Rankings</span>}
+              <span className="market-rankings-label">Rankings</span>
             </Link>
           </nav>
 

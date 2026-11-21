@@ -45,5 +45,5 @@ export default function LearningJourneyPersonalized() {
     return () => controller.abort();
   }, [claimsLoading, getAuthHeaders, loading, userId]);
 
-  return <LearningJourney recommendation={recommendation} progress={progress} />;
+  return <LearningJourney recommendation={recommendation} progress={progress} userId={userId} />;
 }

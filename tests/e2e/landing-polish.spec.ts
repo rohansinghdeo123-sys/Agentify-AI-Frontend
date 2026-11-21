@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { installWorkspaceMocks } from "./helpers/mockWorkspace";
 
+test.use({ launchOptions: { args: ["--disable-webgl"] } });
+
 const destinations = [
   { title: "Planning", href: "/dashboard/planning", action: "Open Planning" },
   { title: "Study Lab", href: "/dashboard/study", action: "Open Study Lab" },
@@ -31,6 +33,7 @@ for (const theme of ["light", "dark"] as const) {
     const heading = page.getByRole("heading", { name: "Your Learning Journey" });
     await expect(heading).toBeVisible();
     const scene = page.getByRole("region", { name: "Your Learning Journey" });
+    await expect(scene).toHaveAttribute("data-atlas", "fallback");
     const artwork = scene.locator('[class*="__art"]');
     await expect(artwork).toHaveCSS("background-image", new RegExp(initialArtwork));
     await expect(heading).toHaveCSS("color", theme === "light" ? "rgb(24, 46, 43)" : "rgb(255, 249, 237)");

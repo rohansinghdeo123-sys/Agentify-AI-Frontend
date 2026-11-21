@@ -13,6 +13,7 @@ const skyVertex = `
 
 const skyFragment = `
   varying vec3 world;
+  uniform float daylight;
   float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
   float noise(vec2 p){
     vec2 i=floor(p),f=fract(p);
@@ -29,7 +30,10 @@ const skyFragment = `
     float aurora=exp(-abs(direction.y+.10-direction.x*.37)*5.);
     float veil=smoothstep(.76,1.25,haze)*(.21+aurora*.47);
     color=mix(color,vec3(.066,.37,.32),veil);
-    gl_FragColor=vec4(color,1.);
+    vec3 day=mix(vec3(.71,.85,.83),vec3(.95,.95,.87),horizon*.86);
+    day=mix(day,vec3(.57,.79,.74),veil*.7);
+    gl_FragColor=sRGBTransferEOTF(vec4(mix(color,day,daylight),1.));
+    #include <colorspace_fragment>
   }
 `;
 
@@ -43,7 +47,8 @@ const waterFragment = `
     float edge=exp(-distance(world.xz,vec2(0.,8.))*.14);
     vec3 color=mix(vec3(.015,.10,.105),vec3(.025,.24,.215),shore*.79);
     color+=vec3(.72,.37,.10)*glint*.73;
-    gl_FragColor=vec4(color,edge*(.28+.56*view.y));
+    gl_FragColor=sRGBTransferEOTF(vec4(color,edge*(.28+.56*view.y)));
+    #include <colorspace_fragment>
   }
 `;
 
@@ -71,12 +76,14 @@ function softCloud(seed: number) {
   return result;
 }
 
-export function atmosphere(parent: T.Scene) {
+export function atmosphere(parent: T.Scene, compact: boolean) {
   const group = new T.Group();
   group.name = "Atmosphere and mountain ranges";
   parent.add(group);
+  const daylight = { value: 0 };
   mesh(group, new T.SphereGeometry(154, 32, 20), new T.ShaderMaterial({
     vertexShader: skyVertex, fragmentShader: skyFragment, side: T.BackSide,
+    uniforms: { daylight },
     depthWrite: false,
   })).renderOrder = -20;
   const water = mesh(group, new T.PlaneGeometry(60, 43), new T.ShaderMaterial({
@@ -103,7 +110,7 @@ export function atmosphere(parent: T.Scene) {
     mist.scale.set(width, height, 1);
     group.add(mist);
   };
-  for (let i = 0; i < 49; i++) {
+  for (let i = 0; i < (compact ? 34 : 49); i++) {
     const x = -33 + random() * 69, z = -40 + random() * 45;
     const y = -4.8 + random() * 7.3;
     layer(x, y, z, 4.6 + random() * 12, 2.3 + random() * 3.4, .32 + random() * .55);
@@ -126,7 +133,9 @@ export function atmosphere(parent: T.Scene) {
   const skyPoints = new T.BufferGeometry();
   skyPoints.setAttribute("position", new T.Float32BufferAttribute(stars, 3));
   skyPoints.setAttribute("color", new T.Float32BufferAttribute(colors, 3));
-  group.add(new T.Points(skyPoints, new T.PointsMaterial({
+  const starField = new T.Points(skyPoints, new T.PointsMaterial({
     size: .069, transparent: true, vertexColors: true, opacity: .72, depthWrite: false, fog: false,
-  })));
+  }));
+  group.add(starField);
+  return { daylight, starField };
 }
