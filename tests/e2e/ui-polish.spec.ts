@@ -5,6 +5,11 @@ for (const theme of ["light", "dark"] as const) {
   test(`login phone form stays readable and keyboard accessible in ${theme}`, async ({ page }, testInfo) => {
     await page.addInitScript((value) => localStorage.setItem("agentify-theme", value), theme);
     await page.goto("/login");
+    await expect(page.getByText("Personal agent", { exact: true })).toBeVisible();
+    const logo = page.getByRole("link", { name: "AgentifyAI home" }).locator('[data-state="thinking"]');
+    await expect(logo.locator(".chat-logo-sweep")).toHaveCSS("animation-name", "chat-logo-sweep");
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await expect(logo.locator(".chat-logo-sweep")).toHaveCSS("animation-name", "none");
     await page.getByRole("button", { name: "Continue with phone" }).click();
     const phone = page.getByRole("textbox", { name: "Mobile number" });
     await expect(phone).toBeFocused();

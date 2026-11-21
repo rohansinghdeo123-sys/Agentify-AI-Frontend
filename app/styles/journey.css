@@ -125,34 +125,6 @@
 .journey-reveal { animation: journey-reveal var(--journey-enter) both; }
 @keyframes journey-reveal { from { opacity: .6; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
-.chat-thinking-logo {
-  --chat-logo-size: 2.75rem;
-  position: relative;
-  display: inline-flex;
-  flex: none;
-  width: var(--chat-logo-size);
-  height: var(--chat-logo-size);
-  vertical-align: middle;
-}
-.chat-thinking-logo img { width: 100%; height: 100%; }
-
-.chat-thinking-logo:is(.is-thinking, .is-streaming)::after {
-  position: absolute;
-  inset: -4px;
-  border: 2px solid #9ee4d8;
-  border-right-color: #bc873c;
-  border-radius: 30%;
-  content: "";
-  animation: journey-signal 2s ease-in-out infinite;
-}
-.chat-thinking-logo.is-streaming::after { animation-duration: 1.25s; }
-.chat-thinking-logo.is-complete { animation: journey-reveal var(--journey-enter) both; }
-
-@keyframes journey-signal {
-  0%, 100% { transform: scale(.96); opacity: .52; }
-  50% { transform: scale(1.07); opacity: 1; }
-}
-
 @media (max-width: 640px) {
   :root { --journey-topbar-height: 3.85rem; }
   .dashboard-shell[data-workspace-bar] .market-landing-utilities { padding-inline: .75rem; }
@@ -166,40 +138,33 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .journey-reveal, .chat-thinking-logo, .chat-thinking-logo::after { animation: none !important; }
+  .journey-reveal { animation: none !important; }
   .journey-progress::-webkit-progress-value { transition: none; }
   .dashboard-shell[data-workspace-bar] .market-landing-utilities :is(a, button, summary) { transition: none; transform: none; }
 }
 
-.auth-journey-copy {
-  display: flex;
-  width: 100%;
-  flex-direction: column;
-  align-items: center;
+/* Preserve the centered sign-in layout and give its controls the same materials as the workspace. */
+.auth-scene-final .auth-login-panel {
+  border-color: var(--auth-final-line);
 }
 
-@media (min-width: 1024px) {
-  .auth-center.auth-journey-center { max-width: 74rem; }
-  .auth-journey-center .auth-hero {
-    display: grid;
-    grid-template-columns: minmax(0, 1.28fr) minmax(20rem, 1fr);
-    gap: clamp(1.8rem, 4vw, 4rem);
-    text-align: start;
-  }
-  .auth-journey-center .auth-journey-copy {
-    min-height: 31rem;
-    justify-content: center;
-    align-items: flex-start;
-    border: 1px solid #17605a;
-    border-radius: var(--journey-radius);
-    background: linear-gradient(90deg, #022727 0%, #022727eb 40%, #0227273d 100%), url("/learning-journey.webp") center right / cover #022727;
-    padding: clamp(1.5rem, 3vw, 3.2rem);
-  }
-  .auth-journey-center .auth-journey-copy .auth-title { color: #fffefa; }
-  .auth-journey-center .auth-journey-copy .auth-title em { color: #f5d18c; background: none; -webkit-text-fill-color: currentColor; }
-  .auth-journey-center .auth-journey-copy .auth-lede { color: #d9efe9; max-width: 34ch; }
-  .auth-journey-center .auth-journey-copy .auth-kicker { background: #063633; border-color: #52968a; color: #b4f2e5; }
-  .auth-journey-center .auth-login-panel { margin: 0; justify-self: center; }
+.auth-scene-final .auth-login-panel::before {
+  left: 12%;
+  right: 12%;
+  background: linear-gradient(90deg, transparent, var(--ds-accent-teal-strong), var(--ds-accent-gold), transparent);
+}
+
+.auth-scene-final .auth-login-panel :is(button, a, input):focus-visible {
+  outline: 2px solid var(--ds-accent-teal);
+  outline-offset: 2px;
+}
+
+body .auth-scene-final .auth-title em {
+  background-image: linear-gradient(120deg, #0a6159 10%, #0a7469 48%, #99630f 90%);
+}
+
+[data-theme="dark"] body .auth-scene-final .auth-title em {
+  background-image: linear-gradient(120deg, #78e5ce 12%, #acebdc 50%, #f6cc80 90%);
 }
 
 .journey-surface-heading :is(h1, h2):focus-visible { outline-offset: 2px; }

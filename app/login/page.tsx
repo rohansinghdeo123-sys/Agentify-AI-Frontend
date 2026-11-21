@@ -354,7 +354,7 @@ export default function LoginPage() {
       <header className="auth-header-final flex items-center justify-between px-5 py-5 sm:px-8 sm:py-6 lg:px-12">
         <Link href="/" aria-label="AgentifyAI home" className="auth-brand-lockup group inline-flex items-center gap-3.5">
           <ChatThinkingLogo
-            state="idle"
+            state="thinking"
             size={46}
             className="auth-brand-logo"
             label="AgentifyAI"
@@ -371,10 +371,10 @@ export default function LoginPage() {
         <ThemeToggle compact />
       </header>
 
-      <main id="main-content" className={cn("auth-center relative mx-auto flex w-full max-w-[48rem] flex-1 items-center justify-center px-5 py-7 sm:px-8 sm:py-10", !granted && "auth-journey-center")}>
+      <main id="main-content" className="auth-center relative mx-auto flex w-full max-w-[48rem] flex-1 items-center justify-center px-5 py-7 sm:px-8 sm:py-10">
         <section aria-label="Sign in to AgentifyAI" className="auth-hero flex w-full flex-col items-center text-center">
           {!granted ? (
-            <div className="auth-journey-copy">
+            <>
               <p className="auth-kicker inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em]">
                 <span aria-hidden="true" />
                 Built for focused students
@@ -386,7 +386,36 @@ export default function LoginPage() {
                 Plan what to study, ask questions as you learn, and pick up where you left off.
               </p>
 
-            </div>
+              <ul className="auth-proof-row mt-6 grid w-full max-w-[41rem] grid-cols-1 gap-2.5 sm:grid-cols-3">
+                {[
+                  {
+                    icon: "spark" as const,
+                    title: "Personal agent",
+                    detail: "Adapts to your pace",
+                  },
+                  {
+                    icon: "mission" as const,
+                    title: "Autonomous Mission",
+                    detail: "Plans your next step",
+                  },
+                  {
+                    icon: "book" as const,
+                    title: "Course-grounded",
+                    detail: "Explains what you study",
+                  },
+                ].map((item) => (
+                  <li key={item.title} className="auth-proof-item flex items-center gap-3 rounded-2xl px-3.5 py-3 text-left">
+                    <span className="auth-proof-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-xl">
+                      <AppIcon name={item.icon} className="h-[1.05rem] w-[1.05rem]" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-[12px] font-bold">{item.title}</span>
+                      <span className="mt-0.5 block truncate text-[10.5px] font-medium">{item.detail}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
           ) : (
             <>
               <p className="auth-kicker inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em]">

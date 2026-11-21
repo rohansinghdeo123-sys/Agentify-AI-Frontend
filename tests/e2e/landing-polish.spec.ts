@@ -11,18 +11,35 @@ for (const theme of ["light", "dark"] as const) {
     await page.goto("/dashboard");
     const route = page.getByRole("list", { name: "Planning, Study, Revision, and Exam learning route" });
     await expect(route.getByRole("link")).toHaveCount(4);
-    for (const link of await route.getByRole("link").all()) {
-      await link.scrollIntoViewIfNeeded();
-      await expect(link).toBeVisible();
-      const fits = await link.evaluate((element) => {
-        const box = element.getBoundingClientRect();
-        return Array.from(element.querySelectorAll("h3, [id]")).every((child) => child.getBoundingClientRect().bottom <= box.bottom + 1);
-      });
-      expect(fits).toBe(true);
-    }
-    await expect(route.getByRole("link", { name: "Study Lab" })).toHaveAttribute("href", "/dashboard/study");
+    const path = page.getByRole("list", { name: "Explore the learning path" });
+    await expect(path.getByRole("button")).toHaveCount(4);
     await expect(page.getByRole("link", { name: "Global Rankings" })).toHaveAttribute("href", "/dashboard/rankings");
-    await expect(page.getByRole("link", { name: "Start a review" })).toHaveAttribute("href", "/dashboard/revision");
+    await expect(page.getByRole("link", { name: "Analytics" })).toHaveAttribute("href", "/dashboard/analytics");
+    await expect(page.getByRole("link", { name: "View analytics" })).toHaveCount(0);
+    await expect(path.getByRole("button", { name: "Preview Revision" })).toHaveAttribute("aria-pressed", "true");
+
+    const panel = page.locator("#workspace-preview");
+    const destinations = [
+      { title: "Planning", href: "/dashboard/planning", action: "Open Planning" },
+      { title: "Study Lab", href: "/dashboard/study", action: "Open Study Lab" },
+      { title: "Revision", href: "/dashboard/revision", action: "Start a review" },
+      { title: "Exam", href: "/dashboard/exam", action: "Open Exam" },
+    ];
+    for (const destination of destinations) {
+      await expect(route.getByRole("link", { name: destination.title })).toHaveAttribute("href", destination.href);
+      const pin = path.getByRole("button", { name: `Preview ${destination.title}` });
+      if (!isMobile && destination.title === "Study Lab") {
+        await pin.focus();
+        await page.keyboard.press("Enter");
+        await expect(pin).toBeFocused();
+      } else {
+        await pin.click();
+      }
+      await expect(path.getByRole("button", { pressed: true })).toHaveCount(1);
+      await expect(pin).toHaveAttribute("aria-pressed", "true");
+      await expect(panel.getByRole("heading", { name: destination.title, exact: true })).toBeVisible();
+      await expect(panel.getByRole("link", { name: destination.action })).toHaveAttribute("href", destination.href);
+    }
     const themeButton = page.getByRole("button", { name: "Dark theme" });
     await themeButton.focus();
     await page.keyboard.press("Escape");
@@ -53,6 +70,7 @@ for (const theme of ["light", "dark"] as const) {
         expect(box && box.x >= 0 && box.x + box.width <= 320).toBe(true);
       }
       expect(await route.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+      await expect(path.getByRole("button", { name: "Preview Exam" })).toBeVisible();
     }
   });
 }

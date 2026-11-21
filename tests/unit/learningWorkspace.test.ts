@@ -168,6 +168,22 @@ describe("learning workspace journey", () => {
     expect(markup).not.toContain("Recent work");
   });
 
+  it("uses only saved mastery for the compass reward and keeps analytics out of the journey", () => {
+    const progress = { mastered_units: 1, active_units: 1, needs_review_units: 0, total_units: 2, percentage: 50 };
+    const partial = renderToStaticMarkup(createElement(LearningJourney, { progress }));
+    expect(partial).toContain("1 of 2 topics mastered");
+    expect(partial).not.toContain("Plan mastered");
+    expect(partial).not.toContain("View analytics");
+    expect(partial).not.toContain('href="/dashboard/analytics"');
+
+    const mastered = renderToStaticMarkup(createElement(LearningJourney, {
+      progress: { ...progress, active_units: 0, mastered_units: 2, percentage: 100 },
+    }));
+    expect(mastered).toContain("Plan mastered");
+    expect(mastered).toContain('data-mastered="true"');
+    expect(mastered).toContain('value="2" max="2"');
+  });
+
   it("moves the visual recommendation without changing the four available routes", () => {
     const markup = renderToStaticMarkup(createElement(LearningJourney, {
       recommendation: {
