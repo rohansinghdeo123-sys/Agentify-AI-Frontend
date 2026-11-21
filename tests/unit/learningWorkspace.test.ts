@@ -153,10 +153,11 @@ describe("learning workspace journey", () => {
     const markup = renderToStaticMarkup(createElement(LearningJourney));
     const destinationLinks = markup.match(/href="\/dashboard\/(?:planning|study|revision|exam)"/g) ?? [];
 
-    expect(destinationLinks).toHaveLength(4);
-    expect(markup).toContain("One clear route from");
-    expect(markup).toContain("Start with clarity");
-    expect(markup).toContain("Move at your pace");
+    expect(new Set(destinationLinks).size).toBe(4);
+    expect(destinationLinks).toHaveLength(5);
+    expect(markup).toContain('aria-label="Planning, Study, Revision, and Exam learning route"');
+    expect(markup).toContain("Create a plan");
+    expect(markup).toContain("Learning workspaces");
     expect(markup).toContain("Choose your chapters and starting confidence");
     expect(markup).toContain("Suggested start");
     expect(markup).toContain('data-mode="planning" data-recommended="true"');

@@ -31,7 +31,7 @@ export function StudyScreen({
     <section className={[styles.screen, className].filter(Boolean).join(" ")}>
       <div className={styles.ambient} aria-hidden="true"><span /><span /></div>
       <div className={styles.frame} data-study-scroll>
-        <header className={styles.header}>
+        <header className={`${styles.header} journey-surface-heading`}>
           <div className={styles.copy}>
             {backHref ? (
               <Link href={backHref} className={styles.backLink}>
@@ -39,7 +39,7 @@ export function StudyScreen({
                 <span>{backLabel}</span>
               </Link>
             ) : null}
-            <p className={styles.eyebrow}>{eyebrow}</p>
+            <p className={`${styles.eyebrow} journey-kicker`}><AppIcon name="study" />{eyebrow}</p>
             <h1 ref={headingRef} tabIndex={-1}>{title}</h1>
             <p className={styles.description}>{description}</p>
           </div>

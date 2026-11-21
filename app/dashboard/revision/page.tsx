@@ -193,9 +193,9 @@ export default function RevisionHomePage() {
       </div>
 
       <div className={styles.shell}>
-        <header className={styles.hero}>
+        <header className={`${styles.hero} journey-surface-heading`}>
           <div className={styles.heroCopy}>
-            <p className={styles.eyebrow}>AgentifyAI / Revision Lab</p>
+            <p className={`${styles.eyebrow} journey-kicker`}><AppIcon name="book" />Revision Lab</p>
             <h1 id="revision-home-title" ref={headingRef} tabIndex={-1}>Strengthen what matters next.</h1>
             <p className={styles.intro}>
               Continue a topic or choose one from the chapter library. Each revision combines a clear explanation, concise notes, and one honest memory check.

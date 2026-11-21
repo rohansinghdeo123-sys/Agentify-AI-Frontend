@@ -35,7 +35,7 @@ for (const theme of ["light", "dark"] as const) {
     const errors = watchPageErrors(page);
     const workspace = await installWorkspaceMocks(page, theme, { state: "ready", founder: true });
     const operations = await installOperationsMocks(page);
-    await page.goto("/dashboard/internal/admin");
+    await page.goto("/dashboard/internal/admin/evidence");
     await expect(page.getByRole("heading", { name: "Know what every learning agent is doing." })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
     await expect(page.getByRole("heading", { name: "Study Coach", exact: true })).toBeVisible();

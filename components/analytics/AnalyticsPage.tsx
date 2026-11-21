@@ -696,7 +696,7 @@ export default function AnalyticsPage() {
   const totalCorrect = progress.total_correct || sum(sessions, (s) => s.correct);
   const avgAccuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
   const totalXp = progress.xp || sum(sessions, (s) => s.xp);
-  const levelProgress = Math.max(2, Math.min(100, totalXp % 100));
+  const levelProgress = totalXp % 100;
   const xpToNext = Math.max(0, 100 - (totalXp % 100));
 
   const subjects = useMemo(() => groupBySubject(sessions), [sessions]);
@@ -1056,9 +1056,8 @@ export default function AnalyticsPage() {
               <span className="text-gray-400">Total XP</span>
               <span className="text-2xl font-bold text-white">{totalXp}</span>
             </div>
-            <div role="progressbar" aria-label="Progress to next level" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(levelProgress)} aria-valuetext={`${xpToNext} XP to next level`} className="h-2 bg-white/5 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-amber-400 to-orange-500" style={{ width: `${levelProgress}%` }} />
-            </div>
+            <progress className="journey-progress" aria-label="Progress to next level"
+              aria-valuetext={`${xpToNext} XP to next level`} value={levelProgress} max={100} />
             <div className={cn("flex flex-wrap justify-between gap-2 uppercase", styles.metaLabel)}>
               <span>LVL {progress.level || 1}</span>
               <span>{xpToNext} XP to next</span>

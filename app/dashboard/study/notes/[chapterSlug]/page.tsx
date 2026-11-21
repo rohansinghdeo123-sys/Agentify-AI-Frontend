@@ -226,9 +226,9 @@ function TopicNotesReader() {
           <button disabled={finishing || page===pages.length-1 || remaining===0} onClick={()=>void navigate(page+1)}>Next</button>}
         <Link href={askHref}>Ask AI about this page</Link>
       </nav>
-      <progress aria-label="Reading progress" value={tracksCompletedPages ? completedPages.length : page+1} max={pages.length} className={noteStyles.progress} />
+      <progress aria-label="Reading progress" value={tracksCompletedPages ? completedPages.length : page+1} max={pages.length} className="journey-progress" />
       {tracksCompletedPages ? <p className={noteStyles.readingSummary}>{completedPages.length} of {pages.length} pages read</p> : null}
-      <article className={noteStyles.card} data-tone={page % 3}>
+      <article key={current.id} className={`${noteStyles.card} journey-reveal`} data-tone={page % 3}>
         <div className={noteStyles.eyebrow}><span>{notesSourceLabel(current.source_type) || current.source || "Concept notes"}</span><span className={noteStyles.badge}>{current.blocks?.length || notePoints(current.text).length} key {(current.blocks?.length || notePoints(current.text).length) === 1 ? "point" : "points"}</span></div>
         <div className={noteStyles.sourceBadges}>{[...new Set([...(current.source_types || []),...(current.provenance || current.source_refs || []).flatMap(reference=>reference.source_type ? [reference.source_type] : [])])].map(type=><NotesSourceBadge key={type} type={type} />)}</div>
         <h2>{current.title}</h2>{current.source_pages?.length ? <p>{notesSourceLabel(current.source_type) || current.source || "Source"} · PDF page {current.source_pages.join(", ")}</p> : null}<ThemedNotePoints text={current.text} blocks={current.blocks} />

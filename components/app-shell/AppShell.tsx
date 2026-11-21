@@ -24,19 +24,22 @@ export default function AppShell({
   const pathname = usePathname();
   const isNotes = pathname.startsWith("/dashboard/study/notes/");
   const isLanding = pathname === "/dashboard" || pathname === "/dashboard/";
+  const isAnalytics = pathname.startsWith("/dashboard/analytics");
+  const isRankings = pathname.startsWith("/dashboard/rankings");
+  const workspaceBar = isLanding || isAnalytics || isRankings;
   const immersive = pathname.startsWith("/dashboard/study")
     || pathname.startsWith("/dashboard/revision")
     || pathname.startsWith("/dashboard/exam")
     || pathname.startsWith("/dashboard/planning");
 
   return (
-    <div className="dashboard-shell market-ready-shell">
-      {isLanding ? (
-        <div className="market-landing-utilities" aria-label="Workspace utilities">
+    <div className="dashboard-shell market-ready-shell" data-workspace-bar={workspaceBar || undefined}>
+      {workspaceBar ? (
+        <header className="market-landing-utilities">
           <Link
             href="/dashboard"
             className="market-floating-brand"
-            aria-label="AgentifyAI workspace home"
+            aria-label={isLanding ? "AgentifyAI workspace home" : "Return to Workspace"}
           >
             <ChatThinkingLogo
               state="idle"
@@ -46,18 +49,17 @@ export default function AppShell({
             />
             <span className="market-floating-brand-copy">
               <strong>Agentify<span>AI</span></strong>
-              <small>Learning workspace</small>
             </span>
           </Link>
 
           <nav className="market-utility-navigation" aria-label="Learning insights">
-            <Link href="/dashboard/analytics" className="market-utility-link">
+            <Link href="/dashboard/analytics" className="market-utility-link" aria-current={isAnalytics ? "page" : undefined}>
               <AppIcon name="analytics" />
               <span>Analytics</span>
             </Link>
-            <Link href="/dashboard/rankings" className="market-utility-link">
-              <AppIcon name="spark" />
-              <span>Rankings</span>
+            <Link href="/dashboard/rankings" className="market-utility-link" aria-label="Global Rankings" aria-current={isRankings ? "page" : undefined}>
+              <AppIcon name="trophy" />
+              <span className="market-rankings-label">Rankings</span>
             </Link>
           </nav>
 
@@ -70,7 +72,7 @@ export default function AppShell({
               onLogout={onLogout}
             />
           </div>
-        </div>
+        </header>
       ) : (
         <div className="market-floating-controls">
           <Link
@@ -79,7 +81,7 @@ export default function AppShell({
             aria-label="Return to Workspace"
             title="Workspace"
           >
-            <AppIcon name="home" />
+            <ChatThinkingLogo state="idle" size={27} label="" />
             <span className="sr-only">Workspace</span>
           </Link>
           <div className="market-floating-actions">

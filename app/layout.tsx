@@ -20,7 +20,7 @@ export const metadata = {
   icons: {
     icon: [
       { url: "/favicon.ico" },
-      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/agentify-mark.svg", type: "image/svg+xml" },
     ],
     apple: "/apple-touch-icon.png",
   },
@@ -51,6 +51,9 @@ export default function RootLayout({
                 try {
                   var theme = localStorage.getItem('agentify-theme') || 'light';
                   document.documentElement.setAttribute('data-theme', theme);
+                  if (localStorage.getItem('agentify-motion') === 'reduced') {
+                    document.documentElement.setAttribute('data-motion', 'reduced');
+                  }
                 } catch(e) {}
               })();
             `,

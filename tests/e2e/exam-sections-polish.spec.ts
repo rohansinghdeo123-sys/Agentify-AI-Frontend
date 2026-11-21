@@ -123,9 +123,8 @@ for (const theme of ["light", "dark"] as const) {
     await expect(questionHeading(0)).toBeFocused();
     await expectFitsViewport(page.getByRole("article"));
     await expectFitsViewport(page.getByRole("button", { name: "Next question", exact: true }));
-    await expect(progress).toHaveAttribute("aria-valuemin", "0");
-    await expect(progress).toHaveAttribute("aria-valuemax", "5");
-    await expect(progress).toHaveAttribute("aria-valuenow", "0");
+    await expect(progress).toHaveJSProperty("max", 5);
+    await expect(progress).toHaveJSProperty("value", 0);
     await page.getByRole("button", { name: "Next question", exact: true }).click();
     await expect(questionHeading(1)).toBeFocused();
     await page.getByRole("button", { name: "Submit and review" }).click();
@@ -137,7 +136,7 @@ for (const theme of ["light", "dark"] as const) {
     for (let index = 0; index < mcqQuestions.length; index += 1) {
       await expect(questionHeading(index)).toBeFocused();
       await page.getByRole("radio", { name: mcqQuestions[index].options[selectedOptionIndexes[index]], exact: true }).check();
-      await expect(progress).toHaveAttribute("aria-valuenow", String(index + 1));
+      await expect(progress).toHaveJSProperty("value", index + 1);
       await expect(progress).toHaveAttribute("aria-valuetext", `${index + 1} of 5 questions answered`);
       await expect(page.getByRole("button", { name: `Question ${index + 1}, answered`, exact: true })).toHaveAttribute("aria-current", "step");
       if (index < mcqQuestions.length - 1) await page.getByRole("button", { name: "Next question", exact: true }).click();

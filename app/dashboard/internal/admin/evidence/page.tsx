@@ -4,6 +4,7 @@ import { DataIngestionReport } from "@/components/admin/DataIngestionReport";
 import { HealthBadge, HealthDot } from "@/components/admin/HealthBadge";
 import { HEALTH_STYLES, MUTED, PANEL, SOFT_PANEL, TEXT, classifyHealth, formatCompact, formatPercent, formatTime, humanize, relativeTime } from "@/components/admin/format";
 import type { AdminActivityEvidence, AdminChapterEvidence, AdminContentEvidence, AdminEvidenceOverview, EvidenceAgentSummary, HealthState } from "@/components/admin/types";
+import ChatThinkingLogo from "@/components/brand/ChatThinkingLogo";
 import ThemeToggle from "@/components/ThemeToggle";
 import { AppIcon, ErrorState } from "@/components/ui/Polished";
 import { useAuth } from "@/context/AuthContext";
@@ -202,7 +203,7 @@ export default function FounderAdminConsolePage() {
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_8%_0%,var(--ds-accent-teal-soft),transparent_35%),radial-gradient(circle_at_92%_5%,var(--ds-accent-gold-soft),transparent_32%),var(--agentify-page-bg)]" />
       <div className="mx-auto w-full max-w-[1500px] px-4 pb-16 pt-4 sm:px-6 lg:px-10">
         <header className={cn(PANEL, "z-20 flex flex-col gap-4 px-5 py-4 xl:sticky xl:top-3 xl:flex-row xl:items-center xl:justify-between")}>
-          <div><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-bold tracking-[0.18em]">AGENTIFY<span className="text-[var(--ds-accent-teal)]">AI</span> CONTROL</p><HealthBadge state={overallState} label={overallState} pulse={overallState === "healthy"} /></div><p className={cn("mt-1 text-sm", MUTED)}>Agent operations and curriculum evidence · synced {formatTime(overview?.generated_at)}</p></div>
+          <div><div className="flex flex-wrap items-center gap-2"><p className="journey-kicker text-sm font-bold"><ChatThinkingLogo size={30} label="" />Curriculum Evidence</p><HealthBadge state={overallState} label={overallState} pulse={overallState === "healthy"} /></div><p className={cn("mt-1 text-sm", MUTED)}>Agent operations and curriculum evidence · synced {formatTime(overview?.generated_at)}</p></div>
           <div className="flex flex-wrap items-center gap-2"><Link href="/dashboard" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[color:var(--agentify-border)] bg-[color:var(--agentify-card-bg)] px-4 text-sm font-semibold hover:bg-[color:var(--agentify-hover-bg)]">Dashboard</Link><ThemeToggle compact /><ConsoleButton busy={refreshing} onClick={() => void loadConsole()}><AppIcon name="history" />{refreshing ? "Refreshing…" : "Refresh"}</ConsoleButton><ConsoleButton primary disabled={!overview} onClick={exportReport}><AppIcon name="download" />Export evidence</ConsoleButton></div>
         </header>
 

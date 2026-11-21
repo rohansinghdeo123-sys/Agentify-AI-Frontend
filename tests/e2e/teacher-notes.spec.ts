@@ -20,7 +20,7 @@ test("ten teaching pages retain session scope, versioned resume and final revisi
   const url=`/dashboard/study/notes/some_basic_concepts_of_chemistry?topic=${notes.topic_id}`;
   await page.goto(url);
   await expect(page.getByText("Page 1 of 10",{exact:true})).toBeVisible();
-  await expect(page.getByText(/For today’s 10-minute study portion/)).toBeVisible();
+  await expect(page.getByText(/30.35 min.*Topic duration/)).toBeVisible();
   await expect(page.locator("article")).toContainText(notes.pages[0].blocks[0].text);
   await page.screenshot({path:testInfo.outputPath("teaching-page-one.png")});
   await page.getByRole("button",{name:"Next",exact:true}).click();

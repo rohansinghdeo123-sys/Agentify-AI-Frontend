@@ -152,9 +152,10 @@ describe("focused Exam Lab architecture", () => {
     const mcq = source("app/dashboard/exam/mcq/page.tsx");
     const css = source("app/dashboard/exam/mcq/mcq.module.css");
 
-    expect(mcq).toContain('role="progressbar"');
-    expect(mcq).toContain("aria-valuemax={questions.length}");
-    expect(mcq).toContain("aria-valuenow={answeredCount}");
+    expect(mcq).toContain('<progress className="journey-progress"');
+    expect(mcq).toContain('aria-label="Questions answered"');
+    expect(mcq).toContain("max={questions.length}");
+    expect(mcq).toContain("value={answeredCount}");
     expect(mcq).toContain("ref={questionHeadingRef} tabIndex={-1}");
     expect(mcq).toContain("ref={resultHeadingRef} tabIndex={-1}");
     expect(mcq).toContain("ref={reviewHeadingRef} tabIndex={-1}");

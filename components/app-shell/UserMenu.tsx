@@ -31,6 +31,20 @@ export default function UserMenu({
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  const toggleMotion = () => {
+    const reduced = !reduceMotion;
+    setReduceMotion(reduced);
+    if (reduced) document.documentElement.dataset.motion = "reduced";
+    else delete document.documentElement.dataset.motion;
+    try {
+      if (reduced) localStorage.setItem("agentify-motion", "reduced");
+      else localStorage.removeItem("agentify-motion");
+    } catch {
+      // The setting still applies for this visit when storage is disabled.
+    }
+  };
 
   const handleLogout = async () => {
     if (loggingOut) return;
@@ -70,6 +84,9 @@ export default function UserMenu({
       ref={detailsRef}
       className="market-user-menu"
       data-compact={compact ? "true" : "false"}
+      onToggle={(event) => {
+        if (event.currentTarget.open) setReduceMotion(document.documentElement.dataset.motion === "reduced");
+      }}
     >
       <summary aria-label={`Open account menu for ${displayName}`}>
         <span className="market-user-avatar" aria-hidden="true">{getInitials(displayName)}</span>
@@ -93,6 +110,13 @@ export default function UserMenu({
           <span>Learning services</span>
           <BackendStatus />
         </div>
+
+        <button type="button" role="switch" aria-checked={reduceMotion}
+          className="market-user-action" onClick={toggleMotion}>
+          <AppIcon name="spark" />
+          <span>Reduce motion</span>
+          <span className="journey-switch" aria-hidden="true" />
+        </button>
 
         {canOpenAdminConsole ? (
           <Link

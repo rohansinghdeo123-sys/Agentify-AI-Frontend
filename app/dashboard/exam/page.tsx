@@ -93,9 +93,9 @@ export default function ExamModePage() {
       </div>
 
       <div className={styles.shell}>
-        <header className={styles.hero}>
+        <header className={`${styles.hero} journey-surface-heading`}>
           <div className={styles.heroCopy}>
-            <p className={styles.eyebrow}>AgentifyAI / Exam Lab</p>
+            <p className={`${styles.eyebrow} journey-kicker`}><AppIcon name="check" />Exam Lab</p>
             <h1 ref={headingRef} tabIndex={-1}>One clear workspace for every exam task.</h1>
             <p className={styles.intro}>
               Choose what you want to accomplish now. Each tool opens on its own full-screen canvas, so your attention stays on one job at a time.

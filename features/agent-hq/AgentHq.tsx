@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
+import ChatThinkingLogo from "@/components/brand/ChatThinkingLogo";
 import { AppIcon, type AppIconName } from "@/components/ui/Polished";
 import { useAuth } from "@/context/AuthContext";
 import { createAgentHqClient, type Agent, type Decision, type Run, type RunInput, type Schedule, type Snapshot, type TraceDetail } from "./api";
@@ -359,7 +360,7 @@ function Workspace({ getHeaders }: { getHeaders: ReturnType<typeof useAuth>["get
   return <main id="main-content" className={styles.shell}>
     <div className={styles.frame}>
       <aside className={styles.sidebar}>
-        <p className={styles.brand}><span className={styles.brandMark}><AppIcon name="spark" /></span>Agent HQ</p>
+        <p className={styles.brand}><ChatThinkingLogo state="idle" size={34} label="" />Agent HQ</p>
         <nav className={styles.nav} aria-label="Agent HQ sections">{VIEWS.map(item => <button key={item.id} type="button"
           aria-current={view === item.id ? "page" : undefined} onClick={() => setView(item.id)}><AppIcon name={item.icon} />{item.title}</button>)}</nav>
         <Link className={styles.back} href="/dashboard/internal/admin/evidence"><AppIcon name="arrowRight" />Admin diagnostics</Link>

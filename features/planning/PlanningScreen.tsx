@@ -1,5 +1,6 @@
 "use client";
 
+import { AppIcon } from "@/components/ui/Polished";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, type ReactNode } from "react";
@@ -37,7 +38,7 @@ export function PlanningScreen({
       </div>
       <div className={styles.scroll}>
         <div className={styles.shell}>
-          <header className={styles.header}>
+          <header className={`${styles.header} journey-surface-heading`}>
             <div className={styles.headerCopy}>
               {backHref ? (
                 <Link href={backHref} className={styles.backLink}>
@@ -45,7 +46,7 @@ export function PlanningScreen({
                   {backLabel}
                 </Link>
               ) : null}
-              <p className={styles.eyebrow}>{eyebrow}</p>
+              <p className={`${styles.eyebrow} journey-kicker`}><AppIcon name="mission" />{eyebrow}</p>
               <h1 ref={headingRef} tabIndex={-1}>{title}</h1>
               <p className={styles.intro}>{intro}</p>
             </div>

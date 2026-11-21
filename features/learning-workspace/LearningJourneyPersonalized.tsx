@@ -1,5 +1,6 @@
 "use client";
 
+import type { PlanningPortfolioProgress } from "@/features/planning/contracts";
 import { useAuth } from "@/context/AuthContext";
 import { readPlanningPortfolioState } from "@/features/planning/storage";
 import { useEffect, useState } from "react";
@@ -13,6 +14,8 @@ export default function LearningJourneyPersonalized() {
     recommendLearningWorkspace(null)
   ));
 
+  const [progress, setProgress] = useState<PlanningPortfolioProgress>();
+
   useEffect(() => {
     if (loading || claimsLoading) return;
     const controller = new AbortController();
@@ -20,6 +23,7 @@ export default function LearningJourneyPersonalized() {
     void Promise.resolve().then(() => {
       if (!controller.signal.aborted) {
         setRecommendation(recommendLearningWorkspace(saved.state));
+        setProgress(saved.state?.portfolio.aggregate_progress);
       }
     });
 
@@ -41,5 +45,5 @@ export default function LearningJourneyPersonalized() {
     return () => controller.abort();
   }, [claimsLoading, getAuthHeaders, loading, userId]);
 
-  return <LearningJourney recommendation={recommendation} />;
+  return <LearningJourney recommendation={recommendation} progress={progress} />;
 }

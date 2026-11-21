@@ -117,7 +117,9 @@ function RecallCards({ artifact }: { artifact: StudyArtifact }) {
           <p className={styles.cardQuestion}>{cleanText(card.front)}</p>
           <div className={styles.cardAnswer} data-revealed={revealed ? "true" : "false"}>
             <span>{revealed ? "Answer" : "Think before you reveal"}</span>
-            <p>{revealed ? cleanText(card.back) : "Say the answer aloud or write it down first."}</p>
+            <p key={revealed ? "answer" : "prompt"} className={revealed ? "journey-reveal" : undefined}>
+              {revealed ? cleanText(card.back) : "Say the answer aloud or write it down first."}
+            </p>
           </div>
           {!revealed ? (
             <button type="button" className={styles.revealButton} onClick={() => setRevealed(true)}>Reveal answer</button>

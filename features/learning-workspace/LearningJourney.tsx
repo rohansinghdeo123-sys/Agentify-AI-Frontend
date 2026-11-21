@@ -1,92 +1,95 @@
 import { AppIcon } from "@/components/ui/Polished";
-import { LEARNING_WORKSPACE_STEPS } from "@/features/learning-workspace/config";
+import type { PlanningPortfolioProgress } from "@/features/planning/contracts";
+import Image from "next/image";
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import { LEARNING_WORKSPACE_STEPS } from "./config";
 import { recommendLearningWorkspace, type LearningRecommendation } from "./recommendation";
 import styles from "./journey-landing.module.css";
 
-const STEP_LABELS = ["Plan", "Understand", "Recall", "Test"] as const;
+const ACTIONS = {
+  planning: "Open Planning",
+  study: "Open Study Lab",
+  revision: "Start a review",
+  exam: "Open Exam",
+} as const;
 
 export default function LearningJourney({
   recommendation = recommendLearningWorkspace(null),
+  progress,
 }: {
   recommendation?: LearningRecommendation;
+  progress?: PlanningPortfolioProgress;
 }) {
-  const recommendationBadge = recommendation.basis === "setup"
-    ? "Suggested start"
-    : "Suggested for you";
+  const next = LEARNING_WORKSPACE_STEPS.find((step) => step.id === recommendation.mode) ?? LEARNING_WORKSPACE_STEPS[0];
+
+  const mastered = !!progress?.total_units && progress.mastered_units === progress.total_units;
 
   return (
-    <section
-      className={styles.page}
-      aria-labelledby="learning-journey-title"
-    >
-      <div className={styles.intro}>
-        <p>AgentifyAI learning route</p>
-        <h1 id="learning-journey-title">
-          One clear route from <span>intention to readiness.</span>
-        </h1>
-        <p className={styles.introCopy}>
-          Start with a plan, build understanding, strengthen recall, and finish by
-          proving what you know. You can enter at whichever stage fits today.
-        </p>
+    <section className={styles.page} aria-labelledby="learning-journey-title">
+      <div className={styles.hero}>
+        <div className={styles.heroArt}>
+          <Image src="/learning-journey.webp" alt="" width={1080} height={720} unoptimized priority />
+        </div>
+        <div className={styles.heroCopy}>
+          <p className={styles.kicker}><AppIcon name="mission" /> Your learning journey</p>
+          <h1 id="learning-journey-title">
+            Take the <em>next step.</em>
+          </h1>
+          <p className={styles.reason}>{recommendation.reason}</p>
+          <Link className={styles.heroAction} href={next.href}>
+            {recommendation.basis === "setup" ? "Create a plan" : ACTIONS[next.id]}
+            <AppIcon name="arrowRight" />
+          </Link>
+        </div>
       </div>
 
-      <div className={styles.routePanel}>
-        <div className={styles.routeMeta} aria-hidden="true">
-          <span>Start with clarity</span>
-          <span>Move at your pace</span>
-          <span>Finish ready</span>
+      <section className={styles.workspaces} aria-labelledby="learning-stages-title">
+        <div className={styles.sectionHeading}>
+          <h2 id="learning-stages-title">Learning workspaces</h2>
         </div>
-
         <ol className={styles.route} aria-label="Planning, Study, Revision, and Exam learning route">
-          {LEARNING_WORKSPACE_STEPS.map((step, index) => {
-            const recommended = step.id === recommendation.mode;
+          {LEARNING_WORKSPACE_STEPS.map((step) => {
+            const recommended = next.id === step.id;
             return (
-              <li
-                key={step.id}
-                className={styles.station}
-                data-mode={step.id}
-                data-recommended={recommended ? "true" : undefined}
-                style={{ "--journey-delay": `${index * 110}ms` } as CSSProperties}
-              >
-                <Link
-                  href={step.href}
-                  className={styles.stationLink}
-                  aria-describedby={`${step.id}-description ${step.id}-outcome`}
-                >
-                  <span className={styles.stationNode} aria-hidden="true">
-                    <AppIcon name={step.icon} />
-                  </span>
-
-                  <span className={styles.stationTopline}>
-                    <span className={styles.sequence}>{String(step.step).padStart(2, "0")}</span>
-                    <span className={styles.phase}>
-                      {recommended ? recommendationBadge : STEP_LABELS[index]}
-                    </span>
-                  </span>
-
-                  <span className={styles.stationCopy}>
-                    <small>{step.eyebrow}</small>
-                    <h2>{step.title}</h2>
-                    <span id={`${step.id}-description`}>{step.description}</span>
-                  </span>
-
-                  <span className={styles.stationOutcome} id={`${step.id}-outcome`}>
-                    <span>
-                      <small>{recommended ? recommendationBadge : "Outcome"}</small>
-                      <strong>{recommended ? recommendation.reason : step.outcome}</strong>
-                    </span>
-                    <span className={styles.openIndicator} aria-hidden="true">
-                      <AppIcon name="arrowRight" />
-                    </span>
+              <li className={styles.station} key={step.id} data-mode={step.id} data-recommended={recommended || undefined}>
+                <Link className={styles.stationLink} href={step.href}
+                  aria-labelledby={`${step.id}-title`} aria-describedby={recommended ? `${step.id}-description suggested-workspace` : `${step.id}-description`}>
+                  <div className={styles.stationArt}>
+                    <span className={styles.stationIcon} aria-hidden="true"><AppIcon name={step.icon} /></span>
+                    <span className={styles.stationTrace} aria-hidden="true" />
+                    {recommended ? (
+                      <span id="suggested-workspace" className={styles.suggestion}>{recommendation.basis === "setup" ? "Suggested start" : "Suggested for you"}</span>
+                    ) : null}
+                  </div>
+                  <div className={styles.stationBody}>
+                    <h3 id={`${step.id}-title`}>{step.title}</h3>
+                    <p id={`${step.id}-description`}>{step.description}</p>
+                  </div>
+                  <span className={styles.stationFoot} aria-hidden="true">
+                    <span>{step.eyebrow}</span>
+                    <AppIcon name="arrowRight" />
                   </span>
                 </Link>
               </li>
             );
           })}
         </ol>
-      </div>
+      </section>
+
+      {progress && progress.total_units > 0 ? (
+        <section className={styles.mastery} data-mastered={mastered || undefined} aria-labelledby="journey-mastery-title">
+          <div className={styles.masteryCopy}>
+            <span className={styles.masteryIcon}><AppIcon name={mastered ? "trophy" : "check"} /></span>
+            <div>
+              <h2 id="journey-mastery-title">{mastered ? "Plan mastered" : "Plan mastery"}</h2>
+              <p>{progress.mastered_units} of {progress.total_units} planned topics mastered</p>
+            </div>
+          </div>
+          <progress className="journey-progress" aria-labelledby="journey-mastery-title"
+            value={progress.mastered_units} max={progress.total_units} />
+          <Link href="/dashboard/analytics">View analytics <AppIcon name="arrowRight" /></Link>
+        </section>
+      ) : null}
     </section>
   );
 }

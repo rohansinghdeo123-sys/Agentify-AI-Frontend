@@ -838,10 +838,10 @@ export function RankingsExperience({
         <div className={styles.masthead}>
           <div className={styles.titleGroup}>
             <span className={styles.leagueMark} aria-hidden="true">
-              <AppIcon name="analytics" />
+              <AppIcon name="trophy" />
             </span>
             <div>
-              <p className={styles.eyebrow}>AgentifyAI competitive learning</p>
+              <p className={styles.eyebrow}>Global Rankings</p>
               <h1>Global Learning League</h1>
               <p>Earn XP through real learning, climb divisions, and challenge the student closest to your rank.</p>
             </div>

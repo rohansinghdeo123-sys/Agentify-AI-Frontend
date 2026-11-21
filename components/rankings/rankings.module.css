@@ -1950,3 +1950,14 @@
     transition: none;
   }
 }
+
+.commandPanel {
+  border-radius: var(--journey-radius);
+  background: var(--journey-band);
+}
+
+.leagueMark {
+  border-color: color-mix(in srgb, var(--ds-accent-gold-strong) 32%, transparent);
+  color: var(--ds-accent-gold-strong);
+  background: var(--ds-accent-gold-soft);
+}

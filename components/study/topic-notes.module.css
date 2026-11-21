@@ -26,7 +26,6 @@
 .navigation span { margin-inline: auto; font-size: .85rem; font-weight: 650; }
 .navigation button:disabled { opacity: .4; cursor: default; }
 .navigation :focus-visible, .continue:focus-visible { outline: 3px solid var(--notes-accent); outline-offset: 3px; }
-.progress { display: block; width: 100%; height: .45rem; margin: .9rem 0; accent-color: var(--notes-accent); border: 0; }
 .continue { display: inline-flex; align-items: center; margin-top: .6rem; }
 :global([data-theme="dark"]) .card { --notes-accent: #55d6c4; }
 :global([data-theme="dark"]) .card[data-tone="1"] { --notes-accent: #aaaaff; }
@@ -34,10 +33,6 @@
 @media(max-width: 600px) { .points > li { padding: .8rem; font-size: .95rem; gap: .65rem; } .navigation a { flex-basis: 100%; text-align: center; } }
 
 .reader[class] { padding-top: max(5rem, calc(env(safe-area-inset-top) + 4.5rem)); }
-.progress { appearance: none; border-radius: 20px; background: var(--market-border, #dbe6ec); overflow: hidden; }
-.progress::-webkit-progress-bar { background: var(--market-border, #dbe6ec); border-radius: 20px; }
-.progress::-webkit-progress-value { background: var(--notes-accent); border-radius: 20px; }
-.progress::-moz-progress-bar { background: var(--notes-accent); border-radius: 20px; }
 
 .teachingText { white-space: pre-line; }
 .transition { margin-top: 1.3rem; padding-left: 1rem; border-left: 3px solid var(--notes-accent); line-height: 1.7; }
@@ -73,3 +68,18 @@
 .markRead { display: inline-flex; align-items: center; padding: .7rem 1rem; min-height: 44px; border: 1px solid var(--market-border, #dbe6ec); border-radius: 10px; color: inherit; background: var(--market-surface-strong, #fff); font-weight: 700; cursor: pointer; }
 .markRead:disabled { opacity: .65; cursor: default; }
 .markRead:focus-visible { outline: 3px solid var(--notes-accent); outline-offset: 3px; }
+
+.reader .card {
+  border-radius: var(--journey-radius);
+  box-shadow: var(--ds-shadow-sm);
+}
+
+.reader .navigation button:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader .navigation button:not(:disabled):active { transform: none; }
+}
+
+.reader :global(.journey-progress) { margin-block: .75rem; }

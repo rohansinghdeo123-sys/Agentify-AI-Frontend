@@ -35,7 +35,7 @@ export function ExamScreen({
     <div className={[styles.screen, className].filter(Boolean).join(" ")}>
       <div className={styles.ambient} aria-hidden="true" />
       <div className={styles.inner}>
-        <header className={styles.header}>
+        <header className={`${styles.header} journey-surface-heading`}>
           <div className={styles.headingBlock}>
             {backHref ? (
               <Link href={backHref} className={styles.backLink}>
@@ -43,7 +43,7 @@ export function ExamScreen({
                 <span>{backLabel}</span>
               </Link>
             ) : null}
-            <p className={styles.eyebrow}>{eyebrow}</p>
+            <p className={`${styles.eyebrow} journey-kicker`}><AppIcon name="check" />{eyebrow}</p>
             <h1 ref={headingRef} tabIndex={-1}>{title}</h1>
             <p className={styles.description}>{description}</p>
           </div>

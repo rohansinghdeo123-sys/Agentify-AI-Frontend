@@ -2018,3 +2018,53 @@
 
 .sharedProgress { padding: 1rem 1.25rem; border: 1px solid var(--market-border); border-radius: 16px; background: var(--market-surface-strong); line-height: 1.6; }
 .sharedProgress a { display: inline-block; padding-top: .5rem; color: var(--market-teal); font-weight: 700; }
+
+/* Connect the curriculum destinations without changing their sequence. */
+.roadmapList {
+  --roadmap-gutter: clamp(.9rem, 2.45vw, 1.8rem);
+  padding-inline-start: var(--roadmap-gutter);
+}
+
+.roadmapList::before {
+  position: absolute;
+  inset: 1.6rem auto 1.6rem calc(var(--roadmap-gutter) / 4);
+  width: 2px;
+  background: linear-gradient(var(--plan-teal), var(--plan-line) 76%);
+  content: "";
+}
+
+.roadmapList > li { position: relative; }
+
+.roadmapList > li::before {
+  position: absolute;
+  z-index: 1;
+  top: 1.55rem;
+  left: calc(var(--roadmap-gutter) * -.75 - 3px);
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--plan-teal);
+  border-radius: 50%;
+  background: var(--ds-surface-elevated);
+  content: "";
+  pointer-events: none;
+}
+
+.roadmapList > li[data-position="completed"]::before,
+.roadmapList > li[data-position="current"]::before {
+  background: var(--plan-teal);
+}
+
+.roadmapUnit[data-position="current"] {
+  background: var(--journey-band);
+}
+
+.roadmapUnit[data-position="completed"] {
+  opacity: 1;
+}
+
+.roadmapUnit[data-status="mastered"] .unitNumber {
+  color: var(--ds-success);
+  background: var(--ds-success-soft);
+}
+
+.progressTrack > span { background: var(--journey-gradient); }

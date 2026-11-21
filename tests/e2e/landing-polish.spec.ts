@@ -3,10 +3,10 @@ import AxeBuilder from "@axe-core/playwright";
 import { installWorkspaceMocks } from "./helpers/mockWorkspace";
 
 for (const theme of ["light", "dark"] as const) {
-  test(`landing preserves four readable destinations in ${theme}`, async ({ page }, testInfo) => {
+  test(`landing preserves four readable destinations in ${theme}`, async ({ page, isMobile }, testInfo) => {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    await installWorkspaceMocks(page, theme);
+    await installWorkspaceMocks(page, theme, { state: "ready" });
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/dashboard");
     const route = page.getByRole("list", { name: "Planning, Study, Revision, and Exam learning route" });
@@ -16,10 +16,13 @@ for (const theme of ["light", "dark"] as const) {
       await expect(link).toBeVisible();
       const fits = await link.evaluate((element) => {
         const box = element.getBoundingClientRect();
-        return Array.from(element.querySelectorAll("h2, [id]")).every((child) => child.getBoundingClientRect().bottom <= box.bottom + 1);
+        return Array.from(element.querySelectorAll("h3, [id]")).every((child) => child.getBoundingClientRect().bottom <= box.bottom + 1);
       });
       expect(fits).toBe(true);
     }
+    await expect(route.getByRole("link", { name: "Study Lab" })).toHaveAttribute("href", "/dashboard/study");
+    await expect(page.getByRole("link", { name: "Global Rankings" })).toHaveAttribute("href", "/dashboard/rankings");
+    await expect(page.getByRole("link", { name: "Start a review" })).toHaveAttribute("href", "/dashboard/revision");
     const themeButton = page.getByRole("button", { name: "Dark theme" });
     await themeButton.focus();
     await page.keyboard.press("Escape");
@@ -27,6 +30,13 @@ for (const theme of ["light", "dark"] as const) {
     const account = page.getByLabel("Open account menu for Aarav Sharma");
     await account.click();
     await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
+    const motion = page.getByRole("switch", { name: "Reduce motion" });
+    await motion.click();
+    await expect(motion).toHaveAttribute("aria-checked", "true");
+    await expect(page.locator("html")).toHaveAttribute("data-motion", "reduced");
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-motion", "reduced");
+    await account.click();
     await page.keyboard.press("Escape");
     await expect(account).toBeFocused();
     const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
@@ -35,5 +45,14 @@ for (const theme of ["light", "dark"] as const) {
     expect(errors).toEqual([]);
     await page.locator("#main-content").evaluate((element) => element.scrollTo(0, 0));
     await page.screenshot({ path: testInfo.outputPath(`landing-${theme}.png`), fullPage: true });
+    if (isMobile) {
+      await page.setViewportSize({ width: 320, height: 780 });
+      const links = page.getByRole("navigation", { name: "Learning insights" }).getByRole("link");
+      for (const link of await links.all()) {
+        const box = await link.boundingBox();
+        expect(box && box.x >= 0 && box.x + box.width <= 320).toBe(true);
+      }
+      expect(await route.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    }
   });
 }

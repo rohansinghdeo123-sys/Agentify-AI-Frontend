@@ -258,7 +258,7 @@ function LearningRoadmap({
           const position = roadmapPosition(unit, index, currentIndex);
           const panelId = `planning-unit-${unit.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
           return (
-            <li key={unit.id}>
+            <li key={unit.id} data-position={position.key}>
               <article
                 className={styles.roadmapUnit}
                 data-importance={unit.importance}
@@ -273,7 +273,9 @@ function LearningRoadmap({
                   aria-controls={panelId}
                   onClick={() => setOpenUnitId(isOpen ? null : unit.id)}
                 >
-                  <span className={styles.unitNumber} aria-hidden="true">{String(unit.order).padStart(2, "0")}</span>
+                  <span className={styles.unitNumber} aria-hidden="true">
+                    {unit.status === "mastered" ? <AppIcon name="check" /> : String(unit.order).padStart(2, "0")}
+                  </span>
                   <span className={styles.unitTitle}>{unit.title}</span>
                   <span className={styles.unitMetadata}>
                     <span className={styles.positionBadge} data-position={position.key}>{position.label}</span>

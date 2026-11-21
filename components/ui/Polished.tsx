@@ -20,6 +20,7 @@ export type AppIconName =
   | "send"
   | "spark"
   | "study"
+  | "trophy"
   | "trash"
   | "x";
 
@@ -81,6 +82,14 @@ export function AppIcon({ name, className }: { name: AppIconName; className?: st
       <svg aria-hidden="true" viewBox="0 0 24 24" className={cn(common, className)}>
         <circle cx="10.8" cy="10.8" r="5.8" />
         <path d="m15 15 4.5 4.5" />
+      </svg>
+    );
+  }
+
+  if (name === "trophy") {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 24 24" className={cn(common, className)}>
+        <path d="M8 4h8v6a4 4 0 0 1-8 0V4ZM8 6H4v1a4 4 0 0 0 4 4m8-5h4v1a4 4 0 0 1-4 4m-4 3v4m-4 2h8" />
       </svg>
     );
   }

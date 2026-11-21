@@ -764,17 +764,12 @@ export default function McqExamPage() {
 
         {stage === "attempt" && questions.length ? (
           <section className={styles.attempt} aria-label="MCQ attempt">
-            <div
-              className={styles.progressTrack}
-              role="progressbar"
+            <progress className="journey-progress"
               aria-label="Questions answered"
-              aria-valuemin={0}
-              aria-valuemax={questions.length}
-              aria-valuenow={answeredCount}
               aria-valuetext={`${answeredCount} of ${questions.length} questions answered`}
-            >
-              <span style={{ width: `${completion}%` }} />
-            </div>
+              value={answeredCount}
+              max={questions.length}
+            />
 
             <div className={styles.attemptGrid}>
               <aside className={styles.navigator} aria-label="Question navigator">
@@ -873,7 +868,7 @@ export default function McqExamPage() {
 
         {stage === "results" && questions.length ? (
           <section className={styles.results} aria-labelledby="mcq-result-title">
-            <div className={styles.resultSummary} data-grade={accuracy >= 80 ? "strong" : accuracy >= 50 ? "steady" : "focus"}>
+            <div className={`${styles.resultSummary} journey-reveal`} data-grade={accuracy >= 80 ? "strong" : accuracy >= 50 ? "steady" : "focus"}>
               <div className={styles.scoreRing}>
                 <strong>{score}/{questions.length}</strong>
                 <span>{accuracy}%</span>

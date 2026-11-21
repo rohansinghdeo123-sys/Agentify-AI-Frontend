@@ -47,7 +47,7 @@ describe("Analytics UI contracts", () => {
 
   it("announces loading and level progress while preserving the range keyboard control", () => {
     expect(page).toContain('aria-label="Loading analytics"');
-    expect(page).toContain('role="progressbar" aria-label="Progress to next level"');
+    expect(page).toContain('<progress className="journey-progress" aria-label="Progress to next level"');
     expect(page).toContain('aria-valuetext={`${xpToNext} XP to next level`}');
     expect(page).toContain('role="radiogroup" aria-label="Trend range"');
     expect(page).toContain("onKeyDown={(event) => handleKeyDown(event, item)}");
