@@ -33,7 +33,7 @@ export default function AppShell({
     || pathname.startsWith("/dashboard/planning");
 
   return (
-    <div className="dashboard-shell market-ready-shell" data-workspace-bar={workspaceBar || undefined}>
+    <div className="dashboard-shell market-ready-shell" data-workspace-bar={workspaceBar || undefined} data-journey-map={isLanding || undefined}>
       {workspaceBar ? (
         <header className="market-landing-utilities">
           <Link
@@ -47,25 +47,28 @@ export default function AppShell({
               className="market-floating-brand-logo"
               label=""
             />
-            <span className="market-floating-brand-copy">
-              <strong>Agentify<span>AI</span></strong>
-            </span>
+            {!isLanding && (
+              <span className="market-floating-brand-copy">
+                <strong>Agentify<span>AI</span></strong>
+              </span>
+            )}
           </Link>
 
           <nav className="market-utility-navigation" aria-label="Learning insights">
-            <Link href="/dashboard/analytics" className="market-utility-link" aria-current={isAnalytics ? "page" : undefined}>
+            <Link href="/dashboard/analytics" className="market-utility-link" aria-label="Analytics" title={isLanding ? "Analytics" : undefined} aria-current={isAnalytics ? "page" : undefined}>
               <AppIcon name="analytics" />
-              <span>Analytics</span>
+              {!isLanding && <span>Analytics</span>}
             </Link>
-            <Link href="/dashboard/rankings" className="market-utility-link" aria-label="Global Rankings" aria-current={isRankings ? "page" : undefined}>
+            <Link href="/dashboard/rankings" className="market-utility-link" aria-label="Global Rankings" title={isLanding ? "Global Rankings" : undefined} aria-current={isRankings ? "page" : undefined}>
               <AppIcon name="trophy" />
-              <span className="market-rankings-label">Rankings</span>
+              {!isLanding && <span className="market-rankings-label">Rankings</span>}
             </Link>
           </nav>
 
           <div className="market-landing-actions">
             <ThemeToggle compact />
             <UserMenu
+              compact={isLanding}
               displayName={displayName}
               classLevel={classLevel}
               canOpenAdminConsole={canOpenAdminConsole}

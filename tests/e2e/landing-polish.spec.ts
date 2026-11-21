@@ -2,48 +2,65 @@ import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { installWorkspaceMocks } from "./helpers/mockWorkspace";
 
+const destinations = [
+  { title: "Planning", href: "/dashboard/planning", action: "Open Planning" },
+  { title: "Study Lab", href: "/dashboard/study", action: "Open Study Lab" },
+  { title: "Revision", href: "/dashboard/revision", action: "Start a review" },
+  { title: "Exam", href: "/dashboard/exam", action: "Open Exam" },
+];
+
 for (const theme of ["light", "dark"] as const) {
-  test(`landing preserves four readable destinations in ${theme}`, async ({ page, isMobile }, testInfo) => {
+  test(`full-screen journey opens all four destinations in ${theme}`, async ({ page, isMobile }, testInfo) => {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await installWorkspaceMocks(page, theme, { state: "ready" });
-    await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/dashboard");
-    const route = page.getByRole("list", { name: "Planning, Study, Revision, and Exam learning route" });
-    await expect(route.getByRole("link")).toHaveCount(4);
+    const heading = page.getByRole("heading", { name: "Your Learning Journey" });
+    await expect(heading).toBeVisible();
+    const scene = page.getByRole("region", { name: "Your Learning Journey" });
+    const panel = page.locator("#workspace-preview");
     const path = page.getByRole("list", { name: "Explore the learning path" });
     await expect(path.getByRole("button")).toHaveCount(4);
-    await expect(page.getByRole("link", { name: "Global Rankings" })).toHaveAttribute("href", "/dashboard/rankings");
-    await expect(page.getByRole("link", { name: "Analytics" })).toHaveAttribute("href", "/dashboard/analytics");
-    await expect(page.getByRole("link", { name: "View analytics" })).toHaveCount(0);
-    await expect(path.getByRole("button", { name: "Preview Revision" })).toHaveAttribute("aria-pressed", "true");
+    await expect(path.getByRole("button", { name: "Preview Revision" })).toHaveAccessibleDescription("Suggested next step");
+    await expect(panel).toHaveCount(0);
+    await expect(scene.getByRole("heading")).toHaveCount(1);
+    await expect(scene.getByText("Learning workspaces")).toHaveCount(0);
+    const utilities = page.getByRole("navigation", { name: "Learning insights" });
+    await expect(utilities.getByRole("link", { name: "Analytics" })).toHaveAttribute("href", "/dashboard/analytics");
+    await expect(utilities.getByRole("link", { name: "Global Rankings" })).toHaveAttribute("href", "/dashboard/rankings");
+    expect(await scene.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      return bounds.x === 0 && bounds.y === 0 && bounds.width === innerWidth && bounds.height === innerHeight;
+    })).toBe(true);
 
-    const panel = page.locator("#workspace-preview");
-    const destinations = [
-      { title: "Planning", href: "/dashboard/planning", action: "Open Planning" },
-      { title: "Study Lab", href: "/dashboard/study", action: "Open Study Lab" },
-      { title: "Revision", href: "/dashboard/revision", action: "Start a review" },
-      { title: "Exam", href: "/dashboard/exam", action: "Open Exam" },
-    ];
+    const spark = scene.locator('[class*="routeSpark"]');
+    await expect(spark).toHaveCSS("animation-duration", "4.4s");
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await expect(spark).toHaveCSS("display", "none");
     for (const destination of destinations) {
-      await expect(route.getByRole("link", { name: destination.title })).toHaveAttribute("href", destination.href);
       const pin = path.getByRole("button", { name: `Preview ${destination.title}` });
       if (!isMobile && destination.title === "Study Lab") {
         await pin.focus();
         await page.keyboard.press("Enter");
-        await expect(pin).toBeFocused();
       } else {
         await pin.click();
       }
-      await expect(path.getByRole("button", { pressed: true })).toHaveCount(1);
-      await expect(pin).toHaveAttribute("aria-pressed", "true");
-      await expect(panel.getByRole("heading", { name: destination.title, exact: true })).toBeVisible();
+      await expect(pin).toHaveAttribute("aria-expanded", "true");
+      await expect(panel.getByRole("heading", { name: destination.title, exact: true })).toBeFocused();
       await expect(panel.getByRole("link", { name: destination.action })).toHaveAttribute("href", destination.href);
+      if (destination.title === "Exam") {
+        const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
+        expect(results.violations.filter((violation) => violation.impact === "serious" || violation.impact === "critical")).toEqual([]);
+      }
+      if (isMobile) {
+        await panel.getByRole("button", { name: "Close workspace preview" }).click();
+      } else {
+        await page.keyboard.press("Escape");
+      }
+      await expect(panel).toHaveCount(0);
+      await expect(pin).toBeFocused();
     }
-    const themeButton = page.getByRole("button", { name: "Dark theme" });
-    await themeButton.focus();
-    await page.keyboard.press("Escape");
-    await expect(themeButton).toBeFocused();
+
     const account = page.getByLabel("Open account menu for Aarav Sharma");
     await account.click();
     await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
@@ -53,24 +70,23 @@ for (const theme of ["light", "dark"] as const) {
     await expect(page.locator("html")).toHaveAttribute("data-motion", "reduced");
     await page.reload();
     await expect(page.locator("html")).toHaveAttribute("data-motion", "reduced");
-    await account.click();
-    await page.keyboard.press("Escape");
-    await expect(account).toBeFocused();
-    const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
-    expect(results.violations.filter((v) => v.impact === "serious" || v.impact === "critical")).toEqual([]);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
-    expect(errors).toEqual([]);
-    await page.locator("#main-content").evaluate((element) => element.scrollTo(0, 0));
-    await page.screenshot({ path: testInfo.outputPath(`landing-${theme}.png`), fullPage: true });
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await expect(spark).toHaveCSS("display", "none");
+    await page.screenshot({ path: testInfo.outputPath(`journey-${theme}.png`) });
     if (isMobile) {
-      await page.setViewportSize({ width: 320, height: 780 });
-      const links = page.getByRole("navigation", { name: "Learning insights" }).getByRole("link");
-      for (const link of await links.all()) {
-        const box = await link.boundingBox();
-        expect(box && box.x >= 0 && box.x + box.width <= 320).toBe(true);
+      await page.setViewportSize({ width: 320, height: 620 });
+      for (const target of [...await utilities.getByRole("link").all(), ...await path.getByRole("button").all()]) {
+        const box = await target.boundingBox();
+        expect(box && box.x >= 0 && box.x + box.width <= 320 && box.y >= 0 && box.y + box.height <= 620).toBe(true);
       }
-      expect(await route.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
-      await expect(path.getByRole("button", { name: "Preview Exam" })).toBeVisible();
+    } else {
+      await page.setViewportSize({ width: 900, height: 370 });
+      await expect(path.getByRole("button", { name: "Preview Exam" })).toBeInViewport({ ratio: 1 });
     }
+    expect(errors).toEqual([]);
+
+    await path.getByRole("button", { name: "Preview Exam" }).click();
+    await panel.getByRole("link", { name: "Open Exam" }).click();
+    await expect(page).toHaveURL(/\/dashboard\/exam$/);
   });
 }

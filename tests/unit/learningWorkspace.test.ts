@@ -149,42 +149,34 @@ describe("learning workspace journey", () => {
     expect(latest).toMatchObject({ id: "2", session_type: "exam", topic: "mole", total_questions: 5, score: 3 });
   });
 
-  it("renders one clear choice screen with only the four canonical landing destinations", () => {
+  it("renders four markers and no open preview on the initial map", () => {
     const markup = renderToStaticMarkup(createElement(LearningJourney));
-    const destinationLinks = markup.match(/href="\/dashboard\/(?:planning|study|revision|exam)"/g) ?? [];
 
-    expect(new Set(destinationLinks).size).toBe(4);
-    expect(destinationLinks).toHaveLength(5);
-    expect(markup).toContain('aria-label="Planning, Study, Revision, and Exam learning route"');
-    expect(markup).toContain("Create a plan");
-    expect(markup).toContain("Learning workspaces");
-    expect(markup).toContain("Choose your chapters and starting confidence");
-    expect(markup).toContain("Suggested start");
+    for (const step of LEARNING_WORKSPACE_STEPS) {
+      expect(markup).toContain(`aria-label="Preview ${step.title}"`);
+    }
+    expect(markup.match(/aria-expanded="false"/g)).toHaveLength(4);
+    expect(markup).toContain("Your Learning");
+    expect(markup).toContain("Journey");
+    expect(markup).not.toContain('id="workspace-preview"');
+    expect(markup).not.toContain("Learning workspaces");
     expect(markup).toContain('data-mode="planning" data-recommended="true"');
-    expect(markup).not.toContain("<header");
-    expect(markup).not.toContain("<aside");
-    expect(markup).not.toContain("<nav");
-    expect(markup).not.toContain("Progress snapshot");
-    expect(markup).not.toContain("Recent work");
   });
 
-  it("uses only saved mastery for the compass reward and keeps analytics out of the journey", () => {
+  it("celebrates only saved mastery without adding an analytics link to the map", () => {
     const progress = { mastered_units: 1, active_units: 1, needs_review_units: 0, total_units: 2, percentage: 50 };
     const partial = renderToStaticMarkup(createElement(LearningJourney, { progress }));
-    expect(partial).toContain("1 of 2 topics mastered");
     expect(partial).not.toContain("Plan mastered");
-    expect(partial).not.toContain("View analytics");
+    expect(partial).not.toContain('data-mastered="true"');
     expect(partial).not.toContain('href="/dashboard/analytics"');
-
     const mastered = renderToStaticMarkup(createElement(LearningJourney, {
       progress: { ...progress, active_units: 0, mastered_units: 2, percentage: 100 },
     }));
     expect(mastered).toContain("Plan mastered");
     expect(mastered).toContain('data-mastered="true"');
-    expect(mastered).toContain('value="2" max="2"');
   });
 
-  it("moves the visual recommendation without changing the four available routes", () => {
+  it("highlights the recommended marker without opening its preview", () => {
     const markup = renderToStaticMarkup(createElement(LearningJourney, {
       recommendation: {
         mode: "exam",
@@ -195,9 +187,8 @@ describe("learning workspace journey", () => {
     }));
 
     expect(markup).toContain('data-mode="exam" data-recommended="true"');
-    expect(markup).toContain("Suggested for you");
-    expect(markup).not.toContain("Suggested from your latest check");
-    expect(markup).toContain("Your current evidence is ready for a short diagnostic.");
     expect(markup.match(/data-recommended="true"/g)).toHaveLength(1);
+    expect(markup).toContain('aria-describedby="journey-recommendation"');
+    expect(markup).not.toContain("Your current evidence is ready for a short diagnostic.");
   });
 });

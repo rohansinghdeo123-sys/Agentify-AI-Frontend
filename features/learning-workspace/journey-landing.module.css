@@ -1,72 +1,39 @@
-﻿.page {
-  width: min(calc(100% - 3rem), 90rem);
-  min-height: 100%;
-  margin-inline: auto;
-  padding-block: clamp(1rem, 3vh, 1.7rem) max(1.5rem, env(safe-area-inset-bottom));
-  display: grid;
-  align-items: center;
-  color: var(--ds-text-primary);
-}
-
-.world {
-  display: grid;
-  grid-template-columns: minmax(17rem, .72fr) minmax(0, 1.43fr);
-  grid-template-rows: auto 1fr auto;
-  grid-template-areas: "intro landscape" "preview landscape" "destinations landscape";
-  column-gap: clamp(1rem, 3vw, 3rem);
-  overflow: hidden;
-  border: 1px solid var(--ds-border);
-  border-radius: var(--journey-radius);
-  background: var(--journey-band);
-  box-shadow: var(--ds-shadow-md);
-}
-
-.intro, .preview, .destinations {
-  min-width: 0;
-  margin-inline-start: clamp(1.15rem, 3.1vw, 3.1rem);
-}
-
-.intro {
-  grid-area: intro;
-  padding-block-start: clamp(1.45rem, 3.4vw, 3.1rem);
-}
-
-.intro h1 {
-  max-width: 13ch;
-  font-size: clamp(2.45rem, 4vw, 4.7rem);
-  font-weight: 850;
-  letter-spacing: -.073em;
-  line-height: 1.03;
-}
-
-.intro h1 em {
-  color: var(--ds-accent-teal);
-  font-weight: inherit;
-}
-
-.intro p {
-  margin-top: .7rem;
-  color: var(--ds-text-secondary);
-  font-size: .92rem;
-  line-height: 1.55;
-}
-
-.landscape {
+.page {
   position: relative;
   isolation: isolate;
-  display: grid;
-  grid-area: landscape;
-  place-items: center;
-  min-width: 0;
+  container-type: size;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
-  background: radial-gradient(ellipse at 80% 46%, #074440 0%, #032626 73%);
+  background: radial-gradient(ellipse at 48% 68%, #104841 0%, #032828 54%, #021e20 100%);
+  color: #fff9ed;
 }
 
+.title {
+  position: absolute;
+  z-index: 2;
+  inset-inline-start: clamp(1.5rem, 6.2vw, 7.2rem);
+  top: clamp(5rem, 24%, 18rem);
+  max-width: min(11ch, 43%);
+  color: #fff9ed;
+  font-size: clamp(2.7rem, 5.2vw, 6.4rem);
+  font-weight: 850;
+  line-height: 1.02;
+  letter-spacing: -.071em;
+  text-shadow: 0 2px 20px #02201e, 0 8px 35px #021617b2;
+  text-wrap: balance;
+  pointer-events: none;
+}
+
+.title em { color: #ffdfa5; font-weight: inherit; }
+
 .map {
-  position: relative;
-  width: min(100%, max(28rem, calc(111svh - 7.5rem)));
+  position: absolute;
+  inset-inline-end: 0;
+  top: 50%;
+  translate: 0 -50%;
+  width: min(100%, calc((100cqh - .5rem) * 10 / 9));
   aspect-ratio: 10 / 9;
-  overflow: hidden;
 }
 
 .map .art {
@@ -75,6 +42,9 @@
   width: 135%;
   max-width: none;
   height: 100%;
+  mask-image: linear-gradient(to right, transparent, #000 24%),
+    linear-gradient(to bottom, transparent, #000 2.6%, #000 96.25%, transparent);
+  mask-composite: intersect;
   pointer-events: none;
   user-select: none;
 }
@@ -82,8 +52,8 @@
 .waypoints {
   position: absolute;
   inset: 0;
-  padding: 0;
   margin: 0;
+  padding: 0;
   list-style: none;
 }
 
@@ -94,69 +64,86 @@
   translate: -50% -50%;
 }
 
+.waypoint:focus-within { z-index: 1; }
+
 .pin {
   position: relative;
   display: grid;
   place-items: center;
-  width: clamp(2.75rem, 4.6vw, 3.55rem);
-  height: clamp(2.75rem, 4.6vw, 3.55rem);
+  width: clamp(2.75rem, 4.6vw, 3.8rem);
+  height: clamp(2.75rem, 4.6vw, 3.8rem);
   border-radius: 50%;
-  color: #fff9e9;
+  color: #fff9ea;
   cursor: pointer;
 }
 
 .pinCore {
   display: grid;
   place-items: center;
-  width: 56%;
-  height: 56%;
+  width: 57%;
+  height: 57%;
+  border: 1px solid #baf4dc;
   border-radius: 50%;
-  border: 1px solid #bef9e0;
-  background: #05332fe6;
-  box-shadow: 0 0 0 3px #043c3570, 0 0 14px #92eecd75;
-  transition: transform var(--ds-duration-normal) var(--ds-ease-standard), background-color var(--ds-duration-normal) ease, box-shadow var(--ds-duration-normal) ease;
+  background: #05322e;
+  box-shadow: 0 0 0 3px #043c357a, 0 0 13px #92eecda6;
+  transition: transform var(--ds-duration-normal) var(--ds-ease-standard), background-color var(--ds-duration-normal) ease;
 }
 
-.pinCore svg { width: 64%; height: 64%; }
+.pinCore svg { width: 62%; height: 62%; }
 
-.pin[aria-pressed="true"] .pinCore {
-  color: #1f382b;
+.waypoint[data-recommended] .pinCore, .pin[aria-expanded="true"] .pinCore {
   border-color: #fff0be;
   background: #f8d78f;
-  box-shadow: 0 0 0 3px #ffdf9c77, 0 0 18px #f5c46cb3;
-  animation: waypoint-select 420ms var(--ds-ease-standard) both;
+  color: #1f382b;
+  box-shadow: 0 0 0 3px #ffdf9c80, 0 0 18px #f5c46cb3;
 }
 
-.pin:is(:hover, :focus-visible) .pinCore { transform: scale(1.12); }
-.pin:active .pinCore { transform: scale(.95); }
-.pin:focus-visible { outline: 2px solid #ffdfa3; outline-offset: 2px; }
+.pin[aria-expanded="true"] .pinCore { animation: waypoint-select 440ms var(--ds-ease-standard) both; }
+.pin:active .pinCore { transform: scale(.92); }
+.pin:focus-visible { outline: 2px solid #ffdfa3; outline-offset: 1px; }
 
 .pinLabel {
   position: absolute;
-  inset-inline-end: calc(100% - .06rem);
+  inset-inline-end: 100%;
   top: 50%;
   translate: .3rem -50%;
-  padding: .28rem .55rem;
-  border: 1px solid #a2e7d68c;
+  padding: .32rem .58rem;
+  border: 1px solid #a2e7d6a6;
   border-radius: .45rem;
   background: #032725;
   color: #fff9e9;
   white-space: nowrap;
-  font-size: clamp(.68rem, 1.25vw, .8rem);
-  font-weight: 800;
+  font-size: .78rem;
+  font-weight: 820;
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--ds-duration-fast) ease, translate var(--ds-duration-fast) var(--ds-ease-standard);
 }
 
-.pin:is(:hover, :focus-visible, [aria-pressed="true"]) .pinLabel {
-  opacity: 1;
-  translate: 0 -50%;
+.pin:focus-visible .pinLabel { opacity: 1; translate: 0 -50%; }
+
+@media (hover: hover) and (pointer: fine) {
+  .pin:hover .pinCore { transform: scale(1.13); }
+  .pin:hover .pinLabel { opacity: 1; translate: 0 -50%; }
 }
 
-.pin[aria-pressed="true"] .pinLabel {
-  border-color: #f8d78f;
-  color: #ffe7ad;
+/* The transformed layer shares the map's coordinate space. Only the light moves. */
+.routeSpark {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  animation: follow-path 4.4s linear both;
+}
+
+.routeSpark::before {
+  position: absolute;
+  width: .34rem;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  translate: -50% -50%;
+  background: #fff4c8;
+  box-shadow: 0 0 .65rem .2rem #ffdd8ea6, 0 0 1.45rem .3rem #8af1c97a;
+  content: "";
 }
 
 .compassReward {
@@ -166,139 +153,103 @@
   width: 18%;
   aspect-ratio: 1;
   translate: -50% -50%;
-  border-radius: 50%;
   border: 2px solid #ffdc94;
-  box-shadow: 0 0 24px #f8c56789;
+  border-radius: 50%;
+  box-shadow: 0 0 26px #f8c56789;
   pointer-events: none;
   animation: compass-unlock 850ms var(--ds-ease-standard) both;
 }
 
 .preview {
-  grid-area: preview;
-  align-self: center;
-  margin-block: clamp(1rem, 2.5vw, 1.85rem);
-  padding: clamp(1rem, 2vw, 1.4rem);
+  position: absolute;
+  z-index: 3;
+  inset-inline-start: clamp(1rem, 6.2vw, 7.2rem);
+  bottom: max(clamp(1rem, 6vh, 4.5rem), env(safe-area-inset-bottom));
+  width: min(23rem, 37%);
+  max-height: calc(100% - 5.5rem - env(safe-area-inset-top));
+  overflow: auto;
+  padding: 1.1rem;
   border: 1px solid var(--ds-border);
-  border-radius: 1.05rem;
+  border-radius: 1.15rem;
   background: var(--ds-surface-elevated);
-  box-shadow: var(--ds-shadow-sm);
+  color: var(--ds-text-primary);
+  box-shadow: 0 18px 48px #00171580;
+  animation: preview-in var(--journey-enter) both;
 }
 
-.previewReveal { animation: journey-reveal var(--journey-enter) both; }
+.previewHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: .55rem; }
 
-.kicker {
-  display: flex;
-  align-items: center;
-  gap: .45rem;
-  color: var(--ds-accent-teal);
-  font-size: .75rem;
-  font-weight: 850;
+.previewHeading h2 { font-size: 1.5rem; font-weight: 850; letter-spacing: -.04em; }
+.previewHeading h2:focus { outline: none; }
+.kicker { display: flex; align-items: center; gap: .4rem; color: var(--ds-accent-teal); font-size: .75rem; font-weight: 820; }
+.detail { margin-top: .3rem; color: var(--ds-text-secondary); font-size: .88rem; line-height: 1.5; overflow-wrap: anywhere; }
+
+.close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--ds-border);
+  border-radius: .7rem;
+  background: var(--ds-bg-subtle);
+  color: var(--ds-text-primary);
+  cursor: pointer;
 }
 
-.preview h2 {
-  margin-top: .25rem;
-  font-weight: 850;
-  font-size: clamp(1.35rem, 2.1vw, 1.85rem);
-  letter-spacing: -.045em;
-}
-
-.detail {
-  min-height: 4.55em;
-  margin-top: .35rem;
-  color: var(--ds-text-secondary);
-  font-size: .88rem;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
+.close:hover { background: var(--ds-accent-teal-soft); }
 
 .launch {
   display: inline-flex;
-  min-height: 2.85rem;
+  min-height: 2.75rem;
   align-items: center;
-  gap: .7rem;
-  margin-top: .85rem;
-  padding: .54rem .85rem;
-  border: 1px solid #c08e43;
-  border-radius: .64rem;
+  gap: .65rem;
+  margin-top: .8rem;
+  padding: .52rem .85rem;
+  border: 1px solid #bd8c40;
+  border-radius: .65rem;
   background: #f9da96;
   color: #193629;
   box-shadow: 0 3px 0 #a77131;
+  font-size: .87rem;
   font-weight: 850;
-  font-size: .88rem;
   text-decoration: none;
-  transition: background-color var(--ds-duration-fast) ease, transform var(--ds-duration-fast) var(--ds-ease-standard);
+  transition: transform var(--ds-duration-fast) var(--ds-ease-standard), background-color var(--ds-duration-fast) ease;
 }
 
 .launch:hover { background: #ffebbc; }
 .launch:active { transform: translateY(2px); }
+.close:focus-visible, .launch:focus-visible { outline: 2px solid var(--ds-accent-teal); outline-offset: 2px; }
 
 .mastery {
   display: grid;
-  gap: .45rem;
-  margin-top: 1.05rem;
-  padding-block-start: .7rem;
+  gap: .42rem;
+  padding-top: .6rem;
+  margin-top: .9rem;
   border-top: 1px solid var(--ds-border);
-}
-
-.masteryCaption {
-  display: flex;
-  align-items: center;
-  gap: .48rem;
-  font-size: .8rem;
-  font-weight: 780;
   color: var(--ds-text-secondary);
+  font-size: .78rem;
+  font-weight: 740;
 }
 
-.mastery[data-mastered] .masteryCaption { color: var(--ds-accent-gold-strong); }
-
-.destinations {
-  grid-area: destinations;
-  padding-block-end: clamp(1.4rem, 3.1vw, 2.8rem);
+@keyframes follow-path {
+  0% { transform: translate3d(42%, 85%, 0); opacity: 0; }
+  8% { transform: translate3d(51%, 79%, 0); opacity: .87; }
+  18% { transform: translate3d(66%, 71%, 0); opacity: 1; }
+  28% { transform: translate3d(87%, 63%, 0); }
+  36% { transform: translate3d(83%, 58%, 0); }
+  48% { transform: translate3d(54%, 53%, 0); }
+  57% { transform: translate3d(40%, 48%, 0); }
+  66% { transform: translate3d(55%, 43%, 0); }
+  76% { transform: translate3d(69%, 38%, 0); }
+  84% { transform: translate3d(81%, 33%, 0); }
+  93% { transform: translate3d(68%, 29%, 0); opacity: .9; }
+  100% { transform: translate3d(74%, 17%, 0); opacity: 0; }
 }
-
-.destinations h2 {
-  margin-bottom: .52rem;
-  color: var(--ds-text-secondary);
-  font-size: .83rem;
-  font-weight: 800;
-}
-
-.route {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: .45rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.route li { min-width: 0; }
-
-.destination {
-  display: flex;
-  min-height: 2.75rem;
-  align-items: center;
-  gap: .38rem;
-  padding: .4rem .52rem;
-  border: 1px solid var(--ds-border);
-  border-radius: .64rem;
-  background: var(--ds-surface-elevated);
-  color: var(--ds-text-primary);
-  text-decoration: none;
-  font-size: .79rem;
-  font-weight: 800;
-  transition: transform var(--ds-duration-fast) var(--ds-ease-standard), border-color var(--ds-duration-fast) ease;
-}
-
-.destination svg { flex: none; color: var(--ds-accent-teal); }
-.destination[data-selected] { border-color: var(--ds-accent-teal); background: color-mix(in srgb, var(--ds-accent-teal) 10%, var(--ds-surface-elevated)); }
-.destination:hover { border-color: var(--ds-accent-teal); transform: translateY(-1px); }
-.destination:active { transform: translateY(1px); }
-.destination:focus-visible, .launch:focus-visible { outline: 2px solid var(--ds-accent-teal); outline-offset: 2px; }
 
 @keyframes waypoint-select {
   0% { scale: .88; }
-  55% { scale: 1.17; }
+  58% { scale: 1.17; }
   100% { scale: 1; }
 }
 
@@ -308,20 +259,40 @@
   100% { scale: 1; opacity: .72; }
 }
 
-@media (max-width: 720px) {
-  .page { width: calc(100% - 1.25rem); min-height: auto; padding-block-start: .65rem; }
-  .world { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; grid-template-areas: "intro" "landscape" "preview" "destinations"; }
-  .intro, .preview, .destinations { margin-inline: .85rem; }
-  .intro { padding-block: 1rem .85rem; }
-  .intro h1 { max-width: none; font-size: clamp(1.95rem, 7vw, 3.2rem); text-wrap: balance; }
-  .intro p { margin-top: .3rem; font-size: .85rem; }
-  .map { width: min(100%, 34rem); }
-  .preview { margin-block: .8rem; }
-  .detail { min-height: 0; }
-  .destinations { padding-block-end: 1rem; }
+@keyframes preview-in {
+  from { opacity: 0; transform: translateY(.45rem); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
+@media (max-aspect-ratio: 1 / 1) {
+  .title {
+    inset-inline: 1rem;
+    top: max(5.15rem, calc(env(safe-area-inset-top) + 4.6rem));
+    max-width: none;
+    font-size: clamp(2.05rem, 7vw, 4rem);
+    text-align: center;
+  }
+
+  .map {
+    inset-inline-end: 50%;
+    top: 53%;
+    translate: 50% -50%;
+    width: min(105%, calc((100cqh - 8rem) * 10 / 9));
+  }
+
+  .preview { inset-inline: max(.75rem, env(safe-area-inset-left)); bottom: max(.75rem, env(safe-area-inset-bottom)); width: auto; }
+}
+
+@media (max-height: 470px) and (min-aspect-ratio: 1 / 1) {
+  .title { top: 4.4rem; font-size: clamp(1.8rem, 4vw, 3rem); }
+  .map { width: min(100%, calc((100cqh - 2rem) * 10 / 9)); top: calc(50% + .5rem); }
+  .preview { width: min(21rem, 48%); bottom: .55rem; max-height: calc(100% - 4.2rem); padding: .72rem; }
+}
+
+:global(html[data-motion="reduced"]) .routeSpark { display: none; }
+
 @media (prefers-reduced-motion: reduce) {
-  .pinCore, .pinLabel, .launch, .destination { transition: none; transform: none !important; }
-  .previewReveal, .compassReward, .pin[aria-pressed="true"] .pinCore { animation: none; }
+  .routeSpark, .compassReward, .pin[aria-expanded="true"] .pinCore, .preview { animation: none; }
+  .routeSpark { display: none; }
+  .pinCore, .pinLabel, .launch { transition: none; transform: none !important; }
 }

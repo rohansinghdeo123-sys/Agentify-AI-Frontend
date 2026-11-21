@@ -208,3 +208,33 @@ html[data-motion="reduced"] *, html[data-motion="reduced"] *::before, html[data-
   transform: translateX(.73rem);
   background: var(--ds-accent-teal);
 }
+
+/* The map fills the shell. Keep the navigation available above the artwork. */
+.dashboard-shell[data-journey-map] .market-shell-main.is-landing {
+  inset-block-start: 0;
+  overflow: hidden;
+}
+
+.dashboard-shell[data-journey-map] .market-landing-utilities {
+  min-height: calc(4rem + env(safe-area-inset-top));
+  padding-inline: clamp(.75rem, 2.5vw, 2.4rem);
+  border-bottom: 0;
+  background: none;
+  pointer-events: none;
+}
+
+.dashboard-shell[data-journey-map] .market-utility-navigation {
+  padding: 0 .15rem;
+  border-color: #a1e8d45c;
+  background: #032c2b;
+}
+
+.dashboard-shell[data-journey-map] .market-utility-link {
+  justify-content: center;
+  min-width: 2.75rem;
+  padding: .35rem;
+}
+
+.dashboard-shell[data-journey-map] .market-utility-link svg { width: 1.1rem; height: 1.1rem; color: #c9f3e7; }
+.dashboard-shell[data-journey-map] .market-utility-link:hover { background: #12504b; }
+.dashboard-shell[data-journey-map] .market-landing-utilities :is(a, button, summary):focus-visible { outline-color: #ffdfa3; }
