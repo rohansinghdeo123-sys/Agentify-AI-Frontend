@@ -7,6 +7,25 @@
   overflow: hidden;
   background: radial-gradient(ellipse at 48% 68%, #104841 0%, #032828 54%, #021e20 100%);
   color: #fff9ed;
+  --journey-artwork: url("/learning-journey.webp");
+  --journey-title-accent: #ffdfa5;
+  --journey-title-shadow: 0 2px 20px #02201e, 0 8px 35px #021617b2;
+  --journey-map-focus: #ffdfa3;
+  --journey-spark-core: #fff4c8;
+  --journey-spark-glow: 0 0 .65rem .2rem #ffdd8ea6, 0 0 1.45rem .3rem #8af1c97a;
+}
+
+:global([data-theme="light"]) .page {
+  background:
+    radial-gradient(ellipse at 74% 64%, #bfdfd6 0%, transparent 60%),
+    linear-gradient(115deg, #faf7ef, #d4ebe4 83%);
+  color: #182e2b;
+  --journey-artwork: url("/learning-journey-light.webp");
+  --journey-title-accent: #80521d;
+  --journey-title-shadow: 0 2px 18px #ffffffa6;
+  --journey-map-focus: #155e53;
+  --journey-spark-core: #a0570d;
+  --journey-spark-glow: 0 0 0 1px #fff5d5, 0 0 .65rem .2rem #e0a036ba, 0 0 1.3rem .25rem #7fd0b695;
 }
 
 .title {
@@ -15,17 +34,17 @@
   inset-inline-start: clamp(1.5rem, 6.2vw, 7.2rem);
   top: clamp(5rem, 24%, 18rem);
   max-width: min(11ch, 43%);
-  color: #fff9ed;
+  color: inherit;
   font-size: clamp(2.7rem, 5.2vw, 6.4rem);
   font-weight: 850;
   line-height: 1.02;
   letter-spacing: -.071em;
-  text-shadow: 0 2px 20px #02201e, 0 8px 35px #021617b2;
+  text-shadow: var(--journey-title-shadow);
   text-wrap: balance;
   pointer-events: none;
 }
 
-.title em { color: #ffdfa5; font-weight: inherit; }
+.title em { color: var(--journey-title-accent); font-weight: inherit; }
 
 .map {
   position: absolute;
@@ -42,6 +61,7 @@
   width: 135%;
   max-width: none;
   height: 100%;
+  background: var(--journey-artwork) center / 100% 100% no-repeat;
   mask-image: linear-gradient(to right, transparent, #000 24%),
     linear-gradient(to bottom, transparent, #000 2.6%, #000 96.25%, transparent);
   mask-composite: intersect;
@@ -100,7 +120,7 @@
 
 .pin[aria-expanded="true"] .pinCore { animation: waypoint-select 440ms var(--ds-ease-standard) both; }
 .pin:active .pinCore { transform: scale(.92); }
-.pin:focus-visible { outline: 2px solid #ffdfa3; outline-offset: 1px; }
+.pin:focus-visible { outline: 2px solid var(--journey-map-focus); outline-offset: 1px; }
 
 .pinLabel {
   position: absolute;
@@ -141,8 +161,8 @@
   aspect-ratio: 1;
   border-radius: 50%;
   translate: -50% -50%;
-  background: #fff4c8;
-  box-shadow: 0 0 .65rem .2rem #ffdd8ea6, 0 0 1.45rem .3rem #8af1c97a;
+  background: var(--journey-spark-core);
+  box-shadow: var(--journey-spark-glow);
   content: "";
 }
 
@@ -158,6 +178,18 @@
   box-shadow: 0 0 26px #f8c56789;
   pointer-events: none;
   animation: compass-unlock 850ms var(--ds-ease-standard) both;
+}
+
+/* Keep the gold selection and completion states distinct from sunlit stone. */
+:global([data-theme="light"]) .waypoint[data-recommended] .pinCore,
+:global([data-theme="light"]) .pin[aria-expanded="true"] .pinCore {
+  border-color: #986123;
+  box-shadow: 0 0 0 3px #fff6debd, 0 0 18px #bc812b85;
+}
+
+:global([data-theme="light"]) .compassReward {
+  border-color: #aa6e2b;
+  box-shadow: 0 0 24px #f4d390ad;
 }
 
 .preview {

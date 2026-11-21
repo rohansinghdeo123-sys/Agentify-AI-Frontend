@@ -14,10 +14,27 @@ for (const theme of ["light", "dark"] as const) {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await installWorkspaceMocks(page, theme, { state: "ready" });
+    const lightArtwork = "/learning-journey-light.webp";
+    const darkArtwork = "/learning-journey.webp";
+    const initialArtwork = theme === "light" ? lightArtwork : darkArtwork;
+    const alternateArtwork = theme === "light" ? darkArtwork : lightArtwork;
+    const artworkLoads: string[] = [];
+    page.on("request", (request) => {
+      const path = new URL(request.url()).pathname;
+      if (path === lightArtwork || path === darkArtwork) artworkLoads.push(path);
+    });
+    const imageLoaded = page.waitForResponse((response) =>
+      new URL(response.url()).pathname === initialArtwork && response.ok(),
+    );
     await page.goto("/dashboard");
+    await imageLoaded;
     const heading = page.getByRole("heading", { name: "Your Learning Journey" });
     await expect(heading).toBeVisible();
     const scene = page.getByRole("region", { name: "Your Learning Journey" });
+    const artwork = scene.locator('[class*="__art"]');
+    await expect(artwork).toHaveCSS("background-image", new RegExp(initialArtwork));
+    await expect(heading).toHaveCSS("color", theme === "light" ? "rgb(24, 46, 43)" : "rgb(255, 249, 237)");
+    expect([...new Set(artworkLoads)]).toEqual([initialArtwork]);
     const panel = page.locator("#workspace-preview");
     const path = page.getByRole("list", { name: "Explore the learning path" });
     await expect(path.getByRole("button")).toHaveCount(4);
@@ -60,6 +77,20 @@ for (const theme of ["light", "dark"] as const) {
       await expect(panel).toHaveCount(0);
       await expect(pin).toBeFocused();
     }
+
+    const preview = path.getByRole("button", { name: "Preview Revision" });
+    await preview.click();
+    await expect(panel.getByRole("heading", { name: "Revision" })).toBeVisible();
+    const themeToggle = page.getByRole("button", { name: "Dark theme" });
+    await themeToggle.click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme === "light" ? "dark" : "light");
+    await expect(artwork).toHaveCSS("background-image", new RegExp(alternateArtwork));
+    await expect(preview).toHaveAttribute("aria-expanded", "true");
+    await expect(panel.getByRole("link", { name: "Start a review" })).toHaveAttribute("href", "/dashboard/revision");
+    await themeToggle.click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    await expect(artwork).toHaveCSS("background-image", new RegExp(initialArtwork));
+    await panel.getByRole("button", { name: "Close workspace preview" }).click();
 
     const account = page.getByLabel("Open account menu for Aarav Sharma");
     await account.click();

@@ -2,7 +2,6 @@
 
 import { AppIcon } from "@/components/ui/Polished";
 import type { PlanningPortfolioProgress } from "@/features/planning/contracts";
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { LEARNING_WORKSPACE_STEPS } from "./config";
@@ -52,8 +51,7 @@ export default function LearningJourney({
       <h1 id="learning-journey-title" className={styles.title}>Your Learning <em>Journey</em></h1>
 
       <div className={styles.map}>
-        <Image className={styles.art} src="/learning-journey.webp" alt=""
-          width={1080} height={720} unoptimized preload />
+        <div className={styles.art} aria-hidden="true" />
         <span className={styles.routeSpark} aria-hidden="true" />
         {mastered ? <span className={styles.compassReward} data-mastered="true" aria-hidden="true" /> : null}
         <span className="sr-only" id="journey-recommendation">Suggested next step</span>
