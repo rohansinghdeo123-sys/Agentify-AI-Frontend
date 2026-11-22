@@ -76,6 +76,17 @@ const portalFragment = `
   }
 `;
 
+const haloFragment = `
+  varying vec2 vUv;
+  uniform float energy;
+  void main() {
+    float radius = length(vUv - .5) * 2.;
+    float spill = exp(-pow((radius - .63) * 9., 2.)) * (1. - smoothstep(.72, 1., radius));
+    gl_FragColor = vec4(.96,.56,.23,spill * (.12 + energy * .105));
+    #include <colorspace_fragment>
+  }
+`;
+
 function glyph(group: T.Object3D, p: Palette, id: Destination) {
   const line = p.glass;
   const trace = (points: Point[], radius = .021) => {
@@ -127,6 +138,10 @@ function portal(group: T.Object3D, p: Palette, id: Destination, point: Point, ac
   frame.name = id + " portal";
   group.add(frame);
   const energy = { value: 0 };
+  mesh(frame, new T.PlaneGeometry(2.60, 2.60), new T.ShaderMaterial({
+    vertexShader: portalVertex, fragmentShader: haloFragment, uniforms: { energy },
+    transparent: true, depthWrite: false, blending: T.AdditiveBlending,
+  }), [0,0,.047]);
   mesh(frame, new T.CircleGeometry(.79, 64), new T.ShaderMaterial({
     vertexShader: portalVertex, fragmentShader: portalFragment,
     uniforms: { accent: { value: new T.Color(accent).convertLinearToSRGB() }, energy },
@@ -172,24 +187,41 @@ function stairs(group: T.Object3D, p: Palette, x: number, z: number, width: numb
   }
 }
 
+function clerestory(group: T.Object3D, p: Palette, origin: Point, radius: number, height: number, windows: number) {
+  const [x,y,z] = origin;
+  column(group, p.shadowStone, radius * .92, radius * .96, height, origin, 32);
+  for (const edge of [-1, 1]) {
+    column(group, p.stone, radius * 1.02, radius * 1.02, .14, [x,y + edge * height * .52,z], 32);
+    ring(group, p.gold, radius * 1.027, .019, [x,y + edge * height * .56,z]).rotation.x = Math.PI / 2;
+  }
+  const light = emissive(0xca9462, 0xffaa64, .32);
+  for (let i = 0; i < windows; i++) {
+    const a = i * Math.PI * 2 / windows;
+    const at: Point = [x + Math.sin(a) * radius * .945, y + height * .09, z + Math.cos(a) * radius * .945];
+    const w = radius * Math.PI / windows * .65;
+    box(group, light, [w * 1.85,height * .49,.04], [at[0],at[1] - height * .11,at[2]]).rotation.y = a;
+    arch(group, p.stone, w, .047, height * .26, .083, at).rotation.y = a;
+    arch(group, p.gold, w + .03, .012, height * .27, .091, at).rotation.y = a;
+  }
+}
+
 function planning(group: T.Object3D, p: Palette, accent: number) {
-  floor(group, p, 3.6, 2.55);
+  floor(group, p, 4.55, 3.28);
   stairs(group, p, 0, 1.52, 1.92);
   for (const x of [-1.37, 1.37]) for (const z of [-.68, .76]) pillar(group, p, x, z, 2.01);
   for (const x of [-1.37, 1.37]) box(group, p.stone, [.56, .24, 2.01], [x, 2.351, .02]);
   arch(group, p.stone, .96, .195, 1.12, .31, [0, 1.44, .37]);
   arch(group, p.gold, .995, .044, 1.04, .045, [0, 1.44, .693]);
   const glow = portal(group, p, "planning", [0, 1.39, .72], accent);
-  const orbit = new T.Group();
-  orbit.position.set(0, 2.75, -.17);
-  group.add(orbit);
-  ring(orbit, p.gold, .96, .038, [0, 0, 0], Math.PI * 1.82).rotation.y = -.25;
-  ring(orbit, p.gold, .86, .024, [0, 0, 0]).rotation.set(.63, .60, -.22);
-  ring(orbit, p.gold, .75, .027, [0, 0, 0]).rotation.set(-.61, -.38, -.35);
-  mesh(orbit, new T.IcosahedronGeometry(.17, 0), p.goldLight, [0, .12, .14]);
+  column(group, p.shadowStone, 1.07, 1.32, .34, [0,2.39,-.48], 24);
+  column(group, p.gold, .91, 1.07, .12, [0,2.61,-.48], 24);
+  column(group, p.bronze, .2, .52, .39, [0,2.87,-.48], 12);
   for (const side of [-1, 1]) {
     banner(group, p, [side * 1.37, 2.12, 1.01], .36, 1.14);
     lantern(group, p, [side * 1.54, .30, 1.31]);
+    pillar(group, p, side * 2.06, -.78, 1.63);
+    arch(group, p.stone, .42, .095, .71, .37, [side * 1.92,1.69,-.74]);
+    dome(group, p, [side * 1.92,2.05,-.64], .49, p.emerald, 7);
   }
   return glow;
 }
@@ -214,7 +246,10 @@ function library(group: T.Object3D, p: Palette, accent: number) {
   }
   column(group, p.stone, 1.51, 1.52, .22, [x, 2.18, z], 32);
   column(group, p.gold, 1.54, 1.54, .05, [x, 2.319, z], 32);
-  dome(group, p, [x, 2.35, z], 1.46, p.turquoise, 12);
+  clerestory(group, p, [x,2.80,z], 1.38, .89, 12);
+  dome(group, p, [x, 3.25, z], 1.44, p.turquoise, 16);
+  clerestory(group, p, [x,4.49,z], .40, .30, 7);
+  dome(group, p, [x,4.64,z], .43, p.emerald, 8);
   const timber = material(0x55382d, .81);
   const rng = randomFor(87);
   for (const panelX of [-1.49, -.75]) {
@@ -247,7 +282,7 @@ function library(group: T.Object3D, p: Palette, accent: number) {
 }
 
 function memory(group: T.Object3D, p: Palette, accent: number) {
-  floor(group, p, 4.10, 2.88);
+  floor(group, p, 4.35, 3.15);
   stairs(group, p, 0, 1.64, 2.25);
   for (const x of [-1.46, 1.46]) {
     for (const z of [-.83, .67]) pillar(group, p, x, z, 2.08);
@@ -259,7 +294,21 @@ function memory(group: T.Object3D, p: Palette, accent: number) {
   arch(group, p.plum, 1.28, .09, 1.16, .12, [0, 1.52, .89]);
   const glow = portal(group, p, "revision", [0, 1.44, 1.132], accent, 1.15);
   dome(group, p, [0, 2.18, -.36], 1.24, p.plum, 12);
-  const crystal = emissive(0xd5b7ff, 0x8765e8, .53);
+  const crystal = new T.MeshPhysicalMaterial({
+    color: 0x73e4e0, emissive: 0x497ba7, emissiveIntensity: .43,
+    roughness: .19, metalness: .31, clearcoat: .73, iridescence: .22,
+  });
+  for (const side of [-1, 1]) {
+    arch(group, p.emerald, .51, .13, .93, .39, [side * 1.85,1.72,-.46]);
+    arch(group, p.gold, .52, .025, .95, .036, [side * 1.85,1.72,-.05]);
+    const plinth = column(group, p.plum, .53, .69, .31, [side * 1.89,.44,1.03], 8);
+    plinth.rotation.y = .3;
+    for (let i = 0; i < 5; i++) {
+      const gem = mesh(group, new T.CylinderGeometry(.023,.23,.86, 5), crystal,
+        [side * 1.89 + (i-2)*.135,.92 + (i%3)*.145,1.03+(i%2)*.13]);
+      gem.rotation.set(.12 * Math.sin(i), i * 1.1, (i-2)*.19);
+    }
+  }
   for (const [x, y, z, scale] of [[0,3.04,1,.31],[-1.68,2.70,.73,.19],[1.68,2.73,.73,.19],[-2.17,.72,.16,.16],[2.03,.63,-.15,.14]]) {
     const gem = mesh(group, new T.OctahedronGeometry(scale), crystal, [x, y, z]);
     gem.scale.y = 1.58;
@@ -269,25 +318,30 @@ function memory(group: T.Object3D, p: Palette, accent: number) {
 }
 
 function temple(group: T.Object3D, p: Palette, accent: number, starMaterial: T.Material) {
-  floor(group, p, 4.65, 3.49);
+  floor(group, p, 5.37, 3.81);
   stairs(group, p, 0, 1.94, 2.48);
   box(group, p.blueStone, [3.38, 2.35, .40], [0, 1.43, -.85]);
   for (const x of [-1.87, -1.38, 1.38, 1.87]) for (const z of [-.74, .77]) pillar(group, p, x, z, 2.45);
   box(group, p.stone, [4.21, .21, 2.16], [0, 2.77, .10]);
   box(group, p.gold, [4.18, .058, 2.20], [0, 2.896, .10]);
   const pediment = new T.Shape().moveTo(-2.08, 0).lineTo(0, .90).lineTo(2.08, 0).closePath();
-  mesh(group, new T.ExtrudeGeometry(pediment, { depth: 1.62, bevelEnabled: false }), p.stone, [0, 2.936, -.51]);
+  mesh(group, new T.ExtrudeGeometry(pediment, { depth: 1.62, bevelEnabled: true, bevelSize: .035, bevelThickness: .033, bevelSegments: 2 }), p.stone, [0, 2.936, -.51]);
   rod(group, p.gold, new T.Vector3(-2.03, 2.988, 1.136), new T.Vector3(0, 3.84, 1.136), .037);
   rod(group, p.gold, new T.Vector3(0, 3.84, 1.136), new T.Vector3(2.03, 2.988, 1.136), .037);
   arch(group, p.stone, 1.073, .245, 1.32, .71, [0, 1.55, .13]);
   arch(group, p.gold, 1.102, .044, 1.22, .05, [0, 1.55, .861]);
   const glow = portal(group, p, "exam", [0, 1.52, .925], accent, 1.20);
   star(group, starMaterial, .31, [0, 4.19, 1.104]);
+  ring(group, p.bronze, .35, .036, [0,3.31,1.20]);
+  star(group, starMaterial, .21, [0,3.31,1.24]);
   for (const side of [-1, 1]) {
     banner(group, p, [side * 1.65, 2.57, 1.01], .37, 1.66);
     column(group, p.stone, .30, .39, 2.15, [side * 2.22, 1.41, -1.11], 8);
     column(group, p.turquoise, .035, .36, .82, [side * 2.22, 2.82, -1.11], 8);
     mesh(group, new T.OctahedronGeometry(.065), p.lamp, [side * 2.22, 3.28, -1.11]).scale.y = 1.8;
+    column(group, p.shadowStone, .51, .64, 1.94, [side * 2.40,1.24,-1.18], 8);
+    clerestory(group, p, [side*2.40,2.47,-1.18], .48,.71, 7);
+    dome(group, p, [side*2.40,2.86,-1.18], .56,p.turquoise,8);
     for (const x of [1.4, 2.07]) lantern(group, p, [side * x, .32, 1.59], 1.18);
   }
   return glow;
@@ -312,7 +366,8 @@ export function buildings(parent: T.Object3D, p: Palette) {
 export function compass(parent: T.Object3D, p: Palette) {
   const group = new T.Group();
   group.name = "Golden armillary compass";
-  group.position.set(-7.9, 12.7, -2.8);
+  group.position.set(5.9, 5.26, 4.38);
+  group.scale.setScalar(.43);
   group.rotation.set(.18, -.29, -.14);
   parent.add(group);
   ring(group, p.gold, 2.56, .032, [0, 0, 0]);

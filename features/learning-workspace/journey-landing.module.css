@@ -52,9 +52,9 @@
 .page[data-atlas="ready"] .surface { visibility: visible; }
 
 .page[data-atlas="ready"] .title {
-  top: clamp(5.4rem, 26%, 15rem);
+  top: clamp(4.9rem, 24%, 14rem);
   font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(2.8rem, 5.5vw, 6.4rem);
+  font-size: clamp(2.15rem, 4.75vw, 5.6rem);
   font-weight: 680;
   line-height: .97;
   letter-spacing: -.062em;
@@ -84,33 +84,48 @@
   position: static;
   translate: none;
   opacity: 1;
-  padding: .36rem .66rem;
-  border: 1px solid #cba45d;
-  border-radius: .5rem;
-  background: #082d2a;
-  color: #fff5dc;
-  box-shadow: 0 2px 13px #0214138a;
-  font-size: clamp(.76rem, 1.19vw, 1.06rem);
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  padding: .22rem .46rem;
+  border: 1px solid #bd9a61;
+  border-radius: .32rem;
+  background: #092724;
+  color: #fff1d4;
+  box-shadow: 0 2px 7px #0214139a;
+  font-size: clamp(.6875rem, .96vw, .87rem);
+  font-weight: 730;
 }
 .page[data-atlas="ready"] .pin:is(:hover, :focus-visible) .pinLabel,
 .page[data-atlas="ready"] :is(.waypoint[data-active], .waypoint[data-recommended]) .pinLabel {
-  border-color: #af7b31;
-  background: #f9e0a7;
-  color: #19362c;
-  box-shadow: 0 0 .75rem #f9c97091;
+  border-color: #edc586;
+  background: #153e35;
+  color: #ffedbb;
+  box-shadow: 0 0 .65rem #dba75677;
+}
+.page[data-atlas="ready"] .waypoint[data-recommended] .pinLabel::before {
+  content: "";
+  width: .27rem;
+  height: .27rem;
+  border-radius: 50%;
+  background: #f3c77c;
 }
 :global([data-theme="light"]) .page[data-atlas="ready"] .pinLabel {
-  border-color: #8f652b;
+  border-color: #ae8347;
 }
 .page[data-atlas="ready"][data-selected] .title { visibility: hidden; }
 
 .controls {
   position: absolute;
   z-index: 2;
-  inset-inline-start: clamp(.8rem, 3vw, 2.8rem);
+  inset-inline-end: clamp(.65rem, 2.3vw, 2rem);
   bottom: max(1rem, env(safe-area-inset-bottom));
   display: flex;
-  gap: .42rem;
+  gap: .2rem;
+  padding: .2rem;
+  border: 1px solid var(--ds-border);
+  border-radius: .85rem;
+  background: color-mix(in srgb, var(--ds-surface-elevated) 95%, transparent);
 }
 .controls button, .back {
   min-height: 2.75rem;
@@ -124,6 +139,14 @@
   cursor: pointer;
 }
 .controls button:hover, .back:hover { background: var(--ds-accent-teal-soft); }
+.controls button {
+  display: inline-grid;
+  place-items: center;
+  min-width: 2.75rem;
+  border-color: transparent;
+  background: transparent;
+  line-height: 1;
+}
 .controls button:focus-visible, .back:focus-visible { outline: 2px solid var(--journey-map-focus); outline-offset: 2px; }
 .back { margin: .8rem 0 0 .45rem; }
 .page[data-atlas="ready"] .preview {
@@ -400,10 +423,10 @@
 
   .preview { inset-inline: max(.75rem, env(safe-area-inset-left)); bottom: max(.75rem, env(safe-area-inset-bottom)); width: auto; }
   .page[data-atlas="ready"] .title {
-    top: max(5.15rem, calc(env(safe-area-inset-top) + 4.6rem));
-    font-size: clamp(2rem, 7.8vw, 4rem);
+    top: max(5.0rem, calc(env(safe-area-inset-top) + 4.55rem));
+    font-size: clamp(1.65rem, 6.6vw, 3.6rem);
   }
-  .page[data-atlas="ready"] .pinLabel { padding-inline: .46rem; }
+  .page[data-atlas="ready"] .pinLabel { padding-inline: .39rem; }
 }
 
 @media (max-height: 470px) and (min-aspect-ratio: 1 / 1) {

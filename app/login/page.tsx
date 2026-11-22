@@ -7,7 +7,7 @@ import { Fraunces } from "next/font/google";
 import { useEffect, useMemo, useRef, useState } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
 import ChatThinkingLogo from "@/components/brand/ChatThinkingLogo";
-import { AlertState, AppIcon, LoadingState } from "@/components/ui/Polished";
+import { AlertState, AppIcon } from "@/components/ui/Polished";
 import { primeBackend } from "@/lib/apiClient";
 import { readOtpInputDigits } from "@/lib/otpInput";
 
@@ -228,9 +228,8 @@ export default function LoginPage() {
     (sessionExpired ? "Your session expired. Sign in again to continue studying." : "");
 
   useEffect(() => {
-    router.prefetch("/dashboard");
-    router.prefetch("/onboarding");
     primeBackend(backendURL);
+    router.prefetch("/dashboard");
   }, [backendURL, router]);
 
   useEffect(() => {
@@ -336,17 +335,6 @@ export default function LoginPage() {
     if (!otpSent) setUsePhone(false);
   };
 
-  if (loading) {
-    return (
-      <main id="main-content">
-        <LoadingState
-          title={user ? "Signed in. Opening your study workspace..." : "Preparing secure sign in..."}
-          detail={user ? "Connecting to your saved profile. The study server may need a moment to wake up; you do not need to sign in again." : "Opening your private AgentifyAI study workspace."}
-        />
-      </main>
-    );
-  }
-
   return (
     <div className="auth-scene auth-scene-final flex min-h-[100dvh] flex-col antialiased">
       <div className="auth-final-backdrop" aria-hidden="true" />
@@ -437,14 +425,16 @@ export default function LoginPage() {
               shake && "animate-shake",
             )}
           >
-            {granted ? (
+            {granted || (user && loading) ? (
               <div className="flex flex-col items-center py-5 text-center" role="status" aria-live="polite">
                 <span className="auth-success-badge flex h-14 w-14 items-center justify-center rounded-full">
                   <AppIcon name="check" className="h-6 w-6" />
                 </span>
-                <p className="mt-4 text-sm font-bold text-[var(--agentify-primary-text)]">You&apos;re in.</p>
+                <p className="mt-4 text-sm font-bold text-[var(--agentify-primary-text)]">
+                  {granted ? "You’re in." : "Signed in. Opening your study workspace..."}
+                </p>
                 <p className="mt-1 text-xs leading-5 text-[var(--agentify-muted-text)]">
-                  Restoring your sessions and progress.
+                  {granted ? "Restoring your sessions and progress." : "Connecting to your saved study profile."}
                 </p>
                 <div className="mx-auto mt-5 w-full max-w-[13rem] space-y-2">
                   <span className="polished-skeleton block h-2.5 w-full rounded-full" />

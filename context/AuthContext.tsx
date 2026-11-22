@@ -32,18 +32,20 @@ import { getPublicBackendUrl } from "@/lib/env";
 import {
   ApiRequestError,
   apiJson,
-  invalidateApiCache,
   primeBackend,
 } from "@/lib/apiClient";
 import {
   AUTH_BOOTSTRAP_TIMEOUT_MESSAGE,
   AUTH_BOOTSTRAP_TIMEOUT_MS,
+  PROFILE_FOREGROUND_WAIT_MS,
+  PROFILE_RECOVERY_MESSAGE,
 } from "@/lib/authBootstrap";
 import {
   type BackendUserProfile,
   type ProfileUpdate,
   resolveDisplayName,
 } from "@/lib/profile";
+import { isProfileFor, readProfileSnapshot, writeProfileSnapshot } from "@/lib/profileSnapshot";
 
 type AuthRole = "admin" | "user";
 
@@ -271,10 +273,17 @@ function isTemporaryBackendError(error: unknown) {
 
 function profileErrorMessage(error: unknown) {
   if (isTemporaryBackendError(error)) {
-    return "The backend is still starting. Please retry in a moment.";
+    return "You’re signed in, but the study server is unavailable. Retry to reconnect your profile.";
   }
 
   return error instanceof Error ? error.message : "We could not load your AgentifyAI profile.";
+}
+
+function withIdentityDeadline<T>(request: Promise<T>) {
+  return new Promise<T>((resolve, reject) => {
+    const deadline = setTimeout(() => reject(new ApiRequestError("Identity verification timed out.", 408)), 10_000);
+    void request.then(resolve, reject).finally(() => clearTimeout(deadline));
+  });
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -297,7 +306,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasAuthenticatedRef = useRef(false);
   const manualSignOutRef = useRef(false);
   const authStateResolvedRef = useRef(false);
-  const profileRequestRef = useRef(0);
+  const profileRequest = useRef<{ uid: string; controller: AbortController; pending: Promise<BackendUserProfile | null> } | null>(null);
+  const previousUser = useRef<User | null>(null);
   const backendURL = getPublicBackendUrl();
 
   const requireAuthClient = useCallback(() => {
@@ -312,67 +322,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [authError]);
 
   const loadProfile = useCallback(
-    async (currentUser: User, forceFresh = false) => {
-      const requestId = ++profileRequestRef.current;
-      const isCurrent = () => requestId === profileRequestRef.current && authRef.current?.currentUser?.uid === currentUser.uid;
+    (currentUser: User, forceFresh = false): Promise<BackendUserProfile | null> => {
+      if (profileRequest.current?.uid === currentUser.uid) return profileRequest.current.pending;
+      profileRequest.current?.controller.abort();
+      const controller = new AbortController();
+      const project = authRef.current?.app.options.projectId || "";
+      const { uid } = currentUser;
+      const isCurrent = () => !controller.signal.aborted && authRef.current?.currentUser?.uid === uid;
+      const cached = forceFresh ? null : readProfileSnapshot(backendURL, project, uid);
       setProfileLoading(true);
       setProfileError("");
-      try {
-        primeBackend(backendURL);
-        let token = await currentUser.getIdToken();
-        const loadAccountProfile = (timeoutMs: number, fresh: boolean) =>
-          apiJson<BackendUserProfile>(
-            `${backendURL}/profile/me`,
-            {
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              cacheKey: `account-profile:${currentUser.uid}`,
-              cacheTtlMs: 30000,
-              forceFresh: fresh,
-              retries: 0,
-              timeoutMs,
-            },
-          );
-        // Hosted instances can take longer than eight seconds to wake up.
-        // Keep the original request alive instead of aborting useful work and
-        // restarting it. All transient retries share this one recovery budget.
-        const deadline = Date.now() + 60_000;
-        let refreshedToken = false;
-        for (let attempt = 0; attempt < 3; attempt += 1) {
-          try {
-            const remainingMs = deadline - Date.now();
-            if (remainingMs <= 0) throw new ApiRequestError("The study server took too long to respond. Please retry.", 408);
-            const loadedProfile = await loadAccountProfile(remainingMs, forceFresh || attempt > 0);
-            if (!isCurrent()) return null;
-            setAccountProfile(loadedProfile);
-            setProfileError("");
-            return loadedProfile;
-          } catch (error) {
-            if (!isCurrent()) return null;
-            // A restored Firebase session can carry an expired cached token.
-            if (error instanceof ApiRequestError && error.status === 401 && !refreshedToken) {
-              refreshedToken = true;
-              token = await currentUser.getIdToken(true);
-              continue;
-            }
-            if (!isTemporaryBackendError(error) || attempt === 2) throw error;
-            if (Date.now() >= deadline) throw error;
-            await new Promise((resolve) => setTimeout(resolve, Math.min(1500 * (attempt + 1), deadline - Date.now())));
-            if (!isCurrent()) return null;
-          }
+      let resumed = false;
+      const foreground = setTimeout(() => {
+        if (isCurrent() && !resumed) {
+          setProfileLoading(false);
+          setProfileError(PROFILE_RECOVERY_MESSAGE);
         }
-        throw new Error("Your session could not be verified. Please sign in again.");
-      } catch (error) {
-        if (isCurrent()) {
-          setAccountProfile(null);
-          setProfileError(profileErrorMessage(error));
+      }, PROFILE_FOREGROUND_WAIT_MS);
+      const pending = (async () => {
+        try {
+          let token = await withIdentityDeadline(currentUser.getIdToken());
+          if (!isCurrent()) return null;
+          if (cached) {
+            // Only a current Firebase identity may use its own verified profile.
+            resumed = true;
+            setAccountProfile(cached);
+            setProfileLoading(false);
+            setProfileError("");
+          }
+          const deadline = Date.now() + 66_000;
+          let refreshedToken = false;
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              const remaining = deadline - Date.now();
+              if (remaining <= 0) throw new ApiRequestError("The study server took too long to respond.", 408);
+              const loadedProfile = await apiJson<unknown>(`${backendURL}/profile/me`, {
+                headers: { Authorization: `Bearer ${token}` },
+                signal: controller.signal,
+                timeoutMs: remaining,
+              });
+              if (!isProfileFor(loadedProfile, uid)) throw new ApiRequestError("The study server did not return a valid profile.", 503);
+              if (!isCurrent()) return null;
+              writeProfileSnapshot(backendURL, project, uid, loadedProfile);
+              setAccountProfile(loadedProfile);
+              setProfileError("");
+              return loadedProfile;
+            } catch (error) {
+              if (!isCurrent()) return null;
+              if (error instanceof ApiRequestError && error.status === 401 && !refreshedToken && attempt < 2) {
+                refreshedToken = true;
+                resumed = false;
+                writeProfileSnapshot(backendURL, project, uid, null);
+                setAccountProfile(null);
+                token = await withIdentityDeadline(currentUser.getIdToken(true));
+                continue;
+              }
+              if (!isTemporaryBackendError(error) || attempt === 2 || Date.now() >= deadline) throw error;
+              await new Promise((resolve) => setTimeout(resolve, 350 * (attempt + 1)));
+              if (!isCurrent()) return null;
+            }
+          }
+        } catch (error) {
+          if (isCurrent() && !(resumed && isTemporaryBackendError(error))) {
+            if (!isTemporaryBackendError(error)) writeProfileSnapshot(backendURL, project, uid, null);
+            setAccountProfile(null);
+            setProfileError(profileErrorMessage(error));
+          }
+        } finally {
+          clearTimeout(foreground);
+          if (profileRequest.current?.controller === controller) profileRequest.current = null;
+          if (isCurrent()) setProfileLoading(false);
         }
         return null;
-      } finally {
-        if (isCurrent()) setProfileLoading(false);
-      }
+      })();
+      profileRequest.current = { uid, controller, pending };
+      return pending;
     },
     [backendURL],
   );
@@ -387,12 +411,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     setClaimsLoading(true);
+    const uid = authClient.currentUser.uid;
 
     try {
-      const tokenResult = await authClient.currentUser.getIdTokenResult(forceRefresh);
-      setClaims(tokenResult.claims as Record<string, unknown>);
+      const tokenResult = await withIdentityDeadline(authClient.currentUser.getIdTokenResult(forceRefresh));
+      if (authClient.currentUser?.uid === uid) setClaims(tokenResult.claims as Record<string, unknown>);
     } finally {
-      setClaimsLoading(false);
+      if (authClient.currentUser?.uid === uid) setClaimsLoading(false);
     }
   }, []);
 
@@ -401,7 +426,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAdminAccessLoading(true);
       setBackendAdminAccess(null);
       try {
-        const token = await currentUser.getIdToken();
+        const token = await withIdentityDeadline(currentUser.getIdToken());
         const requestAccess = (timeoutMs: number) => apiJson<BackendAdminAccess>(
           `${backendURL}/admin/me`,
           {
@@ -497,6 +522,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    const authClient = requireAuthClient();
+    if (authClient.currentUser) {
+      writeProfileSnapshot(backendURL, authClient.app.options.projectId || "", authClient.currentUser.uid, null);
+    }
+    profileRequest.current?.controller.abort();
+    profileRequest.current = null;
     confirmationResultRef.current = null;
     manualSignOutRef.current = true;
     resetRecaptcha();
@@ -505,8 +536,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAdminAccessLoading(false);
     setProfileError("");
     setSessionExpired(false);
-    await signOut(requireAuthClient());
-  }, [requireAuthClient, resetRecaptcha]);
+    await signOut(authClient);
+  }, [backendURL, requireAuthClient, resetRecaptcha]);
 
   const getIdToken = useCallback(async (forceRefresh = false) => {
     const authClient = authRef.current;
@@ -529,7 +560,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAccountProfile(null);
       return null;
     }
-    invalidateApiCache(`account-profile:${authClient.currentUser.uid}`);
     return loadProfile(authClient.currentUser, true);
   }, [loadProfile]);
 
@@ -554,8 +584,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           timeoutMs: 12000,
         },
       );
-      invalidateApiCache(`account-profile:${currentUser.uid}`);
-      setAccountProfile(updatedProfile);
+      if (authRef.current?.currentUser?.uid === currentUser.uid) {
+        profileRequest.current?.controller.abort();
+        profileRequest.current = null;
+        writeProfileSnapshot(backendURL, authRef.current.app.options.projectId || "", currentUser.uid, updatedProfile);
+        setAccountProfile(updatedProfile);
+        setProfileLoading(false);
+      }
       return updatedProfile;
     },
     [backendURL],
@@ -602,6 +637,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthStartupMessage("");
       setUser(currentUser);
       setAuthLoading(false);
+      if (previousUser.current?.uid !== currentUser?.uid) {
+        profileRequest.current?.controller.abort();
+        profileRequest.current = null;
+        setAccountProfile(null);
+        if (previousUser.current && !currentUser) {
+          writeProfileSnapshot(backendURL, authClient.app.options.projectId || "", previousUser.current.uid, null);
+        }
+      }
+      previousUser.current = currentUser;
 
       if (!currentUser) {
         setSessionExpired(hasAuthenticatedRef.current && !manualSignOutRef.current);
@@ -623,15 +667,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setBackendAdminAccess(null);
       setClaimsLoading(true);
       setAdminAccessLoading(true);
-      primeBackend(getPublicBackendUrl());
+      primeBackend(backendURL);
       await Promise.allSettled([refreshClaims(), loadProfile(currentUser), loadAdminAccess(currentUser)]);
     });
 
     return () => {
       clearTimeout(authStateTimeout);
       unsubscribe();
+      profileRequest.current?.controller.abort();
+      profileRequest.current = null;
     };
-  }, [loadAdminAccess, loadProfile, refreshClaims]);
+  }, [backendURL, loadAdminAccess, loadProfile, refreshClaims]);
 
   const { isAdmin, isFounderAdmin } = useMemo(
     () => resolveAdminAuthorization(user, claims, backendAdminAccess),

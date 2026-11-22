@@ -4,14 +4,15 @@ import { describe, expect, it } from "vitest";
 import {
   AUTH_BOOTSTRAP_TIMEOUT_MESSAGE,
   AUTH_BOOTSTRAP_TIMEOUT_MS,
+  PROFILE_FOREGROUND_WAIT_MS,
 } from "@/lib/authBootstrap";
 
 const context = readFileSync(resolve(process.cwd(), "context/AuthContext.tsx"), "utf8");
 
 describe("authentication bootstrap recovery", () => {
   it("releases a stalled Firebase startup without blocking sign-in", () => {
-    expect(AUTH_BOOTSTRAP_TIMEOUT_MS).toBeGreaterThanOrEqual(8_000);
-    expect(AUTH_BOOTSTRAP_TIMEOUT_MS).toBeLessThanOrEqual(15_000);
+    expect(AUTH_BOOTSTRAP_TIMEOUT_MS).toBeLessThanOrEqual(6_000);
+    expect(PROFILE_FOREGROUND_WAIT_MS).toBeLessThan(8_000);
     expect(AUTH_BOOTSTRAP_TIMEOUT_MESSAGE).toContain("sign in below");
     expect(context).toContain("authStateTimeout = setTimeout");
     expect(context).toContain("setAuthLoading(false)");

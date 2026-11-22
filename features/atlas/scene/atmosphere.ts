@@ -1,5 +1,6 @@
 import * as T from "three";
 import { mesh, randomFor } from "./primitives";
+import type { Point } from "./layout";
 import { taperedRock } from "./terrain";
 
 const skyVertex = `
@@ -100,7 +101,7 @@ export function atmosphere(parent: T.Scene, compact: boolean) {
 
   const cloudMaps = [softCloud(12), softCloud(48), softCloud(179)];
   const random = randomFor(319);
-  const layer = (x: number, y: number, z: number, width: number, height: number, alpha: number) => {
+  const layer = (x: number, y: number, z: number, width: number, height: number, alpha: number, parent: T.Object3D = group) => {
     const stock = new T.SpriteMaterial({
       map: cloudMaps[Math.floor(random() * cloudMaps.length)], depthWrite: false,
       transparent: true, opacity: alpha, color: 0xe5f0ea,
@@ -108,7 +109,7 @@ export function atmosphere(parent: T.Scene, compact: boolean) {
     const mist = new T.Sprite(stock);
     mist.position.set(x, y, z);
     mist.scale.set(width, height, 1);
-    group.add(mist);
+    parent.add(mist);
   };
   for (let i = 0; i < (compact ? 34 : 49); i++) {
     const x = -33 + random() * 69, z = -40 + random() * 45;
@@ -125,7 +126,7 @@ export function atmosphere(parent: T.Scene, compact: boolean) {
 
   const stars: number[] = [];
   const colors: number[] = [];
-  for (let i = 0; i < 440; i++) {
+  for (let i = 0; i < 290; i++) {
     stars.push(-48 + random() * 95, 5 + random() * 37, -42 - random() * 40);
     const intensity = .29 + random() * .65;
     colors.push(.84 * intensity, 1 * intensity, .90 * intensity);
@@ -137,5 +138,12 @@ export function atmosphere(parent: T.Scene, compact: boolean) {
     size: .069, transparent: true, vertexColors: true, opacity: .72, depthWrite: false, fog: false,
   }));
   group.add(starField);
-  return { daylight, starField };
+  return {
+    daylight,
+    starField,
+    mist(parent: T.Object3D, [x,y,z]: Point, width: number) {
+      layer(x,y,z,width * 1.9,.66,.46,parent);
+      layer(x + width * .18,y - .24,z + .30,width * 2.6,.83,.34,parent);
+    },
+  };
 }

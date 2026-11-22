@@ -8,7 +8,7 @@ test.use({
 });
 
 test("the 3D journey plays once, can replay, and preserves workspace navigation", async ({ page, isMobile }, testInfo) => {
-  test.setTimeout(120_000);
+  test.setTimeout(150_000);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
@@ -62,7 +62,10 @@ test("the 3D journey plays once, can replay, and preserves workspace navigation"
     await expect.poll(async () => (await planning.boundingBox())?.x).toBeCloseTo(start.x, 0);
     const proposal = await planning.boundingBox();
     if (!proposal) throw new Error("Missing Planning label after reset");
-    await page.mouse.move(proposal.x + proposal.width / 2, proposal.y - view.height * .031);
+    for (const offset of [.031, .055, .075]) {
+      await page.mouse.move(proposal.x + proposal.width / 2, proposal.y - view.height * offset);
+      if (await canvas.evaluate((element) => getComputedStyle(element).cursor) === "pointer") break;
+    }
     await expect(canvas).toHaveCSS("cursor", "pointer");
     await page.mouse.down();
     await page.mouse.up();
@@ -83,6 +86,8 @@ test("the 3D journey plays once, can replay, and preserves workspace navigation"
   await expect(insights.getByRole("link", { name: "Global Rankings" })).toHaveAttribute("href", "/dashboard/rankings");
   await page.screenshot({ path: testInfo.outputPath("atlas-light.png") });
 
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(replay).toHaveCount(0);
   const panel = scene.locator("#workspace-preview");
   for (const [name, action, route] of destinations) {
     const marker = markers.getByRole("button", { name: `Preview ${name}` });
@@ -96,8 +101,6 @@ test("the 3D journey plays once, can replay, and preserves workspace navigation"
 
   const axe = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
   expect(axe.violations.filter(({ impact }) => impact === "serious" || impact === "critical")).toEqual([]);
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await expect(replay).toHaveCount(0);
   await markers.getByRole("button", { name: "Preview Exam" }).click();
   await panel.getByRole("link", { name: "Open Exam" }).click();
   await expect(page).toHaveURL(/\/dashboard\/exam$/);

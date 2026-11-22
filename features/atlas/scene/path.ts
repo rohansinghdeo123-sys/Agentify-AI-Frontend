@@ -14,7 +14,7 @@ function ribbon(curve: T.CatmullRomCurve3, left: number, right: number, offset: 
     for (const side of [left, right]) {
       const edge = center.clone().addScaledVector(across, side);
       positions.push(edge.x, edge.y + offset, edge.z);
-      uvs.push(side === left ? 0 : 1, t * 18);
+      uvs.push(side === left ? 0 : 1, t * 13);
     }
     if (i) {
       const k = i * 2;
@@ -47,7 +47,7 @@ function masonry(curve: T.CatmullRomCurve3, side: number, start: number, end: nu
     const fraction = T.MathUtils.lerp(start, end, t);
     const point = curve.getPointAt(fraction);
     const direction = curve.getTangentAt(fraction);
-    point.addScaledVector(new T.Vector3(-direction.z, 0, direction.x).normalize(), side * .58);
+    point.addScaledVector(new T.Vector3(-direction.z, 0, direction.x).normalize(), side * .70);
     const arch = Math.pow(Math.abs(Math.sin(t * Math.PI * 4)), .55);
     positions.push(point.x, point.y - .075, point.z, point.x, point.y - height + (height - .24) * arch, point.z);
     if (i) {
@@ -68,21 +68,22 @@ export function pathway(parent: T.Object3D, p: Palette) {
   parent.add(group);
   const curve = new T.CatmullRomCurve3(ROUTE.map((point) => new T.Vector3(...point)));
   const paving = p.parchment.clone();
-  paving.color.set(0xeac186);
+  paving.color.set(0xc3a676);
   paving.emissive.set(0xe8a240);
-  paving.emissiveIntensity = .32;
-  paving.roughness = .49;
+  paving.emissiveIntensity = .10;
+  paving.roughness = .65;
   paving.side = T.DoubleSide;
-  mesh(group, ribbon(curve, -.64, .64, .023), paving);
-  const trailGeometry = ribbon(curve, -.079, .079, .039);
-  const trail = mesh(group, trailGeometry, new T.MeshBasicMaterial({ color: 0xffdf93, side: T.DoubleSide }));
+  mesh(group, ribbon(curve, -.76, .76, .023), paving);
+  const trailGeometry = ribbon(curve, -.032, .032, .038);
+  const trail = mesh(group, trailGeometry, new T.MeshBasicMaterial({ color: 0xffdc90, side: T.DoubleSide,
+    transparent: true, opacity: .68, depthWrite: false }));
   const spark = mesh(group, new T.OctahedronGeometry(.115), p.lamp);
   trail.visible = spark.visible = false;
   const under = p.bronze.clone();
   under.side = T.DoubleSide;
-  mesh(group, ribbon(curve, -.68, .68, -.15), under);
+  mesh(group, ribbon(curve, -.79, .79, -.18), under);
   const limestone = p.stone.clone();
-  limestone.color.set(0xaa8355);
+  limestone.color.set(0xb39367);
   limestone.side = T.DoubleSide;
   for (const [start, end, height] of [[.19, .44, 1.28], [.52, .75, 1.26], [.77, .96, 1.1]]) {
     for (const side of [-1, 1]) mesh(group, masonry(curve, side, start, end, height), limestone);
@@ -92,25 +93,26 @@ export function pathway(parent: T.Object3D, p: Palette) {
       const direction = curve.getTangentAt(fraction);
       const across = new T.Vector3(-direction.z, 0, direction.x).normalize();
       for (const side of [-1, 1]) {
-        const edge = point.clone().addScaledVector(across, .51 * side);
+        const edge = point.clone().addScaledVector(across, .62 * side);
         column(group, limestone, .131, .17, height, [edge.x, point.y - height * .5, edge.z], 8);
         column(group, p.bronze, .184, .184, .07, [edge.x, point.y - .28, edge.z], 8);
       }
     }
   }
   for (const side of [-1, 1]) {
-    const structure = edgeCurve(curve, side * .658, -.058);
-    const illumination = edgeCurve(curve, side * .622, .043);
-    mesh(group, new T.TubeGeometry(structure, 160, .097, 7, false), p.bronze);
-    mesh(group, new T.TubeGeometry(illumination, 160, .031, 7, false), p.goldLight);
-    const rail = edgeCurve(curve, side * .621, .221);
+    const structure = edgeCurve(curve, side * .762, -.095);
+    const illumination = edgeCurve(curve, side * .725, .035);
+    mesh(group, new T.TubeGeometry(structure, 160, .091, 7, false), p.bronze);
+    mesh(group, new T.TubeGeometry(illumination, 160, .030, 7, false), p.gold);
+    const rail = edgeCurve(curve, side * .72, .252);
     mesh(group, new T.TubeGeometry(rail, 160, .027, 6, false), p.gold);
     for (let i = 3; i <= 42; i++) {
       const t = i / 43;
       const point = curve.getPointAt(t);
       const direction = curve.getTangentAt(t);
-      point.addScaledVector(new T.Vector3(-direction.z, 0, direction.x).normalize(), side * .621);
-      column(group, p.gold, .025, .036, .21, [point.x, point.y + .12, point.z], 6);
+      point.addScaledVector(new T.Vector3(-direction.z, 0, direction.x).normalize(), side * .72);
+      column(group, p.gold, .023, .038, .25, [point.x, point.y + .128, point.z], 8);
+      column(group, p.bronze, .045, .057, .047, [point.x, point.y + .041, point.z], 8);
       if (i % 6 === 0) {
         mesh(group, new T.OctahedronGeometry(.052), p.lamp, [point.x, point.y + .276, point.z]);
       }
@@ -121,7 +123,7 @@ export function pathway(parent: T.Object3D, p: Palette) {
     const progress = i / 59;
     const point = curve.getPointAt(progress);
     const tangent = curve.getTangentAt(progress);
-    box(group, under, [1.18, .007, .016], [point.x, point.y + .027, point.z]).rotation.y = Math.atan2(tangent.x, tangent.z);
+    box(group, under, [1.39, .007, .012], [point.x, point.y + .027, point.z]).rotation.y = Math.atan2(tangent.x, tangent.z);
   }
 
   // Short landings meet each set of entrance stairs.
@@ -141,6 +143,7 @@ export function pathway(parent: T.Object3D, p: Palette) {
   }
   return {
     group,
+    paving,
     lightRoute(progress: number) {
       trail.visible = progress > 0;
       spark.visible = progress > 0 && progress < 1;

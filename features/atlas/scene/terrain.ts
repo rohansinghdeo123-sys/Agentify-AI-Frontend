@@ -2,55 +2,37 @@ import * as T from "three";
 import { DESTINATIONS, type Point } from "./layout";
 import { material, mesh, randomFor, rod, type Palette } from "./primitives";
 
-function mineralTexture() {
-  const rng = randomFor(51);
-  const width = 128;
-  const data = new Uint8Array(width * width * 4);
-  const ridges = Array.from({ length: width }, () => .70 + rng() * .3);
-  for (let y = 0; y < width; y++) {
-    for (let x = 0; x < width; x++) {
-      const i = (y * width + x) * 4, band = ridges[(x + Math.floor(y / 12)) % width];
-      const value = 125 + band * 100 - rng() * 39;
-      data.set([value, value, value, 255], i);
-    }
-  }
-  const texture = new T.DataTexture(data, width, width);
-  texture.wrapS = texture.wrapT = T.RepeatWrapping;
-  texture.magFilter = T.LinearFilter;
-  texture.minFilter = T.LinearMipmapLinearFilter;
-  texture.generateMipmaps = true;
-  texture.needsUpdate = true;
-  return texture;
-}
-
 export function taperedRock(parent: T.Object3D, rocky: T.Material, position: Point, size: Point, seed: number, mountain = false) {
   const random = randomFor(seed);
-  const count = 38;
+  const count = mountain ? 48 : size[0] > 2 ? 78 : 32;
   const points: number[] = [];
   const colors: number[] = [];
   const uv: number[] = [];
   const indices: number[] = [];
   const ridges = Array.from({ length: count }, () => .85 + .26 * random());
-  const stone = new T.Color(mountain ? 0x3a505d : 0x465650);
-  const vegetation = new T.Color(mountain ? 0x1d3f34 : 0x395724);
+  const stone = new T.Color(mountain ? 0x3a505d : 0x859585);
+  const vegetation = new T.Color(mountain ? 0x1d3f34 : 0x81965c);
   const angleOffset = random() * 5;
   const tilt = random() - .5;
   const layers = mountain
-    ? [[1, 0], [.8, .28], [.47, .58], [.2, .89], [.025, 1]]
-    : [[.04, -1.38], [.28, -1.13], [.56, -.77], [.78, -.44], [.98, -.12], [1, -.055], [.93, .005], [.73, .03], [.32, .048], [0, .06]];
+    ? [[1, -.08], [.91,.08], [.78,.24], [.70,.32], [.49,.48], [.44,.61], [.28,.72], [.20,.87], [.055,.95], [0,1]]
+    : [[.025,-1.51],[.17,-1.28],[.28,-1.19],[.40,-1.05],[.46,-.92],[.59,-.81],[.54,-.70],
+      [.71,-.56],[.79,-.39],[.77,-.31],[.95,-.24],[.9,-.21],[.97,-.15],[1,-.076],[.93,0],[.73,.024],[.45,.041],[.21,.056],[0,.06]];
   layers.forEach(([scale, elevation], layer) => {
     for (let i = 0; i <= count; i++) {
       const idx = i % count;
       const angle = idx * Math.PI * 2 / count;
-      const fracture = Math.sin(angle * 7 + angleOffset) * Math.sin(angle * 3 - elevation * 2);
-      const profile = scale * (ridges[idx] + fracture * .16) * (1 + .15 * Math.sin(angle * 3 + seed));
-      const edge = layer >= layers.length - 4 && !mountain;
-      const bump = (random() - .5) * (edge ? .06 : .17) * (scale === 0 ? 0 : 1);
+      const fracture = Math.sin(angle * 7 + angleOffset) * Math.sin(angle * 3 - elevation * 2)
+        + .38 * Math.cos(angle * 17 + elevation * 3 + seed);
+      const strata = 1 + .035 * Math.sin(elevation * 65 + angle * 4);
+      const profile = strata * scale * (ridges[idx] + fracture * .13) * (1 + .15 * Math.sin(angle * 3 + seed));
+      const edge = layer >= layers.length - 5 && !mountain;
+      const bump = (random() - .5) * (edge ? .04 : .12) * (scale === 0 ? 0 : 1);
       const height = size[1] * (elevation + (edge ? .025 : .11) * scale * fracture) + bump;
       points.push(size[0] * (Math.cos(angle) * profile + elevation * tilt * .33), height, Math.sin(angle) * size[2] * profile);
       const tone = (edge ? vegetation : stone).clone().multiplyScalar((.74 + random() * .36 + fracture * .18) * (layer < 2 && !mountain ? .51 : 1));
       colors.push(tone.r, tone.g, tone.b);
-      uv.push(i / count * 2.4, elevation * 1.3);
+      uv.push(i / count * (size[0] * .82 + 1), elevation * Math.max(1.15, size[1] * .72));
       if (layer && i) {
         const a = layer * (count + 1) + i;
         indices.push(a, a - count - 2, a - 1, a, a - count - 1, a - count - 2);
@@ -79,11 +61,12 @@ const WATER_FRAGMENT = `
   uniform float time;
   void main() {
     float flow = vUv.y + time * .46;
-    float stripe = pow(0.5 + 0.5*sin(vUv.x*108. + flow*13. + sin(flow*13.)*1.2), 5.);
-    float currents = pow(0.5 + 0.5*sin(vUv.x*62. - sin(flow*6.5)*1.1), 3.);
-    vec3 color = mix(vec3(.08,.44,.46), vec3(.59,.94,.89), .21+stripe*.50+currents*.25);
-    float outline = smoothstep(0.,.18,vUv.x)*smoothstep(0.,.18,1.-vUv.x);
-    float alpha = outline * (.50 + stripe*.43) * smoothstep(0.,.27,vUv.y);
+    float stripe = pow(.5 + .5*sin(vUv.x*103. + flow*17. + sin(flow*9.+vUv.x*23.)*2.2), 4.);
+    float currents = pow(.5 + .5*sin(vUv.x*48. + sin(flow*14.+vUv.x*8.)*1.9), 3.);
+    float foam = pow(.5 + .5*sin(vUv.x*270. + flow*29.+sin(flow*19.)*3.), 8.);
+    vec3 color = mix(vec3(.07,.33,.36), vec3(.80,.98,.96), .18+stripe*.31+currents*.29+foam*.16);
+    float outline = smoothstep(0.,.22,vUv.x)*smoothstep(0.,.22,1.-vUv.x);
+    float alpha = outline * (.33 + stripe*.30 + currents*.24 + foam*.13) * smoothstep(0.,.18,vUv.y);
     gl_FragColor = sRGBTransferEOTF(vec4(color, alpha));
     #include <colorspace_fragment>
   }
@@ -94,12 +77,13 @@ function falls(parent: T.Object3D, position: Point, width: number, height: numbe
   group.position.set(...position);
   group.rotation.y = angle;
   parent.add(group);
-  const geometry = new T.PlaneGeometry(width, height, 20, 14);
+  const geometry = new T.PlaneGeometry(width, height, 28, 25);
   const positions = geometry.getAttribute("position");
   const uv = geometry.getAttribute("uv");
   for (let i = 0; i < positions.count; i++) {
     const horizontal = uv.getX(i), level = uv.getY(i);
-    const z = Math.min(.44, Math.pow(1 - level, 2) * .75) + .055 * Math.sin(horizontal * 22 + level * 7);
+    const crest = Math.pow(level, 12) * -.18;
+    const z = crest + Math.pow(1 - level, 3) * .63 + .075 * Math.sin(horizontal * 25 + level * 11);
     positions.setXYZ(i, positions.getX(i) * (.89 + .22 * (1 - level)), (level - 1) * height, z);
   }
   mesh(group, geometry, material);
@@ -140,6 +124,12 @@ function plant(parent: T.Object3D, items: Foliage[], compact: boolean) {
     positions.setXYZ(i, x * irregularity, y * irregularity, z * irregularity);
   }
   geometry.computeVertexNormals();
+  const normals = geometry.getAttribute("normal");
+  const smooth = new T.Vector3(), face = new T.Vector3();
+  for (let i = 0; i < positions.count; i++) {
+    smooth.fromBufferAttribute(positions, i).normalize().lerp(face.fromBufferAttribute(normals, i), .25).normalize();
+    normals.setXYZ(i, smooth.x, smooth.y, smooth.z);
+  }
   const canopy = new T.InstancedMesh(geometry, material(0xffffff, .94), items.length);
   const transform = new T.Object3D();
   items.forEach((item, i) => {
@@ -158,7 +148,7 @@ export function terrain(parent: T.Object3D, p: Palette, compact: boolean) {
   group.name = "Floating islands and forest";
   parent.add(group);
   const rough = new T.MeshStandardMaterial({
-    color: 0xffffff, vertexColors: true, side: T.DoubleSide, roughness: .98, map: mineralTexture(),
+    color: 0xffffff, vertexColors: true, side: T.DoubleSide, roughness: .98,
   });
   const water = new T.ShaderMaterial({
     vertexShader: WATER_VERTEX, fragmentShader: WATER_FRAGMENT,
@@ -186,9 +176,10 @@ export function terrain(parent: T.Object3D, p: Palette, compact: boolean) {
       const scale: Point = [.37 + rng() * .48, depth * (.47 + rng() * .49), .36 + rng() * .49];
       taperedRock(group, rough, point, scale, 1556 + index * 18 + ridge);
     }
-    const trees = [[-.8,.08],[-.7,-.53],[.71,.37],[.73,-.4],[.42,-.75],[-.42,-.68],[.78,.62],[-.7,.62]];
+    const trees = [[-.8,.08],[-.7,-.53],[.71,.37],[.73,-.4],[.42,-.75],[-.42,-.68],[.78,.62],[-.7,.62],
+      [-.84,-.22],[.85,-.14],[-.26,-.83],[.49,.68],[.6,-.57]];
     trees.forEach(([dx, dz], i) => {
-      tree(group, p, crowns, [x + rx * dx, y + .025, z + rz * dz], .48 + rng() * .52, 200 + index * 37 + i, index === 2 && i < 3);
+      tree(group, p, crowns, [x + rx * dx, y + .025, z + rz * dz], .36 + rng() * .57, 200 + index * 37 + i, index === 2 && i < 3);
     });
     for (let i = 0; i < 15; i++) {
       const angle = i * 2.39996 + rng() * .23;
@@ -222,5 +213,9 @@ export function terrain(parent: T.Object3D, p: Palette, compact: boolean) {
     tree(group, p, crowns, [x, y, z], size * .77, 258 + i);
   }
   plant(group, crowns, compact);
-  return { group, waterTime: water.uniforms.time };
+  return { group, rock: rough, waterTime: water.uniforms.time,
+    waterfallBases: cascades.filter((_, index) => index % 2 === 0).map(([point, width, height]) => ({
+      point: [point[0], point[1] - height + .16, point[2] + .30] as Point, width,
+    })),
+  };
 }

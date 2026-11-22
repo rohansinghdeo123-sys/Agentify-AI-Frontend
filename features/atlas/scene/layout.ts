@@ -2,10 +2,34 @@ export type Point = [number, number, number];
 export type Destination = "planning" | "study" | "revision" | "exam";
 
 export const VIEW = {
-  eye: [1, 13.2, 33.5] as Point,
-  target: [-3.03, 4.76, .9] as Point,
-  fov: 39,
+  eye: [.7, 12.5, 31.8] as Point,
+  target: [-2.55, 5.18, .85] as Point,
+  fov: 41,
 };
+
+export function overviewCamera(width: number, height: number) {
+  const aspect = width / height;
+  if (aspect <= .58) {
+    return {
+      eye: [-4, 12.5, 27] as Point,
+      target: [.55, 8.25, .6] as Point,
+      fov: 2 * Math.atan(.382 / aspect) * 180 / Math.PI,
+      rise: 1.27,
+    };
+  }
+  if (aspect < 1.12) {
+    return {
+      eye: [-1.4, 13.4, 29] as Point,
+      target: [.32, 7.45, .71] as Point,
+      fov: 2 * Math.atan(Math.max(.37, .34 / aspect)) * 180 / Math.PI,
+      rise: 1.16,
+    };
+  }
+  if (height < 550) {
+    return { eye: [2.5, 12.4, 32.5] as Point, target: [-2, 5.3, .4] as Point, fov: 41.5, rise: 1 };
+  }
+  return { ...VIEW, fov: 2 * Math.atan(Math.max(.372, .60 / aspect)) * 180 / Math.PI, rise: 1 };
+}
 
 export const DESTINATIONS: { id: Destination; title: string; site: Point; shelf: Point; size: [number, number, number]; accent: number }[] = [
   { id: "planning", title: "Planning", site: [5.9, 1.4, 4.85], shelf: [5.65, 1.28, 4.3], size: [4.4, 3, 4.2], accent: 0x43d6b3 },
@@ -16,7 +40,7 @@ export const DESTINATIONS: { id: Destination; title: string; site: Point; shelf:
 
 // Coordinates run continuously from the book's spine to the Exam stair.
 export const ROUTE: Point[] = [
-  [-.75, .19, 11.2],
+  [-.75, .18, 10.95],
   [-.7, .45, 9.55],
   [.05, .84, 7.05],
   [2.55, 1.65, 5.95],

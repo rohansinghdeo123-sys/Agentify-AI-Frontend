@@ -171,8 +171,12 @@ export default function LearningJourney({
             <button type="button" onClick={() => atlas.current?.finishIntro()}>Skip intro</button>
           ) : (
             <>
-              <button type="button" onClick={() => atlas.current?.reset()}>Reset view</button>
-              {!reduced && <button type="button" onClick={() => atlas.current?.playIntro()}>Replay intro</button>}
+              <button type="button" aria-label="Reset view" title="Reset view" onClick={() => atlas.current?.reset()}>
+                <AppIcon name="home" />
+              </button>
+              {!reduced && <button type="button" aria-label="Replay intro" title="Replay intro" onClick={() => atlas.current?.playIntro()}>
+                <AppIcon name="history" />
+              </button>}
             </>
           )}
         </div>
