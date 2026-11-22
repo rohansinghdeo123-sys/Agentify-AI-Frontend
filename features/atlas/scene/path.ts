@@ -2,6 +2,31 @@ import * as T from "three";
 import { ROUTE } from "./layout";
 import { box, column, mesh, rod, type Palette } from "./primitives";
 
+const trailVertex = `
+  varying vec2 ribbonUv;
+  void main() {
+    ribbonUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.);
+  }
+`;
+
+const trailFragment = `
+  uniform float progress;
+  varying vec2 ribbonUv;
+  void main() {
+    float along = ribbonUv.y / 13.;
+    float edge = abs(ribbonUv.x * 2. - 1.);
+    float traveled = 1. - smoothstep(progress - .012, progress + .009, along);
+    float distanceToHead = (along - progress) * 50.;
+    float head = exp(-distanceToHead * distanceToHead);
+    float pulse = smoothstep(0., .04, progress) * (1. - smoothstep(.94, 1., progress));
+    float center = 1. - smoothstep(.08, .29, edge);
+    float halo = (1. - smoothstep(.12, 1., edge)) * head * pulse;
+    gl_FragColor = vec4(mix(vec3(.91, .51, .13), vec3(1., .86, .49), center), .49 * traveled * center + .80 * halo);
+    #include <colorspace_fragment>
+  }
+`;
+
 function ribbon(curve: T.CatmullRomCurve3, left: number, right: number, offset: number) {
   const positions: number[] = [];
   const uvs: number[] = [];
@@ -69,14 +94,17 @@ export function pathway(parent: T.Object3D, p: Palette) {
   const curve = new T.CatmullRomCurve3(ROUTE.map((point) => new T.Vector3(...point)));
   const paving = p.parchment.clone();
   paving.color.set(0xc3a676);
-  paving.emissive.set(0xe8a240);
-  paving.emissiveIntensity = .10;
+  paving.emissive.set(0xe3d4a7);
+  paving.emissiveIntensity = .23;
   paving.roughness = .65;
   paving.side = T.DoubleSide;
   mesh(group, ribbon(curve, -.76, .76, .023), paving);
-  const trailGeometry = ribbon(curve, -.032, .032, .038);
-  const trail = mesh(group, trailGeometry, new T.MeshBasicMaterial({ color: 0xffdc90, side: T.DoubleSide,
-    transparent: true, opacity: .68, depthWrite: false }));
+  const lightProgress = { value: 0 };
+  const trail = mesh(group, ribbon(curve, -.28, .28, .040), new T.ShaderMaterial({
+    vertexShader: trailVertex, fragmentShader: trailFragment,
+    uniforms: { progress: lightProgress },
+    transparent: true, depthWrite: false, side: T.DoubleSide, blending: T.AdditiveBlending,
+  }));
   const spark = mesh(group, new T.OctahedronGeometry(.115), p.lamp);
   trail.visible = spark.visible = false;
   const under = p.bronze.clone();
@@ -147,8 +175,11 @@ export function pathway(parent: T.Object3D, p: Palette) {
     lightRoute(progress: number) {
       trail.visible = progress > 0;
       spark.visible = progress > 0 && progress < 1;
-      trailGeometry.setDrawRange(0, Math.round(164 * progress) * 6);
-      curve.getPointAt(progress, spark.position).y += .21;
+      lightProgress.value = progress;
+      if (spark.visible) {
+        curve.getPointAt(progress, spark.position).y += .17;
+        spark.scale.setScalar(T.MathUtils.smoothstep(progress, 0, .06) * (1 - T.MathUtils.smoothstep(progress, .93, 1)));
+      }
     },
   };
 }

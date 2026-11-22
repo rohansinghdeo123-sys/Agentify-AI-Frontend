@@ -64,9 +64,9 @@ export default function LearningJourney({
     const preferences = new MutationObserver(syncPreferences);
     preferences.observe(root, { attributes: true, attributeFilter: ["data-theme", "data-motion"] });
     motion.addEventListener("change", syncPreferences);
-    void import("@/features/atlas/scene/createAtlas").then(({ createAtlas }) => {
+    void import("@/features/atlas/scene/createAtlas").then(async ({ createAtlas }) => {
       if (cancelled || !surface.current) return;
-      atlas.current = createAtlas(surface.current, markers.current, (available) => {
+      const runtime = createAtlas(surface.current, markers.current, (available) => {
         setAtlasReady(available);
         if (!available) setPlaying(false);
       }, {
@@ -79,19 +79,21 @@ export default function LearningJourney({
           atlas.current?.focus(id);
         },
       });
+      atlas.current = runtime;
       const reduce = syncPreferences();
-      setAtlasReady(true);
       if (selected.current) {
-        atlas.current.focus(selected.current);
+        runtime.focus(selected.current);
       } else if (!reduce) {
+        let played = false;
         try {
-          if (sessionStorage.getItem(key)) return;
-          sessionStorage.setItem(key, "1");
+          played = !!sessionStorage.getItem(key);
+          if (!played) sessionStorage.setItem(key, "1");
         } catch {
           // Replay stays available when a browser blocks session storage.
         }
-        atlas.current.playIntro();
+        if (!played) runtime.playIntro();
       }
+      if (await runtime.ready && !cancelled) setAtlasReady(true);
     }).catch(() => {
       if (!cancelled) setAtlasReady(false);
     });
@@ -171,12 +173,8 @@ export default function LearningJourney({
             <button type="button" onClick={() => atlas.current?.finishIntro()}>Skip intro</button>
           ) : (
             <>
-              <button type="button" aria-label="Reset view" title="Reset view" onClick={() => atlas.current?.reset()}>
-                <AppIcon name="home" />
-              </button>
-              {!reduced && <button type="button" aria-label="Replay intro" title="Replay intro" onClick={() => atlas.current?.playIntro()}>
-                <AppIcon name="history" />
-              </button>}
+              <button type="button" onClick={() => atlas.current?.reset()}>Reset view</button>
+              {!reduced && <button type="button" onClick={() => atlas.current?.playIntro()}>Replay intro</button>}
             </>
           )}
         </div>

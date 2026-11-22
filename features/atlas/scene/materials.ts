@@ -1,7 +1,7 @@
 import * as T from "three";
 
 // CC0 textures from Poly Haven: mossy_rock, old_sandstone_02 and brown_leather.
-// Keep them on the app origin so a material cannot hold up the initial frame.
+// Keep them on the app origin and share the texture objects between materials.
 export function dressAtlas(
   renderer: T.WebGLRenderer,
   surfaces: { rock: T.MeshStandardMaterial; stone: T.MeshStandardMaterial; paving: T.MeshStandardMaterial; cover: T.MeshStandardMaterial },
@@ -9,8 +9,14 @@ export function dressAtlas(
   redraw: () => void,
 ) {
   const loader = new T.TextureLoader();
+  const pending: Promise<void>[] = [];
   function load(name: string, color = false) {
-    const texture = loader.load("/atlas/" + name + ".webp", redraw);
+    let settle!: () => void;
+    pending.push(new Promise<void>((resolve) => { settle = resolve; }));
+    const texture = loader.load("/atlas/" + name + ".webp", () => {
+      settle();
+      redraw();
+    }, undefined, settle);
     texture.colorSpace = color ? T.SRGBColorSpace : T.NoColorSpace;
     texture.wrapS = texture.wrapT = T.RepeatWrapping;
     texture.anisotropy = Math.min(quality.compact ? 4 : 12, renderer.capabilities.getMaxAnisotropy());
@@ -20,7 +26,7 @@ export function dressAtlas(
   rock.map = load("rock-color", true);
   stone.map = paving.map = load("stone-color", true);
   stone.color.setHex(0xcfbda3);
-  paving.color.setHex(0xe8cda5);
+  paving.color.setHex(0xffedcc);
   cover.map = load("leather-color", true);
   cover.color.setHex(0xb2a081);
   if (!quality.software) {
@@ -36,4 +42,5 @@ export function dressAtlas(
     cover.normalMap = load("leather-normal");
     cover.normalScale.setScalar(.54);
   }
+  return Promise.all(pending);
 }

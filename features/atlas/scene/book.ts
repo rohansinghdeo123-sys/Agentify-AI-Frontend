@@ -28,18 +28,20 @@ function sheet(side: number, level: number, extra = 0) {
   return geometry;
 }
 
-function pageInk() {
+function pageInk(detailed: boolean) {
   const canvas = document.createElement("canvas");
-  canvas.width = 768;
-  canvas.height = 512;
+  const scale = detailed ? 2 : 1;
+  canvas.width = 768 * scale;
+  canvas.height = 512 * scale;
   const ink = canvas.getContext("2d")!;
+  ink.scale(scale, scale);
   const rng = randomFor(41);
   const paper = ink.createLinearGradient(0, 0, 768, 0);
   paper.addColorStop(0, "#94704c");
-  paper.addColorStop(.07, "#d9b982");
-  paper.addColorStop(.37, "#e5cda0");
-  paper.addColorStop(.78, "#e9d2a9");
-  paper.addColorStop(1, "#b89460");
+  paper.addColorStop(.07, "#e7d0a1");
+  paper.addColorStop(.37, "#f2e6c7");
+  paper.addColorStop(.78, "#f4e7c6");
+  paper.addColorStop(1, "#c2a675");
   ink.fillStyle = paper;
   ink.fillRect(0, 0, 768, 512);
   for (let i = 0; i < 28_000; i++) {
@@ -71,7 +73,7 @@ function pageInk() {
   }
   const texture = new T.CanvasTexture(canvas);
   texture.colorSpace = T.SRGBColorSpace;
-  texture.anisotropy = 4;
+  texture.anisotropy = detailed ? 8 : 4;
   return texture;
 }
 
@@ -112,13 +114,13 @@ function coverEmboss(stack: T.Group, trim: T.Material, side: number) {
   }), .019);
 }
 
-export function book(parent: T.Object3D, p: Palette) {
+export function book(parent: T.Object3D, p: Palette, detailed: boolean) {
   const group = new T.Group();
   group.name = "Open book";
   group.position.copy(base);
   parent.add(group);
-  const ink = pageInk();
-  const page = new T.MeshStandardMaterial({ color: 0xf4e7d1, map: ink, roughness: .92, side: T.DoubleSide });
+  const ink = pageInk(detailed);
+  const page = new T.MeshStandardMaterial({ color: 0xfff5dd, map: ink, roughness: .92, side: T.DoubleSide });
   const sheets = [0xb19266, 0xc7a673, 0xa18258, 0xd0b383, 0x806340].map((color) =>
     new T.MeshStandardMaterial({ color, roughness: .94, side: T.DoubleSide }));
   const cover = p.binding.clone();
@@ -145,7 +147,21 @@ export function book(parent: T.Object3D, p: Palette) {
     }
     coverEmboss(stack, trim, side);
   }
-  mesh(leaf, sheet(-1, .57), page);
+  const pageGeometry = sheet(-1, .57);
+  const bentPage = pageGeometry.clone();
+  const bentVertices = bentPage.getAttribute("position");
+  const uv = bentPage.getAttribute("uv");
+  for (let i = 0; i < bentVertices.count; i++) {
+    const distanceFromHinge = 1 - uv.getX(i);
+    const flex = Math.sin(distanceFromHinge * Math.PI * .71) * (1 + .18 * Math.sin(uv.getY(i) * Math.PI));
+    bentVertices.setX(i, bentVertices.getX(i) + .46 * flex);
+    bentVertices.setY(i, bentVertices.getY(i) + 1.22 * flex);
+  }
+  bentPage.computeVertexNormals();
+  pageGeometry.morphAttributes.position = [bentVertices];
+  pageGeometry.morphAttributes.normal = [bentPage.getAttribute("normal")];
+  bentPage.dispose();
+  const turningPage = mesh(leaf, pageGeometry, page);
   const binding = mesh(group, new T.CylinderGeometry(.16, .16, DEPTH + .37, 16), cover, [0, -.02, 0]);
   binding.rotation.x = Math.PI / 2;
   for (const z of [-2.78, -1.61, 1.61, 2.78]) mesh(group, new T.TorusGeometry(.164, .027, 7, 24), trim, [0, -.02, z]);
@@ -162,7 +178,7 @@ export function book(parent: T.Object3D, p: Palette) {
       leaf.rotation.z = -Math.PI * (1 - pageTurn);
       leaf.position.y = .74 * (1 - pageTurn);
       leaf.scale.y = T.MathUtils.lerp(.24, 1, pageTurn);
-      leaf.visible = pageTurn > .04 || progress === 1;
+      turningPage.morphTargetInfluences![0] = Math.sin(Math.PI * pageTurn) ** 2;
     },
   };
 }

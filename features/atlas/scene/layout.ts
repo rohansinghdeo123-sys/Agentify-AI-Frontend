@@ -11,10 +11,10 @@ export function overviewCamera(width: number, height: number) {
   const aspect = width / height;
   if (aspect <= .58) {
     return {
-      eye: [-4, 12.5, 27] as Point,
-      target: [.55, 8.25, .6] as Point,
-      fov: 2 * Math.atan(.382 / aspect) * 180 / Math.PI,
-      rise: 1.27,
+      eye: [-.94, 10.35, 24] as Point,
+      target: [.15, 5.75, 1] as Point,
+      fov: 2 * Math.atan(.68 / aspect) * 180 / Math.PI,
+      rise: 1.25,
     };
   }
   if (aspect < 1.12) {

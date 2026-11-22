@@ -14,8 +14,10 @@ import { terrain } from "./terrain";
 import { atmosphere } from "./atmosphere";
 import { buildings, compass } from "./architecture";
 import { dressAtlas } from "./materials";
+import { ATLAS_INTRO_MS, atlasPixelRatio, cinematicDelta } from "./presentation";
 
 export type AtlasRuntime = {
+  ready: Promise<boolean>;
   reset: () => void;
   focus: (id: Destination | null) => void;
   highlight: (id: Destination | null) => void;
@@ -118,6 +120,8 @@ export function createAtlas(
 ): AtlasRuntime {
   const renderer = new T.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
   const gl = renderer.getContext();
+  const viewportLimit = gl.getParameter(gl.MAX_VIEWPORT_DIMS) as Int32Array;
+  const maxBufferSide = Math.min(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) as number, viewportLimit[0], viewportLimit[1]);
   const debug = gl.getExtension("WEBGL_debug_renderer_info");
   const gpu = debug ? String(gl.getParameter(debug.UNMASKED_RENDERER_WEBGL)) : "";
   const software = /swiftshader|llvmpipe|software rasterizer/i.test(gpu);
@@ -177,7 +181,7 @@ export function createAtlas(
   world.add(entranceLights);
   const islands = terrain(world, p, compact);
   for (const { point, width } of islands.waterfallBases) air.mist(world, point, width);
-  const spine = book(scene, p);
+  const spine = book(scene, p, !software);
   const road = pathway(world, p);
   road.lightRoute(1);
   const havens = buildings(world, p);
@@ -187,7 +191,6 @@ export function createAtlas(
     new T.MeshBasicMaterial({ color: 0xffda86, transparent: true, opacity: 0, depthWrite: false }),
   );
   reward.visible = false;
-  north.add(reward);
   for (const asset of [islands.group, ...spine.batches, road.group, ...havens.map(({ group }) => group), north]) {
     batchStaticPieces(asset);
     asset.traverse((object) => {
@@ -197,6 +200,13 @@ export function createAtlas(
       }
     });
   }
+  const distantCompass = north.clone(true);
+  distantCompass.name = "Portrait sky compass";
+  distantCompass.position.set(-9.06, 12.03, -2.8);
+  distantCompass.scale.setScalar(1.09);
+  distantCompass.visible = false;
+  world.add(distantCompass);
+  north.add(reward);
 
   const camera = new T.PerspectiveCamera(VIEW.fov, 1, .3, 330);
   const controls = new OrbitControls(camera, canvas);
@@ -239,18 +249,30 @@ export function createAtlas(
   let lastFrame = 0;
   let atmosphereTime = 0;
   let masteredAt: number | null = null;
-  let introStart: number | null = null;
+  let introElapsed: number | null = null;
+  let introVisibleTime = 0;
+  let lastMotionFrame = 0;
+  let slowMotionFrames = 0;
+  let motionScale = 1;
+  let warming = true;
+  let introRequested = false;
+  let warmupTimer: number | undefined;
+  let resolveReady!: (available: boolean) => void;
+  const ready = new Promise<boolean>((resolve) => { resolveReady = resolve; });
+  let presented = false;
   let width = 0;
   let height = 0;
   let profileRise = 1;
   let resolution = 0;
   let orbiting = false;
-  let flight: { start: number; fromEye: T.Vector3; fromTarget: T.Vector3; toEye: T.Vector3; toTarget: T.Vector3 } | null = null;
+  let flight: { elapsed: number; fromEye: T.Vector3; fromTarget: T.Vector3; toEye: T.Vector3; toTarget: T.Vector3 } | null = null;
   let press: { id: number; x: number; y: number } | null = null;
   let coarse = false;
   let queued = 0;
   let disposed = false;
-  dressAtlas(renderer, { rock: islands.rock, stone: p.stone, paving: road.paving, cover: spine.cover }, { compact, software }, invalidate);
+  const textures = dressAtlas(renderer,
+    { rock: islands.rock, stone: p.stone, paving: road.paving, cover: spine.cover },
+    { compact, software }, invalidate);
 
   function aim(eye: T.Vector3, look: T.Vector3) {
     camera.position.copy(eye);
@@ -259,17 +281,19 @@ export function createAtlas(
   }
 
   function applyIntro(progress: number) {
-    const open = T.MathUtils.smootherstep(progress, .03, .48);
-    spine.unfold(open, T.MathUtils.smootherstep(progress, .22, .64));
-    const rise = T.MathUtils.smootherstep(progress, .30, .83);
-    world.visible = rise > .002;
-    world.scale.set(.72 + .28 * rise, Math.max(.01, rise) * profileRise, .86 + .14 * rise);
-    world.position.y = -1.65 * (1 - rise);
-    const light = T.MathUtils.smootherstep(progress, .48, .97);
+    const open = T.MathUtils.smootherstep(progress, .02, .51);
+    spine.unfold(open, T.MathUtils.smootherstep(progress, .20, .68));
+    const rise = T.MathUtils.smootherstep(progress, .34, .89);
+    world.visible = progress >= .34;
+    world.scale.set(.65 + .35 * rise, (.035 + .965 * rise) * profileRise, .79 + .21 * rise);
+    world.position.y = -2.05 * (1 - rise);
+    const light = T.MathUtils.smoothstep(progress, .43, .98);
     road.lightRoute(light);
-    gutter.intensity = 14 + 29 * Math.sin(Math.PI * light) + 9 * light;
-    const sweep = T.MathUtils.smootherstep(progress, .09, .89);
+    const wick = T.MathUtils.smootherstep(progress, .16, .37);
+    gutter.intensity = 12 + wick * (11 + 20 * Math.sin(Math.PI * light));
+    const sweep = T.MathUtils.smootherstep(progress, .12, .96);
     camera.position.lerpVectors(introEye, homeEye, sweep);
+    camera.position.y += Math.sin(Math.PI * sweep) * 1.25;
     target.lerpVectors(introTarget, homeTarget, sweep);
     camera.lookAt(target);
   }
@@ -277,15 +301,28 @@ export function createAtlas(
   function draw(now: number) {
     queued = 0;
     if (disposed || paused || document.hidden) return;
-    const moving = introStart !== null || flight !== null;
-    if (introStart !== null) {
-      if (introStart < 0) introStart = now;
-      const progress = Math.min((now - introStart) / 3300, 1);
-      applyIntro(progress);
-      if (progress === 1) finishIntro();
+    const moving = introElapsed !== null || flight !== null;
+    const interactive = moving || orbiting;
+    const frameGap = lastMotionFrame ? Math.max(0, now - lastMotionFrame) : 0;
+    const delta = cinematicDelta(lastMotionFrame, now, software);
+    lastMotionFrame = interactive ? now : 0;
+    if (interactive && !software) {
+      slowMotionFrames = delta > 25 ? slowMotionFrames + 1 : Math.max(0, slowMotionFrames - 1);
+      if (slowMotionFrames >= 4) {
+        motionScale = Math.max(.30, motionScale * .77);
+        slowMotionFrames = 0;
+      }
+    }
+    if (introElapsed !== null) {
+      introVisibleTime += frameGap;
+      // Smooth short stalls, but don't keep the route hidden if software WebGL falls behind.
+      introElapsed = Math.max(introElapsed + delta, introVisibleTime - 1200);
+      if (introElapsed >= ATLAS_INTRO_MS) finishIntro();
+      else applyIntro(introElapsed / ATLAS_INTRO_MS);
     }
     if (flight) {
-      const time = T.MathUtils.smootherstep(now - flight.start, 0, 840);
+      flight.elapsed += delta;
+      const time = T.MathUtils.smootherstep(flight.elapsed, 0, 840);
       camera.position.lerpVectors(flight.fromEye, flight.toEye, time);
       target.lerpVectors(flight.fromTarget, flight.toTarget, time);
       camera.lookAt(target);
@@ -299,6 +336,7 @@ export function createAtlas(
     lastFrame = now;
     islands.waterTime.value = atmosphereTime;
     north.rotation.y = compassAngle + Math.sin(atmosphereTime * .78) * .16;
+    distantCompass.rotation.y = north.rotation.y;
     if (masteredAt !== null) {
       const pulse = reduced ? 1 : Math.min(1, (now - masteredAt) / 790);
       reward.scale.setScalar(1 + .19 * Math.sin(Math.PI * pulse));
@@ -308,21 +346,34 @@ export function createAtlas(
       glow.value = index === selected ? .92 + .08 * Math.sin(atmosphereTime * 3) : index === hovered ? .73 : 0;
       lamps[index].intensity = index === selected ? 31 : index === hovered ? 22 : 15;
     });
-    syncResolution(moving || orbiting);
     try {
-      if (focusPass && selected >= 0 && !flight && !reduced) {
-        camera.getWorldDirection(viewDirection);
-        focusPass.render(projected.subVectors(centers[selected], camera.position).dot(viewDirection));
-      } else {
-        renderer.render(scene, camera);
+      syncResolution(introElapsed !== null || flight !== null || orbiting);
+      renderScene();
+      if (!presented) {
+        presented = true;
+        resolveReady(true);
       }
     } catch {
-      paused = true;
-      onAvailabilityChange(false);
+      renderFailed();
       return;
     }
-    projectLabels();
-    if (introStart !== null || flight || atmospheric) invalidate();
+    if (introElapsed === null) projectLabels();
+    if (introElapsed !== null || flight || atmospheric) invalidate();
+  }
+
+  function renderScene() {
+    if (focusPass && selected >= 0 && !flight && !reduced) {
+      camera.getWorldDirection(viewDirection);
+      focusPass.render(projected.subVectors(centers[selected], camera.position).dot(viewDirection));
+    } else {
+      renderer.render(scene, camera);
+    }
+  }
+
+  function renderFailed() {
+    paused = true;
+    resolveReady(false);
+    onAvailabilityChange(false);
   }
 
   function projectLabels() {
@@ -364,18 +415,16 @@ export function createAtlas(
   }
 
   function invalidate() {
-    if (!disposed && !paused && !document.hidden && !queued) queued = requestAnimationFrame(draw);
+    if (!warming && !disposed && !paused && !document.hidden && !queued) queued = requestAnimationFrame(draw);
   }
 
   function syncResolution(moving: boolean) {
     if (!width || !height) return;
-    const pixelBudget = software ? (moving ? 300_000 : 560_000)
-      : coarse ? (moving ? 980_000 : 2_550_000) : (moving ? 2_500_000 : 4_400_000);
-    const ratio = Math.min(devicePixelRatio, coarse ? 2.8 : 2.5, Math.sqrt(pixelBudget / (width * height)));
+    const ratio = atlasPixelRatio(width, height, devicePixelRatio, maxBufferSide,
+      { software, compact: coarse, moving, motionScale });
     if (ratio === resolution) return;
     resolution = ratio;
-    renderer.setPixelRatio(ratio);
-    renderer.setSize(width, height, false);
+    renderer.setDrawingBufferSize(width, height, ratio);
     focusPass?.resize(width, height, ratio);
   }
 
@@ -389,23 +438,26 @@ export function createAtlas(
     homeEye.set(...framing.eye);
     homeTarget.set(...framing.target);
     profileRise = framing.rise;
-    spine.group.scale.x = width / height <= .58 ? .89 : 1;
+    const portrait = width / height <= .58;
+    distantCompass.visible = portrait;
+    spine.group.scale.x = portrait ? 1.24 : 1;
+    introEye.set(portrait ? -.5 : 1.05, portrait ? 6.2 : 7.35, portrait ? 20.6 : 24);
     introTarget.x = width / height < 1 ? 3.3 : 2.65;
     camera.aspect = width / height;
     camera.fov = framing.fov;
     camera.updateProjectionMatrix();
     coarse = matchMedia("(pointer: coarse)").matches || width < 900;
     resolution = 0;
-    syncResolution(false);
     if (coarse && focusPass) {
       focusPass.dispose();
       focusPass = undefined;
     }
-    if (introStart === null) {
+    if (introElapsed === null) {
       world.scale.y = profileRise;
       updateLandmarkBounds();
+      if (newPose) renderer.shadowMap.needsUpdate = true;
     }
-    if (introStart === null && selected < 0 && !flight && newPose) {
+    if (introElapsed === null && selected < 0 && !flight && newPose) {
       aim(homeEye, homeTarget);
       enterOrbit();
     }
@@ -424,20 +476,27 @@ export function createAtlas(
   }
 
   function playIntro() {
-    if (reduced || paused || introStart !== null) return;
+    if (reduced || paused || introElapsed !== null) return;
+    if (warming) {
+      introRequested = true;
+      return;
+    }
     flight = null;
     selected = hovered = -1;
-    introStart = -1;
+    introElapsed = 0;
+    introVisibleTime = 0;
+    lastMotionFrame = 0;
     controls.enabled = false;
     applyIntro(0);
-    renderer.shadowMap.needsUpdate = true;
     invalidate();
     journey.onIntroChange(true);
   }
 
   function finishIntro() {
-    if (introStart === null) return;
-    introStart = null;
+    introRequested = false;
+    if (introElapsed === null) return;
+    introElapsed = null;
+    lastMotionFrame = 0;
     applyIntro(1);
     updateLandmarkBounds();
     renderer.shadowMap.needsUpdate = true;
@@ -502,7 +561,8 @@ export function createAtlas(
       flight = null;
       if (!id) enterOrbit();
     } else {
-      flight = { start: performance.now(), fromEye: camera.position.clone(), fromTarget: target.clone(), toEye, toTarget };
+      lastMotionFrame = 0;
+      flight = { elapsed: 0, fromEye: camera.position.clone(), fromTarget: target.clone(), toEye, toTarget };
       ambienceUntil = performance.now() + 1140;
     }
     invalidate();
@@ -570,13 +630,13 @@ export function createAtlas(
     if (press?.id !== event.pointerId) return;
     const start = press;
     press = null;
-    if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 8 || introStart !== null || flight) return;
+    if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 8 || introElapsed !== null || flight) return;
     const hit = hitTest(event);
     if (hit) journey.onSelect(hit);
   }
 
   function pointerMove(event: PointerEvent) {
-    if (press || event.pointerType !== "mouse" || introStart !== null || flight) return;
+    if (press || event.pointerType !== "mouse" || introElapsed !== null || flight) return;
     const hit = hitTest(event);
     canvas.style.cursor = hit ? "pointer" : "";
     highlight(hit);
@@ -590,8 +650,32 @@ export function createAtlas(
 
   function contextLost(event: Event) {
     event.preventDefault();
-    paused = true;
-    onAvailabilityChange(false);
+    renderFailed();
+  }
+
+  function visibilityChanged() {
+    lastMotionFrame = 0;
+    lastFrame = 0;
+    invalidate();
+  }
+
+  function present() {
+    window.clearTimeout(warmupTimer);
+    warming = false;
+    if (disposed || paused) return;
+    try {
+      if (introRequested && !reduced) {
+        if (!software && !document.hidden) {
+          // Upload the visible world and its shadow map before the book moves.
+          syncResolution(true);
+          renderScene();
+        }
+        playIntro();
+      }
+      invalidate();
+    } catch {
+      renderFailed();
+    }
   }
 
   function contextRestored() {
@@ -614,17 +698,24 @@ export function createAtlas(
   canvas.addEventListener("pointermove", pointerMove);
   canvas.addEventListener("pointerleave", clearPointer);
   canvas.addEventListener("pointercancel", clearPointer);
-  document.addEventListener("visibilitychange", invalidate);
+  document.addEventListener("visibilitychange", visibilityChanged);
   controls.addEventListener("change", invalidate);
   controls.addEventListener("start", () => { orbiting = true; });
   controls.addEventListener("end", () => { orbiting = false; invalidate(); });
   const observer = new ResizeObserver(resize);
   observer.observe(surface);
+  window.addEventListener("resize", invalidate);
   resize();
   reset();
   renderer.shadowMap.needsUpdate = true;
+  const shaderWarmup = !software && renderer.extensions.has("KHR_parallel_shader_compile")
+    ? renderer.compileAsync(scene, camera)
+    : Promise.resolve();
+  const warmupLimit = new Promise<void>((resolve) => { warmupTimer = window.setTimeout(resolve, 900); });
+  void Promise.race([Promise.all([textures, shaderWarmup]), warmupLimit]).then(present, present);
 
   return {
+    ready,
     reset,
     focus,
     highlight,
@@ -634,8 +725,11 @@ export function createAtlas(
     finishIntro,
     dispose() {
       disposed = true;
+      window.clearTimeout(warmupTimer);
+      resolveReady(false);
       if (queued) cancelAnimationFrame(queued);
       observer.disconnect();
+      window.removeEventListener("resize", invalidate);
       controls.removeEventListener("change", invalidate);
       controls.dispose();
       canvas.removeEventListener("pointerdown", pointerDown);
@@ -643,7 +737,7 @@ export function createAtlas(
       canvas.removeEventListener("pointermove", pointerMove);
       canvas.removeEventListener("pointerleave", clearPointer);
       canvas.removeEventListener("pointercancel", clearPointer);
-      document.removeEventListener("visibilitychange", invalidate);
+      document.removeEventListener("visibilitychange", visibilityChanged);
       canvas.removeEventListener("webglcontextlost", contextLost);
       canvas.removeEventListener("webglcontextrestored", contextRestored);
       const released = new Set<T.Material | T.Texture | T.BufferGeometry>();
