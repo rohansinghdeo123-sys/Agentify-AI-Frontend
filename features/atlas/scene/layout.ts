@@ -2,9 +2,9 @@ export type Point = [number, number, number];
 export type Destination = "planning" | "study" | "revision" | "exam";
 
 export const VIEW = {
-  eye: [.7, 12.5, 31.8] as Point,
-  target: [-2.55, 5.18, .85] as Point,
-  fov: 41,
+  eye: [2.7, 12.75, 31.8] as Point,
+  target: [-.55, 5.43, .85] as Point,
+  fov: 44.6,
 };
 
 export function overviewCamera(width: number, height: number) {
@@ -25,10 +25,11 @@ export function overviewCamera(width: number, height: number) {
       rise: 1.16,
     };
   }
+  // Leave room above the Exam temple for the centered title on landscape screens.
   if (height < 550) {
-    return { eye: [2.5, 12.4, 32.5] as Point, target: [-2, 5.3, .4] as Point, fov: 41.5, rise: 1 };
+    return { eye: [4.25, 13.25, 32.5] as Point, target: [-.25, 6.15, .4] as Point, fov: 52, rise: 1 };
   }
-  return { ...VIEW, fov: 2 * Math.atan(Math.max(.372, .60 / aspect)) * 180 / Math.PI, rise: 1 };
+  return { ...VIEW, fov: 2 * Math.atan(Math.max(.41, .60 / aspect)) * 180 / Math.PI, rise: 1 };
 }
 
 export const DESTINATIONS: { id: Destination; title: string; site: Point; shelf: Point; size: [number, number, number]; accent: number }[] = [

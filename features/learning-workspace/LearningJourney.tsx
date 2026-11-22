@@ -28,7 +28,7 @@ export default function LearningJourney({
   userId?: string | null;
 }) {
   const [choice, setChoice] = useState<LearningModeId | null>(null);
-  const [atlasReady, setAtlasReady] = useState(false);
+  const [atlasPhase, setAtlasPhase] = useState<"loading" | "ready" | "fallback">("loading");
   const [playing, setPlaying] = useState(false);
   const [reduced, setReduced] = useState(false);
   const opener = useRef<HTMLButtonElement>(null);
@@ -41,6 +41,7 @@ export default function LearningJourney({
   const active = LEARNING_WORKSPACE_STEPS.find((step) => step.id === choice);
   const recommended = active?.id === recommendation.mode;
   const mastered = !!progress?.total_units && progress.mastered_units === progress.total_units;
+  const atlasReady = atlasPhase === "ready";
 
   useEffect(() => {
     if (choice) previewHeading.current?.focus({ preventScroll: true });
@@ -67,7 +68,8 @@ export default function LearningJourney({
     void import("@/features/atlas/scene/createAtlas").then(async ({ createAtlas }) => {
       if (cancelled || !surface.current) return;
       const runtime = createAtlas(surface.current, markers.current, (available) => {
-        setAtlasReady(available);
+        if (cancelled) return;
+        setAtlasPhase(available ? "ready" : "fallback");
         if (!available) setPlaying(false);
       }, {
         onIntroChange: setPlaying,
@@ -93,9 +95,12 @@ export default function LearningJourney({
         }
         if (!played) runtime.playIntro();
       }
-      if (await runtime.ready && !cancelled) setAtlasReady(true);
+      const available = await runtime.ready;
+      if (!cancelled) setAtlasPhase(available ? "ready" : "fallback");
     }).catch(() => {
-      if (!cancelled) setAtlasReady(false);
+      if (cancelled) return;
+      setPlaying(false);
+      setAtlasPhase("fallback");
     });
     return () => {
       cancelled = true;
@@ -114,7 +119,7 @@ export default function LearningJourney({
   };
 
   return (
-    <section className={styles.page} aria-labelledby="learning-journey-title" data-atlas={atlasReady ? "ready" : "fallback"}
+    <section className={styles.page} aria-labelledby="learning-journey-title" data-atlas={atlasPhase}
       data-intro={playing || undefined} data-selected={choice ?? undefined}
       onKeyDown={(event) => {
         if (event.key === "Escape" && !event.defaultPrevented) {
@@ -126,10 +131,15 @@ export default function LearningJourney({
       }}>
       <h1 id="learning-journey-title" className={styles.title}>Your Learning <em>Journey</em></h1>
       <div ref={surface} className={styles.surface} aria-hidden="true" />
+      {atlasPhase === "loading" && <p className={styles.loading} role="status">Loading your 3D journey…</p>}
 
       <div className={styles.map}>
-        <div className={styles.art} aria-hidden="true" />
-        <span className={styles.routeSpark} aria-hidden="true" />
+        {atlasPhase === "fallback" && (
+          <>
+            <div className={styles.art} aria-hidden="true" />
+            <span className={styles.routeSpark} aria-hidden="true" />
+          </>
+        )}
         {mastered ? <span className={styles.compassReward} data-mastered="true" aria-hidden="true" /> : null}
         <span className="sr-only" id="journey-recommendation">Suggested next step</span>
         {mastered ? <span className="sr-only" role="status">Plan mastered</span> : null}

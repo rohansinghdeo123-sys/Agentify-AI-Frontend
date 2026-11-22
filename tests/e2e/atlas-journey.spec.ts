@@ -7,26 +7,46 @@ test.use({
   trace: { mode: "retain-on-failure", screenshots: false, snapshots: true },
 });
 
-test("the 3D journey plays once, can replay, and preserves workspace navigation", async ({ page, isMobile }, testInfo) => {
+test("the centered 3D journey loads without flashing fallback artwork and preserves navigation", async ({ page, isMobile }, testInfo) => {
   test.setTimeout(150_000);
   const errors: string[] = [];
+  const fallbackRequests: string[] = [];
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (/^\/learning-journey(?:-light)?\.webp$/.test(path)) fallbackRequests.push(path);
+  });
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
     if (message.type() === "error" && /THREE\.|WebGL/.test(message.text())) errors.push(message.text());
   });
   await installWorkspaceMocks(page, "dark", { state: "ready" });
   await page.addInitScript(() => {
+    const phases = new Set<string>();
     const witness = new MutationObserver(() => {
       if (document.querySelector('[data-intro="true"]')) document.documentElement.dataset.testAtlasIntro = "observed";
+      const phase = document.querySelector('[aria-labelledby="learning-journey-title"]')?.getAttribute("data-atlas");
+      if (phase && !phases.has(phase)) {
+        phases.add(phase);
+        document.documentElement.dataset.testAtlasPhases = [...phases].join(",");
+      }
     });
-    witness.observe(document, { attributes: true, attributeFilter: ["data-intro"], childList: true, subtree: true });
+    witness.observe(document, { attributes: true, attributeFilter: ["data-atlas", "data-intro"], childList: true, subtree: true });
   });
   await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
   const scene = page.locator('section[aria-labelledby="learning-journey-title"]');
   const canvas = scene.locator("canvas");
   await expect(scene).toHaveAttribute("data-atlas", "ready", { timeout: 45_000 });
   const skip = scene.getByRole("button", { name: "Skip intro" });
+  await expect(page.locator("html")).toHaveAttribute("data-test-atlas-phases", "loading,ready");
   await expect(page.locator("html")).toHaveAttribute("data-test-atlas-intro", "observed");
+  const heading = scene.getByRole("heading", { name: "Your Learning Journey" });
+  await expect(heading).toHaveCSS("text-align", "center");
+  const insights = page.getByRole("navigation", { name: "Learning insights" });
+  const headingBox = (await heading.boundingBox())!;
+  const insightsBox = (await insights.boundingBox())!;
+  expect(headingBox.x + headingBox.width / 2).toBeCloseTo(page.viewportSize()!.width / 2, 0);
+  expect(headingBox.y).toBeGreaterThan(insightsBox.y + insightsBox.height);
+  expect(headingBox.y).toBeLessThan(125);
   await expect(canvas).toBeVisible();
   const replay = scene.getByRole("button", { name: "Replay intro" });
   await expect(replay).toBeVisible();
@@ -79,7 +99,6 @@ test("the 3D journey plays once, can replay, and preserves workspace navigation"
   await page.getByRole("button", { name: "Dark theme" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await expect(canvas).toHaveCSS("opacity", "1");
-  const insights = page.getByRole("navigation", { name: "Learning insights" });
   const analytics = insights.getByRole("link", { name: "Analytics" });
   await expect(analytics).toHaveAttribute("href", "/dashboard/analytics");
   await expect(analytics).toHaveCSS("color", "rgb(23, 32, 51)");
@@ -107,5 +126,6 @@ test("the 3D journey plays once, can replay, and preserves workspace navigation"
   await page.getByRole("link", { name: "Return to Workspace" }).click();
   await expect(scene).toHaveAttribute("data-atlas", "ready", { timeout: 45_000 });
   await expect(skip).toHaveCount(0);
+  expect(fallbackRequests).toEqual([]);
   expect(errors).toEqual([]);
 });
