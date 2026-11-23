@@ -190,15 +190,11 @@ function OtpBoxes({
 export default function LoginPage() {
   const {
     user,
-    accountProfile,
     authError: authSetupError,
     authStartupMessage,
-    profileError,
-    refreshProfile,
     loginWithGoogle,
     sendPhoneOtp,
     verifyPhoneOtp,
-    loading,
     sessionExpired,
   } = useAuth();
   const router = useRouter();
@@ -213,32 +209,26 @@ export default function LoginPage() {
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [resendIn, setResendIn] = useState(0);
   const [shake, setShake] = useState(false);
-  const [granted, setGranted] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
   const otpInputRef = useRef<HTMLInputElement>(null);
   const phoneInputRef = useRef<HTMLInputElement>(null);
 
   const formattedPhone = useMemo(() => normalizePhoneNumber(phoneNumber), [phoneNumber]);
   const signInBlocked = Boolean(authSetupError);
+  const granted = Boolean(user && !signInBlocked && !sessionExpired);
   const visibleAuthError =
     authSetupError ||
     authStartupMessage ||
     authError ||
-    profileError ||
     (sessionExpired ? "Your session expired. Sign in again to continue studying." : "");
 
   useEffect(() => {
     primeBackend(backendURL);
-    router.prefetch("/dashboard");
-  }, [backendURL, router]);
+  }, [backendURL]);
 
   useEffect(() => {
-    if (!loading && user && accountProfile && !profileError) {
-      setGranted(true);
-      primeBackend(backendURL);
-      router.replace(accountProfile.onboarding_completed ? "/dashboard" : "/onboarding");
-    }
-  }, [accountProfile, backendURL, user, loading, profileError, router]);
+    if (granted) router.replace("/dashboard");
+  }, [granted, router]);
 
   useEffect(() => {
     if (authError) {
@@ -425,16 +415,16 @@ export default function LoginPage() {
               shake && "animate-shake",
             )}
           >
-            {granted || (user && loading) ? (
+            {granted ? (
               <div className="flex flex-col items-center py-5 text-center" role="status" aria-live="polite">
                 <span className="auth-success-badge flex h-14 w-14 items-center justify-center rounded-full">
                   <AppIcon name="check" className="h-6 w-6" />
                 </span>
                 <p className="mt-4 text-sm font-bold text-[var(--agentify-primary-text)]">
-                  {granted ? "You’re in." : "Signed in. Opening your study workspace..."}
+                  Signed in. Opening your study workspace...
                 </p>
                 <p className="mt-1 text-xs leading-5 text-[var(--agentify-muted-text)]">
-                  {granted ? "Restoring your sessions and progress." : "Connecting to your saved study profile."}
+                  Connecting to your saved study profile.
                 </p>
                 <div className="mx-auto mt-5 w-full max-w-[13rem] space-y-2">
                   <span className="polished-skeleton block h-2.5 w-full rounded-full" />
@@ -562,12 +552,6 @@ export default function LoginPage() {
                 {visibleAuthError ? (
                   <div id="login-auth-error" className="mt-4">
                     <AlertState message={visibleAuthError} />
-                    {user && profileError ? (
-                      <button type="button" className="mt-3 w-full rounded-xl border px-4 py-3 text-sm font-semibold"
-                        onClick={() => { setAuthError(""); void refreshProfile(); }}>
-                        Retry loading my profile
-                      </button>
-                    ) : null}
                   </div>
                 ) : null}
 

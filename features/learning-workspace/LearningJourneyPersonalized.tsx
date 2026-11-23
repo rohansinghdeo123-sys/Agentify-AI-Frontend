@@ -9,7 +9,8 @@ import LearningJourney from "./LearningJourney";
 import { recommendLearningWorkspace, type LearningRecommendation } from "./recommendation";
 
 export default function LearningJourneyPersonalized() {
-  const { userId, loading, claimsLoading, getAuthHeaders } = useAuth();
+  const { userId, accountProfile, loading, claimsLoading, getAuthHeaders } = useAuth();
+  const profileReady = accountProfile?.onboarding_completed === true;
   const [recommendation, setRecommendation] = useState<LearningRecommendation>(() => (
     recommendLearningWorkspace(null)
   ));
@@ -17,7 +18,7 @@ export default function LearningJourneyPersonalized() {
   const [progress, setProgress] = useState<PlanningPortfolioProgress>();
 
   useEffect(() => {
-    if (loading || claimsLoading) return;
+    if (loading || claimsLoading || !profileReady) return;
     const controller = new AbortController();
     const saved = userId ? readPlanningPortfolioState(userId) : { state: null };
     void Promise.resolve().then(() => {
@@ -43,7 +44,7 @@ export default function LearningJourneyPersonalized() {
     }
 
     return () => controller.abort();
-  }, [claimsLoading, getAuthHeaders, loading, userId]);
+  }, [claimsLoading, getAuthHeaders, loading, profileReady, userId]);
 
   return <LearningJourney recommendation={recommendation} progress={progress} userId={userId} />;
 }

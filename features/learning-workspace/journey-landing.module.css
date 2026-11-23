@@ -10,8 +10,6 @@
   --journey-title-accent: #ffdfa5;
   --journey-title-shadow: 0 2px 20px #02201e, 0 8px 35px #021617b2;
   --journey-map-focus: #ffdfa3;
-  --journey-spark-core: #fff4c8;
-  --journey-spark-glow: 0 0 .65rem .2rem #ffdd8ea6, 0 0 1.45rem .3rem #8af1c97a;
 }
 
 :global([data-theme="light"]) .page {
@@ -22,8 +20,6 @@
   --journey-title-accent: #80521d;
   --journey-title-shadow: 0 2px 18px #ffffffa6;
   --journey-map-focus: #155e53;
-  --journey-spark-core: #a0570d;
-  --journey-spark-glow: 0 0 0 1px #fff5d5, 0 0 .65rem .2rem #e0a036ba, 0 0 1.3rem .25rem #7fd0b695;
 }
 
 .title {
@@ -71,11 +67,11 @@
   pointer-events: none;
 }
 
-.page[data-atlas="ready"] :is(.compassReward, .pinCore) { display: none; }
+.page[data-atlas="ready"] .compassReward { display: none; }
 .page[data-atlas="ready"] .waypoint { left: var(--atlas-x, var(--waypoint-x)); top: var(--atlas-y, var(--waypoint-y)); }
 .page[data-atlas="ready"][data-intro] .waypoints,
 .page[data-atlas="ready"][data-selected] .waypoint:not([data-active]):not(:focus-within) { visibility: hidden; }
-.page[data-atlas="ready"] .pin {
+.pin {
   position: relative;
   width: auto;
   min-width: 2.75rem;
@@ -83,7 +79,7 @@
   border-radius: .55rem;
   pointer-events: auto;
 }
-.page[data-atlas="ready"] .pinLabel {
+.pinLabel {
   position: static;
   translate: none;
   opacity: 1;
@@ -99,21 +95,21 @@
   font-size: clamp(.6875rem, .96vw, .87rem);
   font-weight: 730;
 }
-.page[data-atlas="ready"] .pin:is(:hover, :focus-visible) .pinLabel,
-.page[data-atlas="ready"] :is(.waypoint[data-active], .waypoint[data-recommended]) .pinLabel {
+.pin:is(:hover, :focus-visible) .pinLabel,
+:is(.waypoint[data-active], .waypoint[data-recommended]) .pinLabel {
   border-color: #edc586;
   background: #153e35;
   color: #ffedbb;
   box-shadow: 0 0 .65rem #dba75677;
 }
-.page[data-atlas="ready"] .waypoint[data-recommended] .pinLabel::before {
+.waypoint[data-recommended] .pinLabel::before {
   content: "";
   width: .27rem;
   height: .27rem;
   border-radius: 50%;
   background: #f3c77c;
 }
-:global([data-theme="light"]) .page[data-atlas="ready"] .pinLabel {
+:global([data-theme="light"]) .pinLabel {
   border-color: #ae8347;
 }
 .page[data-atlas="ready"][data-selected] .title { visibility: hidden; }
@@ -154,28 +150,25 @@
 
 .map {
   position: absolute;
-  inset-inline-end: 0;
-  top: 50%;
-  translate: 0 -50%;
-  width: min(100%, calc((100cqh - .5rem) * 10 / 9));
-  aspect-ratio: 10 / 9;
+  left: 50%;
+  top: 53%;
+  translate: -50% -50%;
+  width: min(100%, calc(100cqh * 25 / 22));
+  aspect-ratio: 25 / 22;
 }
 
 .map .art {
   position: absolute;
-  inset: 0 auto 0 -35%;
-  width: 135%;
-  max-width: none;
-  height: 100%;
-  background: url("/learning-journey.webp") center / 100% 100% no-repeat;
-  mask-image: linear-gradient(to right, transparent, #000 24%),
-    linear-gradient(to bottom, transparent, #000 2.6%, #000 96.25%, transparent);
+  inset: 0;
+  background: url("/atlas-overview-dark.webp") center / 100% 100% no-repeat;
+  mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent),
+    linear-gradient(to bottom, transparent, #000 16%, #000 86%, transparent);
   mask-composite: intersect;
   pointer-events: none;
   user-select: none;
 }
 
-:global([data-theme="light"]) .map .art { background-image: url("/learning-journey-light.webp"); }
+:global([data-theme="light"]) .map .art { background-image: url("/atlas-overview-light.webp"); }
 
 .waypoints {
   position: absolute;
@@ -194,91 +187,13 @@
 
 .waypoint:focus-within { z-index: 1; }
 
-.pin {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: clamp(2.75rem, 4.6vw, 3.8rem);
-  height: clamp(2.75rem, 4.6vw, 3.8rem);
-  border-radius: 50%;
-  color: #fff9ea;
-  cursor: pointer;
-}
-
-.pinCore {
-  display: grid;
-  place-items: center;
-  width: 57%;
-  height: 57%;
-  border: 1px solid #baf4dc;
-  border-radius: 50%;
-  background: #05322e;
-  box-shadow: 0 0 0 3px #043c357a, 0 0 13px #92eecda6;
-  transition: transform var(--ds-duration-normal) var(--ds-ease-standard), background-color var(--ds-duration-normal) ease;
-}
-
-.pinCore svg { width: 62%; height: 62%; }
-
-.waypoint[data-recommended] .pinCore, .pin[aria-expanded="true"] .pinCore {
-  border-color: #fff0be;
-  background: #f8d78f;
-  color: #1f382b;
-  box-shadow: 0 0 0 3px #ffdf9c80, 0 0 18px #f5c46cb3;
-}
-
-.pin[aria-expanded="true"] .pinCore { animation: waypoint-select 440ms var(--ds-ease-standard) both; }
-.pin:active .pinCore { transform: scale(.92); }
 .pin:focus-visible { outline: 2px solid var(--journey-map-focus); outline-offset: 1px; }
-
-.pinLabel {
-  position: absolute;
-  inset-inline-end: 100%;
-  top: 50%;
-  translate: .3rem -50%;
-  padding: .32rem .58rem;
-  border: 1px solid #a2e7d6a6;
-  border-radius: .45rem;
-  background: #032725;
-  color: #fff9e9;
-  white-space: nowrap;
-  font-size: .78rem;
-  font-weight: 820;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--ds-duration-fast) ease, translate var(--ds-duration-fast) var(--ds-ease-standard);
-}
-
-.pin:focus-visible .pinLabel { opacity: 1; translate: 0 -50%; }
-
-@media (hover: hover) and (pointer: fine) {
-  .pin:hover .pinCore { transform: scale(1.13); }
-  .pin:hover .pinLabel { opacity: 1; translate: 0 -50%; }
-}
-
-/* The transformed layer shares the map's coordinate space. Only the light moves. */
-.routeSpark {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  animation: follow-path 4.4s linear both;
-}
-
-.routeSpark::before {
-  position: absolute;
-  width: .34rem;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  translate: -50% -50%;
-  background: var(--journey-spark-core);
-  box-shadow: var(--journey-spark-glow);
-  content: "";
-}
 
 .compassReward {
   position: absolute;
-  top: 16.7%;
-  left: 73.75%;
-  width: 18%;
+  top: 53.7%;
+  left: 68.2%;
+  width: 7%;
   aspect-ratio: 1;
   translate: -50% -50%;
   border: 2px solid #ffdc94;
@@ -286,13 +201,6 @@
   box-shadow: 0 0 26px #f8c56789;
   pointer-events: none;
   animation: compass-unlock 850ms var(--ds-ease-standard) both;
-}
-
-/* Keep the gold selection and completion states distinct from sunlit stone. */
-:global([data-theme="light"]) .waypoint[data-recommended] .pinCore,
-:global([data-theme="light"]) .pin[aria-expanded="true"] .pinCore {
-  border-color: #986123;
-  box-shadow: 0 0 0 3px #fff6debd, 0 0 18px #bc812b85;
 }
 
 :global([data-theme="light"]) .compassReward {
@@ -372,27 +280,6 @@
   font-weight: 740;
 }
 
-@keyframes follow-path {
-  0% { transform: translate3d(42%, 85%, 0); opacity: 0; }
-  8% { transform: translate3d(51%, 79%, 0); opacity: .87; }
-  18% { transform: translate3d(66%, 71%, 0); opacity: 1; }
-  28% { transform: translate3d(87%, 63%, 0); }
-  36% { transform: translate3d(83%, 58%, 0); }
-  48% { transform: translate3d(54%, 53%, 0); }
-  57% { transform: translate3d(40%, 48%, 0); }
-  66% { transform: translate3d(55%, 43%, 0); }
-  76% { transform: translate3d(69%, 38%, 0); }
-  84% { transform: translate3d(81%, 33%, 0); }
-  93% { transform: translate3d(68%, 29%, 0); opacity: .9; }
-  100% { transform: translate3d(74%, 17%, 0); opacity: 0; }
-}
-
-@keyframes waypoint-select {
-  0% { scale: .88; }
-  58% { scale: 1.17; }
-  100% { scale: 1; }
-}
-
 @keyframes compass-unlock {
   0% { scale: .84; opacity: 0; }
   44% { scale: 1.13; opacity: 1; }
@@ -411,39 +298,34 @@
   }
 
   .map {
-    inset-inline-end: 50%;
-    top: 53%;
-    translate: 50% -50%;
-    width: min(105%, calc((100cqh - 8rem) * 10 / 9));
+    left: 45%;
+    width: min(124%, calc((100cqh - 8rem) * 25 / 22));
   }
 
   .preview { inset-inline: max(.75rem, env(safe-area-inset-left)); bottom: max(.75rem, env(safe-area-inset-bottom)); width: auto; }
-  .page[data-atlas="ready"] .pinLabel {
+  .pinLabel {
     padding: .33rem .58rem;
     border-radius: .48rem;
     font-size: .77rem;
   }
-  .page[data-atlas="ready"] .waypoint[data-recommended] .pinLabel {
+  .waypoint[data-recommended] .pinLabel {
     border-color: #e0ab55;
     background: #f9db97;
     color: #16342d;
   }
-  .page[data-atlas="ready"] .waypoint[data-recommended] .pinLabel::before { display: none; }
+  .waypoint[data-recommended] .pinLabel::before { display: none; }
   .controls button { padding-inline: .68rem; font-size: .81rem; }
 }
 
 @media (max-height: 470px) and (min-aspect-ratio: 1 / 1) {
   .title { top: max(4.4rem, calc(env(safe-area-inset-top) + 4.2rem)); font-size: clamp(1.8rem, 3.6vw, 2.4rem); }
-  .map { width: min(100%, calc((100cqh - 2rem) * 10 / 9)); top: calc(50% + .5rem); }
+  .map { width: min(100%, calc((100cqh - 2rem) * 25 / 22)); top: calc(50% + .5rem); }
   .preview { width: min(21rem, 48%); bottom: .55rem; max-height: calc(100% - 4.2rem); padding: .72rem; }
 }
 
-:global(html[data-motion="reduced"]) .routeSpark { display: none; }
-:global(html[data-motion="reduced"]) .preview,
-:global(html[data-motion="reduced"]) .pin[aria-expanded="true"] .pinCore { animation: none; }
+:global(html[data-motion="reduced"]) :is(.preview, .compassReward) { animation: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  .routeSpark, .compassReward, .pin[aria-expanded="true"] .pinCore, .preview { animation: none; }
-  .routeSpark { display: none; }
-  .pinCore, .pinLabel, .launch { transition: none; transform: none !important; }
+  .compassReward, .preview { animation: none; }
+  .pinLabel, .launch { transition: none; transform: none !important; }
 }

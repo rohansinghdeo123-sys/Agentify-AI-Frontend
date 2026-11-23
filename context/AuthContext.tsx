@@ -32,13 +32,12 @@ import { getPublicBackendUrl } from "@/lib/env";
 import {
   ApiRequestError,
   apiJson,
+  ensureBackendReady,
   primeBackend,
 } from "@/lib/apiClient";
 import {
   AUTH_BOOTSTRAP_TIMEOUT_MESSAGE,
   AUTH_BOOTSTRAP_TIMEOUT_MS,
-  PROFILE_FOREGROUND_WAIT_MS,
-  PROFILE_RECOVERY_MESSAGE,
 } from "@/lib/authBootstrap";
 import {
   type BackendUserProfile,
@@ -333,12 +332,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfileLoading(true);
       setProfileError("");
       let resumed = false;
-      const foreground = setTimeout(() => {
-        if (isCurrent() && !resumed) {
-          setProfileLoading(false);
-          setProfileError(PROFILE_RECOVERY_MESSAGE);
-        }
-      }, PROFILE_FOREGROUND_WAIT_MS);
       const pending = (async () => {
         try {
           let token = await withIdentityDeadline(currentUser.getIdToken());
@@ -350,16 +343,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setProfileLoading(false);
             setProfileError("");
           }
-          const deadline = Date.now() + 66_000;
+          const deadline = Date.now() + 90_000;
+          const attemptTimeouts = [15_000, 25_000, 45_000];
           let refreshedToken = false;
-          for (let attempt = 0; attempt < 3; attempt++) {
+          for (const [attempt, timeoutMs] of attemptTimeouts.entries()) {
+            const canRetry = attempt < attemptTimeouts.length - 1;
             try {
               const remaining = deadline - Date.now();
               if (remaining <= 0) throw new ApiRequestError("The study server took too long to respond.", 408);
               const loadedProfile = await apiJson<unknown>(`${backendURL}/profile/me`, {
                 headers: { Authorization: `Bearer ${token}` },
                 signal: controller.signal,
-                timeoutMs: remaining,
+                timeoutMs: Math.min(timeoutMs, remaining),
               });
               if (!isProfileFor(loadedProfile, uid)) throw new ApiRequestError("The study server did not return a valid profile.", 503);
               if (!isCurrent()) return null;
@@ -369,15 +364,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               return loadedProfile;
             } catch (error) {
               if (!isCurrent()) return null;
-              if (error instanceof ApiRequestError && error.status === 401 && !refreshedToken && attempt < 2) {
+              if (error instanceof ApiRequestError && error.status === 401 && !refreshedToken && canRetry) {
                 refreshedToken = true;
                 resumed = false;
                 writeProfileSnapshot(backendURL, project, uid, null);
                 setAccountProfile(null);
+                setProfileLoading(true);
                 token = await withIdentityDeadline(currentUser.getIdToken(true));
                 continue;
               }
-              if (!isTemporaryBackendError(error) || attempt === 2 || Date.now() >= deadline) throw error;
+              if (!isTemporaryBackendError(error) || !canRetry || Date.now() >= deadline) throw error;
+              // When the host wakes up, share the health probe already started from login.
+              if (!(error instanceof ApiRequestError) || error.status === 503) {
+                await ensureBackendReady(backendURL, { timeoutMs: Math.min(45_000, deadline - Date.now()) });
+              }
               await new Promise((resolve) => setTimeout(resolve, 350 * (attempt + 1)));
               if (!isCurrent()) return null;
             }
@@ -389,7 +389,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setProfileError(profileErrorMessage(error));
           }
         } finally {
-          clearTimeout(foreground);
           if (profileRequest.current?.controller === controller) profileRequest.current = null;
           if (isCurrent()) setProfileLoading(false);
         }

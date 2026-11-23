@@ -16,14 +16,14 @@ for (const theme of ["light", "dark"] as const) {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await installWorkspaceMocks(page, theme, { state: "ready" });
-    const lightArtwork = "/learning-journey-light.webp";
-    const darkArtwork = "/learning-journey.webp";
+    const lightArtwork = "/atlas-overview-light.webp";
+    const darkArtwork = "/atlas-overview-dark.webp";
     const initialArtwork = theme === "light" ? lightArtwork : darkArtwork;
     const alternateArtwork = theme === "light" ? darkArtwork : lightArtwork;
     const artworkLoads: string[] = [];
     page.on("request", (request) => {
       const path = new URL(request.url()).pathname;
-      if (path === lightArtwork || path === darkArtwork) artworkLoads.push(path);
+      if (/\/(?:atlas-overview|learning-journey).*\.webp$/.test(path)) artworkLoads.push(path);
     });
     const imageLoaded = page.waitForResponse((response) =>
       new URL(response.url()).pathname === initialArtwork && response.ok(),
@@ -53,10 +53,7 @@ for (const theme of ["light", "dark"] as const) {
       return bounds.x === 0 && bounds.y === 0 && bounds.width === innerWidth && bounds.height === innerHeight;
     })).toBe(true);
 
-    const spark = scene.locator('[class*="routeSpark"]');
-    await expect(spark).toHaveCSS("animation-duration", "4.4s");
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await expect(spark).toHaveCSS("display", "none");
     for (const destination of destinations) {
       const pin = path.getByRole("button", { name: `Preview ${destination.title}` });
       if (!isMobile && destination.title === "Study Lab") {
@@ -105,7 +102,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.reload();
     await expect(page.locator("html")).toHaveAttribute("data-motion", "reduced");
     await page.emulateMedia({ reducedMotion: "no-preference" });
-    await expect(spark).toHaveCSS("display", "none");
+    await expect(scene).toHaveAttribute("data-atlas", "fallback");
     await page.screenshot({ path: testInfo.outputPath(`journey-${theme}.png`) });
     if (isMobile) {
       await page.setViewportSize({ width: 320, height: 620 });

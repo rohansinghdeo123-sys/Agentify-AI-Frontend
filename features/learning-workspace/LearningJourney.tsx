@@ -10,12 +10,12 @@ import { recommendLearningWorkspace, type LearningRecommendation } from "./recom
 import type { LearningModeId } from "./types";
 import styles from "./journey-landing.module.css";
 
-// Positions are relative to the 800 by 720 crop of the source illustration.
+// Label anchors in the 1000 by 880 Atlas overview, used without WebGL.
 const WAYPOINTS = {
-  planning: { x: 66, y: 64, action: "Open Planning" },
-  study: { x: 51.25, y: 49, action: "Open Study Lab" },
-  revision: { x: 58.75, y: 35.5, action: "Start a review" },
-  exam: { x: 67.25, y: 26.6, action: "Open Exam" },
+  planning: { x: 68.3, y: 68.7, action: "Open Planning" },
+  study: { x: 49.9, y: 53.8, action: "Open Study Lab" },
+  revision: { x: 73.0, y: 44.5, action: "Start a review" },
+  exam: { x: 64.8, y: 34.6, action: "Open Exam" },
 } as const;
 
 export default function LearningJourney({
@@ -134,12 +134,7 @@ export default function LearningJourney({
       {atlasPhase === "loading" && <p className={styles.loading} role="status">Loading your 3D journey…</p>}
 
       <div className={styles.map}>
-        {atlasPhase === "fallback" && (
-          <>
-            <div className={styles.art} aria-hidden="true" />
-            <span className={styles.routeSpark} aria-hidden="true" />
-          </>
-        )}
+        {atlasPhase === "fallback" && <div className={styles.art} aria-hidden="true" />}
         {mastered ? <span className={styles.compassReward} data-mastered="true" aria-hidden="true" /> : null}
         <span className="sr-only" id="journey-recommendation">Suggested next step</span>
         {mastered ? <span className="sr-only" role="status">Plan mastered</span> : null}
@@ -168,7 +163,6 @@ export default function LearningJourney({
                       atlas.current?.focus(step.id);
                     }
                   }}>
-                  <span className={styles.pinCore}><AppIcon name={step.icon} /></span>
                   <span className={styles.pinLabel} aria-hidden="true">{step.title}</span>
                 </button>
               </li>

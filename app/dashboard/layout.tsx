@@ -16,6 +16,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     authError,
     profileError,
     refreshProfile,
+    authLoading,
     loading,
     sessionExpired,
     isFounderAdmin,
@@ -23,7 +24,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const authReady = !loading;
+  const authReady = !authLoading;
+  const isLanding = pathname === "/dashboard" || pathname === "/dashboard/";
+  const profilePending = loading && !accountProfile;
   const isAdminRoute = pathname === "/dashboard/admin" || pathname?.startsWith("/dashboard/internal");
   const displayName = profile?.name || user?.displayName || user?.email?.split("@")[0] || "Student";
   const classLevel = profile?.classLevel || accountProfile?.class_level || "";
@@ -64,7 +67,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         id="main-content"
         className="flex min-h-[100dvh] items-center justify-center bg-[var(--ds-bg-app)] px-5 text-sm text-[var(--ds-accent-teal)]"
       >
-        <div className="ds-card-elevated rounded-3xl px-5 py-4 backdrop-blur-2xl">
+        <div className="ds-card-elevated rounded-3xl px-5 py-4 backdrop-blur-2xl" role="status">
           Preparing AgentifyAI...
         </div>
       </main>
@@ -129,42 +132,49 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     );
   }
 
-  if (profileError || !accountProfile) {
+  if (!isLanding && loading) {
     return (
-      <main
-        id="main-content"
-        className="flex min-h-[100dvh] items-center justify-center bg-[var(--agentify-page-bg)] px-5 text-center"
-      >
-        <div className="agentify-card max-w-md rounded-[2rem] p-7">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--ds-accent-teal)]">Profile connection</p>
-          <h1 className="mt-3 text-2xl font-semibold text-[var(--agentify-primary-text)]">
-            We could not prepare your account.
-          </h1>
-          <p className="mt-3 text-sm leading-6 text-[var(--agentify-muted-text)]">
-            Your login is safe. Retry the profile connection to continue.
-          </p>
-          <button
-            type="button"
-            onClick={() => void refreshProfile()}
-            className="agentify-action agentify-action-primary mt-6 rounded-2xl px-5 py-3 text-sm font-semibold"
-          >
-            Retry connection
-          </button>
-        </div>
+      <main id="main-content" className="flex min-h-[100dvh] items-center justify-center bg-[var(--ds-bg-app)] px-5 text-sm">
+        <p className="ds-card-elevated rounded-3xl px-5 py-4" role="status">Connecting to your study profile…</p>
       </main>
     );
   }
 
-  if (!accountProfile.onboarding_completed) return null;
+  const profileUnavailable = Boolean(profileError || (!accountProfile && !profilePending));
+  if (accountProfile && !accountProfile.onboarding_completed) return null;
 
   return (
     <AppShell
       displayName={displayName}
       classLevel={classLevel}
-      canOpenAdminConsole={isFounderAdmin}
+      canOpenAdminConsole={isFounderAdmin && !profilePending && !profileUnavailable}
       onLogout={logout}
     >
-      {children}
+      {profileUnavailable ? (
+        <div className="flex min-h-[100dvh] items-center justify-center bg-[var(--agentify-page-bg)] px-5 text-center">
+          <div className="agentify-card max-w-md rounded-[2rem] p-7">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--ds-accent-teal)]">Profile connection</p>
+            <h1 className="mt-3 text-2xl font-semibold text-[var(--agentify-primary-text)]">
+              We could not prepare your account.
+            </h1>
+            <p className="mt-3 text-sm leading-6 text-[var(--agentify-muted-text)]">
+              {profileError || "Retry the profile connection to continue."}
+            </p>
+            <button
+              type="button"
+              onClick={() => void refreshProfile()}
+              className="agentify-action agentify-action-primary mt-6 rounded-2xl px-5 py-3 text-sm font-semibold"
+            >
+              Retry connection
+            </button>
+          </div>
+        </div>
+      ) : children}
+      {profilePending && (
+        <p role="status" className="ds-card-elevated pointer-events-none fixed bottom-16 left-1/2 z-20 w-max max-w-[90vw] -translate-x-1/2 rounded-full px-4 py-2 text-center text-xs">
+          Connecting to your study profile…
+        </p>
+      )}
     </AppShell>
   );
 }

@@ -81,8 +81,8 @@ describe("founder admin console", () => {
   it("lets signed-in internal routes render before student profile and onboarding gates", () => {
     const layout = source("app/dashboard/layout.tsx");
     const internalGate = layout.indexOf("if (isAdminRoute) {");
-    const profileGate = layout.indexOf("if (profileError || !accountProfile)");
-    const onboardingGate = layout.indexOf("if (!accountProfile.onboarding_completed) return null;");
+    const profileGate = layout.indexOf("if (!isLanding && loading)");
+    const onboardingGate = layout.indexOf("if (accountProfile && !accountProfile.onboarding_completed) return null;");
 
     expect(internalGate).toBeGreaterThan(-1);
     expect(internalGate).toBeLessThan(profileGate);

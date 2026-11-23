@@ -13,7 +13,7 @@ test("the centered 3D journey loads without flashing fallback artwork and preser
   const fallbackRequests: string[] = [];
   page.on("request", (request) => {
     const path = new URL(request.url()).pathname;
-    if (/^\/learning-journey(?:-light)?\.webp$/.test(path)) fallbackRequests.push(path);
+    if (/^\/(?:atlas-overview|learning-journey).*\.webp$/.test(path)) fallbackRequests.push(path);
   });
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
