@@ -175,7 +175,7 @@ export function createAtlas(
     p.gold.metalness = .33;
     p.bronze.metalness = .26;
   }
-  const air = atmosphere(scene, compact);
+  const air = atmosphere(scene, compact, invalidate);
   const world = new T.Group();
   scene.add(world);
   world.add(entranceLights);
@@ -587,6 +587,7 @@ export function createAtlas(
   function preferences(daylight: boolean, reducedMotion: boolean) {
     air.daylight.value = Number(daylight);
     air.starField.visible = !daylight;
+    air.setCloudDaylight(daylight);
     fill.intensity = daylight ? 1.65 : 1.18;
     fill.color.setHex(daylight ? 0xfcfff2 : 0xa5ece5);
     fill.groundColor.setHex(daylight ? 0x77afa0 : 0x244441);
@@ -712,7 +713,7 @@ export function createAtlas(
     ? renderer.compileAsync(scene, camera)
     : Promise.resolve();
   const warmupLimit = new Promise<void>((resolve) => { warmupTimer = window.setTimeout(resolve, 900); });
-  void Promise.race([Promise.all([textures, shaderWarmup]), warmupLimit]).then(present, present);
+  void Promise.race([Promise.all([textures, air.textures, shaderWarmup]), warmupLimit]).then(present, present);
 
   return {
     ready,

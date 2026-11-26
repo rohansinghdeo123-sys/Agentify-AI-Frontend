@@ -1,7 +1,7 @@
 import * as T from "three";
 import { mesh, randomFor } from "./primitives";
-import type { Point } from "./layout";
-import { taperedRock } from "./terrain";
+import { clouds } from "./clouds";
+import { addMountainRanges } from "./mountainRanges";
 
 const skyVertex = `
   varying vec3 world;
@@ -53,31 +53,7 @@ const waterFragment = `
   }
 `;
 
-function softCloud(seed: number) {
-  const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 128;
-  const context = canvas.getContext("2d")!;
-  const random = randomFor(seed);
-  for (let i = 0; i < 49; i++) {
-    const x = 42 + random() * 172;
-    const y = 41 + (1 - Math.sin(x * .055 + seed)) * 12 + random() * 30;
-    const radius = 9 + random() * 35;
-    const fade = .75 * (1 - Math.abs(x - 128) / 165);
-    const lobe = context.createRadialGradient(x - radius * .12, y - radius * .37, radius * .09, x, y, radius);
-    lobe.addColorStop(0, "rgba(209,229,211," + fade + ")");
-    lobe.addColorStop(.39, "rgba(164,197,190," + fade * .85 + ")");
-    lobe.addColorStop(.76, "rgba(75,126,130," + fade * .31 + ")");
-    lobe.addColorStop(1, "rgba(50,104,111,0)");
-    context.fillStyle = lobe;
-    context.fillRect(x - radius, y - radius, radius * 2, radius * 2);
-  }
-  const result = new T.CanvasTexture(canvas);
-  result.colorSpace = T.SRGBColorSpace;
-  return result;
-}
-
-export function atmosphere(parent: T.Scene, compact: boolean) {
+export function atmosphere(parent: T.Scene, compact: boolean, redraw: () => void) {
   const group = new T.Group();
   group.name = "Atmosphere and mountain ranges";
   parent.add(group);
@@ -92,38 +68,12 @@ export function atmosphere(parent: T.Scene, compact: boolean) {
   }), [0, -.76, 4]);
   water.rotation.x = -Math.PI / 2;
   water.renderOrder = -1;
-  const rock = new T.MeshStandardMaterial({ color: 0x518b8d, roughness: 1, vertexColors: true, side: T.DoubleSide });
-  for (const [index, [x, y, z, w, h, d]] of [
-    [-19,-7,-23,6.0,12,7],[-12,-8,-30,5.1,9.5,7], [-27,-7,-40,6,13,6],
-    [24,-9,-25,5.9,13,8],[18,-12,-18,5.5,8,6],[30,-9,-39,8,14,9],
-    [38,-5,-56,9,15,9],[-27,-10,-53,9,11,10],[8,-11,-40,7,8,8],
-  ].entries()) taperedRock(group, rock, [x, y, z], [w, h, d], 956 + index, true);
+  addMountainRanges(group, compact);
 
-  const cloudMaps = [softCloud(12), softCloud(48), softCloud(179)];
-  const random = randomFor(319);
-  const layer = (x: number, y: number, z: number, width: number, height: number, alpha: number, parent: T.Object3D = group) => {
-    const stock = new T.SpriteMaterial({
-      map: cloudMaps[Math.floor(random() * cloudMaps.length)], depthWrite: false,
-      transparent: true, opacity: alpha, color: 0xe5f0ea,
-    });
-    const mist = new T.Sprite(stock);
-    mist.position.set(x, y, z);
-    mist.scale.set(width, height, 1);
-    parent.add(mist);
-  };
-  for (let i = 0; i < (compact ? 34 : 49); i++) {
-    const x = -33 + random() * 69, z = -40 + random() * 45;
-    const y = -4.8 + random() * 7.3;
-    layer(x, y, z, 4.6 + random() * 12, 2.3 + random() * 3.4, .32 + random() * .55);
-  }
-  layer(-9.4, -2.2, 7.5, 12, 4.1, .75);
-  layer(10.8, -1.65, 7.8, 9.1, 3.4, .75);
-  layer(-12.1, -.94, 12.8, 8.8, 3.6, .52);
-  layer(12.1, -1.4, 12.7, 10.8, 3.8, .51);
-  for (const [x, y, z] of [[-4.7,.25,3.7],[11.5,2.6,.2],[2.55,6.25,-7.4],[7.7,-.92,7.8]]) {
-    layer(x,y,z,3.8,1.43,.70);
-  }
+  const cloudLayer = clouds(group, compact, redraw);
 
+  // The established sky pattern is independent of the cloud bank count.
+  const random = randomFor(compact ? 3270378621 : 2639693888);
   const stars: number[] = [];
   const colors: number[] = [];
   for (let i = 0; i < 290; i++) {
@@ -141,9 +91,6 @@ export function atmosphere(parent: T.Scene, compact: boolean) {
   return {
     daylight,
     starField,
-    mist(parent: T.Object3D, [x,y,z]: Point, width: number) {
-      layer(x,y,z,width * 1.9,.66,.46,parent);
-      layer(x + width * .18,y - .24,z + .30,width * 2.6,.83,.34,parent);
-    },
+    ...cloudLayer,
   };
 }
