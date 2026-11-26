@@ -3,7 +3,7 @@
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Fraunces } from "next/font/google";
+import localFont from "next/font/local";
 import { useEffect, useMemo, useRef, useState } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
 import ChatThinkingLogo from "@/components/brand/ChatThinkingLogo";
@@ -11,11 +11,13 @@ import { AlertState, AppIcon } from "@/components/ui/Polished";
 import { primeBackend } from "@/lib/apiClient";
 import { readOtpInputDigits } from "@/lib/otpInput";
 
-const displayFont = Fraunces({
-  subsets: ["latin"],
+const displayFont = localFont({
+  src: [
+    { path: "../fonts/fraunces.woff2", style: "normal", weight: "100 900" },
+    { path: "../fonts/fraunces-italic.woff2", style: "italic", weight: "100 900" },
+  ],
   display: "swap",
-  style: ["normal", "italic"],
-  weight: ["400", "500", "600"],
+  adjustFontFallback: "Times New Roman",
 });
 
 // ─── Utility functions ─────────────────────────────────────────────────────

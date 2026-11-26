@@ -1,12 +1,6 @@
 import { AuthProvider } from "@/context/AuthContext";
-import { Manrope } from "next/font/google";
+import { appFont } from "./fonts";
 import "./globals.css";
-
-const appFont = Manrope({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-agentify",
-});
 
 export const metadata = {
   title: "AgentifyAI",

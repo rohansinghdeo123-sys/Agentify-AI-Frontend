@@ -9,15 +9,10 @@ import {
   isValidDisplayName,
 } from "@/lib/profile";
 import { LEGAL_CONSENT_STORAGE_KEY, LEGAL_VERSION } from "@/lib/legal";
-import { Manrope } from "next/font/google";
+import { appFont } from "@/app/fonts";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-
-const manrope = Manrope({
-  subsets: ["latin"],
-  display: "swap",
-});
 
 type OnboardingStep = 0 | 1 | 2;
 
@@ -156,7 +151,7 @@ export default function OnboardingPage() {
         step={0}
         title="Preparing your account"
         subtitle="Connecting your verified login to AgentifyAI."
-        fontClassName={manrope.className}
+        fontClassName={appFont.className}
       >
         <div className="onboarding-loading-card" role="status">
           <span />
@@ -172,7 +167,7 @@ export default function OnboardingPage() {
         step={0}
         title="Let's reconnect your profile"
         subtitle="Your login is verified. We just need the profile service to respond."
-        fontClassName={manrope.className}
+        fontClassName={appFont.className}
       >
         <div className="onboarding-form-card onboarding-error-card">
           <AppIcon name="history" />
@@ -196,7 +191,7 @@ export default function OnboardingPage() {
         step={step}
         title="Let's create your AgentifyAI account"
         subtitle="A few things for you to review"
-        fontClassName={manrope.className}
+        fontClassName={appFont.className}
         footer={
           <>
             <p>Email verified as <strong>{verifiedIdentity}</strong></p>
@@ -287,7 +282,7 @@ export default function OnboardingPage() {
         step={step}
         title="What's your name?"
         subtitle="So AgentifyAI knows what to call you."
-        fontClassName={manrope.className}
+        fontClassName={appFont.className}
       >
         <form
           className="onboarding-form"
@@ -331,7 +326,7 @@ export default function OnboardingPage() {
       step={step}
       title="Which class are you currently studying in?"
       subtitle="This helps AgentifyAI personalize your notes, revision, exams, analytics, and study path."
-      fontClassName={manrope.className}
+      fontClassName={appFont.className}
     >
       <div className="onboarding-form">
         <label className="sr-only" htmlFor="onboarding-class">
