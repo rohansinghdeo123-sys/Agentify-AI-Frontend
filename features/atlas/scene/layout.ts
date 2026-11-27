@@ -34,9 +34,9 @@ export function overviewCamera(width: number, height: number) {
 
 export const DESTINATIONS: { id: Destination; title: string; site: Point; shelf: Point; size: [number, number, number]; accent: number }[] = [
   { id: "planning", title: "Planning", site: [5.9, 1.4, 4.85], shelf: [5.65, 1.28, 4.3], size: [4.4, 3, 4.2], accent: 0x43d6b3 },
-  { id: "study", title: "Study", site: [-1.8, 4.15, -.15], shelf: [-2, 4.03, -.45], size: [5.2, 3.6, 4.8], accent: 0x44d5ca },
-  { id: "revision", title: "Revision", site: [8.5, 6.65, -4.5], shelf: [8.4, 6.53, -5.4], size: [4.6, 3.15, 5.1], accent: 0xa591fa },
-  { id: "exam", title: "Exam", site: [5.55, 9.55, -11.4], shelf: [5.45, 9.43, -11.9], size: [5.25, 3.35, 5.8], accent: 0x7eeac7 },
+  { id: "study", title: "Study", site: [-1.8, 4.15, -.15], shelf: [-2, 4.03, -.45], size: [5.2, 3.6, 4.8], accent: 0x5ddfff },
+  { id: "revision", title: "Revision", site: [8.5, 6.65, -4.5], shelf: [8.4, 6.53, -5.4], size: [4.6, 3.15, 5.1], accent: 0xb59aff },
+  { id: "exam", title: "Exam", site: [5.55, 9.55, -11.4], shelf: [5.45, 9.43, -11.9], size: [5.25, 3.35, 5.8], accent: 0xffcb79 },
 ];
 
 // Coordinates run continuously from the book's spine to the Exam stair.

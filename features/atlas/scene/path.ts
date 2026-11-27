@@ -66,22 +66,32 @@ function edgeCurve(curve: T.CatmullRomCurve3, width: number, offset: number) {
 
 function masonry(curve: T.CatmullRomCurve3, side: number, start: number, end: number, height: number) {
   const positions: number[] = [];
+  const colors: number[] = [];
   const indices: number[] = [];
   for (let i = 0; i <= 96; i++) {
     const t = i / 96;
     const fraction = T.MathUtils.lerp(start, end, t);
     const point = curve.getPointAt(fraction);
     const direction = curve.getTangentAt(fraction);
-    point.addScaledVector(new T.Vector3(-direction.z, 0, direction.x).normalize(), side * .70);
+    const across = new T.Vector3(-direction.z, 0, direction.x).normalize();
     const arch = Math.pow(Math.abs(Math.sin(t * Math.PI * 4)), .55);
-    positions.push(point.x, point.y - .075, point.z, point.x, point.y - height + (height - .24) * arch, point.z);
+    const low = point.y - height + (height - .24) * arch;
+    for (const width of [.70, .52]) {
+      const edge = point.clone().addScaledVector(across, width * side);
+      positions.push(edge.x, point.y - .075, edge.z, edge.x, low, edge.z);
+      const outer = width > .6;
+      colors.push(.96, .90, .79, outer ? .81 : .58, outer ? .72 : .44, outer ? .58 : .35);
+    }
     if (i) {
-      const k = i * 2;
-      indices.push(k - 2, k, k - 1, k - 1, k, k + 1);
+      const k = i * 4;
+      for (const [a, b] of [[0, 1], [2, 3], [1, 3]]) {
+        indices.push(k - 4 + a, k + a, k - 4 + b, k - 4 + b, k + a, k + b);
+      }
     }
   }
   const geometry = new T.BufferGeometry();
   geometry.setAttribute("position", new T.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new T.Float32BufferAttribute(colors, 3));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
@@ -95,9 +105,28 @@ export function pathway(parent: T.Object3D, p: Palette) {
   const paving = p.parchment.clone();
   paving.color.set(0xc3a676);
   paving.emissive.set(0xe3d4a7);
-  paving.emissiveIntensity = .23;
+  paving.emissiveIntensity = .13;
   paving.roughness = .65;
   paving.side = T.DoubleSide;
+  paving.onBeforeCompile = (shader) => {
+    shader.vertexShader = "varying vec2 vPaverUv;\n" + shader.vertexShader.replace(
+      "#include <begin_vertex>",
+      "#include <begin_vertex>\nvPaverUv = uv;",
+    );
+    shader.fragmentShader = "varying vec2 vPaverUv;\n" + shader.fragmentShader.replace("#include <color_fragment>", `
+      #include <color_fragment>
+      vec2 course = vec2(3.0 * vPaverUv.x, 4.35 * vPaverUv.y);
+      course.x += .5 * mod(floor(course.y), 2.);
+      vec2 distanceToJoint = .5 - abs(fract(course) - .5);
+      vec2 pixel = max(fwidth(course), vec2(.012));
+      vec2 lines = 1. - smoothstep(vec2(.021), vec2(.021) + pixel, distanceToJoint);
+      lines *= 1. - smoothstep(vec2(.18), vec2(.52), pixel);
+      float joint = max(lines.x, lines.y);
+      float stoneTone = .95 + .09 * fract(sin(dot(floor(course), vec2(8.09, 45.13))) * 4321.17);
+      float railContact = smoothstep(.37, .5, abs(vPaverUv.x - .5));
+      diffuseColor.rgb *= stoneTone * (1. - .3 * joint - .22 * railContact);
+    `);
+  };
   mesh(group, ribbon(curve, -.76, .76, .023), paving);
   const lightProgress = { value: 0 };
   const trail = mesh(group, ribbon(curve, -.28, .28, .040), new T.ShaderMaterial({
@@ -113,6 +142,9 @@ export function pathway(parent: T.Object3D, p: Palette) {
   const limestone = p.stone.clone();
   limestone.color.set(0xb39367);
   limestone.side = T.DoubleSide;
+  limestone.vertexColors = true;
+  const pillarStone = p.stone.clone();
+  pillarStone.color.copy(limestone.color);
   for (const [start, end, height] of [[.19, .44, 1.28], [.52, .75, 1.26], [.77, .96, 1.1]]) {
     for (const side of [-1, 1]) mesh(group, masonry(curve, side, start, end, height), limestone);
     for (let span = 0; span <= 4; span++) {
@@ -122,7 +154,8 @@ export function pathway(parent: T.Object3D, p: Palette) {
       const across = new T.Vector3(-direction.z, 0, direction.x).normalize();
       for (const side of [-1, 1]) {
         const edge = point.clone().addScaledVector(across, .62 * side);
-        column(group, limestone, .131, .17, height, [edge.x, point.y - height * .5, edge.z], 8);
+        column(group, pillarStone, .131, .17, height, [edge.x, point.y - height * .5, edge.z], 8);
+        column(group, pillarStone, .179, .21, .13, [edge.x, point.y - height + .075, edge.z], 8);
         column(group, p.bronze, .184, .184, .07, [edge.x, point.y - .28, edge.z], 8);
       }
     }
@@ -145,13 +178,6 @@ export function pathway(parent: T.Object3D, p: Palette) {
         mesh(group, new T.OctahedronGeometry(.052), p.lamp, [point.x, point.y + .276, point.z]);
       }
     }
-  }
-
-  for (let i = 2; i < 59; i++) {
-    const progress = i / 59;
-    const point = curve.getPointAt(progress);
-    const tangent = curve.getTangentAt(progress);
-    box(group, under, [1.39, .007, .012], [point.x, point.y + .027, point.z]).rotation.y = Math.atan2(tangent.x, tangent.z);
   }
 
   // Short landings meet each set of entrance stairs.

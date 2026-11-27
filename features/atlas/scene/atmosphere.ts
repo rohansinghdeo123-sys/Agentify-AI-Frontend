@@ -31,8 +31,8 @@ const skyFragment = `
     float aurora=exp(-abs(direction.y+.10-direction.x*.37)*5.);
     float veil=smoothstep(.76,1.25,haze)*(.21+aurora*.47);
     color=mix(color,vec3(.066,.37,.32),veil);
-    vec3 day=mix(vec3(.71,.85,.83),vec3(.95,.95,.87),horizon*.86);
-    day=mix(day,vec3(.57,.79,.74),veil*.7);
+    vec3 day=mix(vec3(.63,.79,.81),vec3(.94,.94,.86),horizon*.88);
+    day=mix(day,vec3(.54,.73,.75),veil*.65);
     gl_FragColor=sRGBTransferEOTF(vec4(mix(color,day,daylight),1.));
     #include <colorspace_fragment>
   }

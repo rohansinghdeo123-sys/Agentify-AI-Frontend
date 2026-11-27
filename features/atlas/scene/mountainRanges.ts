@@ -88,14 +88,20 @@ function rangeGeometry(range: Range, compact: boolean) {
 
     const foothill = T.MathUtils.smoothstep(elevation, .0, 5);
     const erosion = (coarse - .5) * 1.9 + (fractured - .5) * 1.62 + (fine - .5) * .42;
-    points.setY(i, (elevation + erosion * foothill) * exit - 1.8 * (1 - exit));
+    // Break the nearer slopes into irregular ledges where an exposed layer
+    // meets the hillside. The distant ridges retain a softer silhouette.
+    const bedding = elevation * 2.35 + vx * .86 - vz * .44 + fractured * .8;
+    const seam = bedding - Math.floor(bedding);
+    const ledge = (T.MathUtils.smoothstep(seam, .34, .76) - seam) *
+      T.MathUtils.smoothstep(fractured, .18, .83) * (distant ? .12 : .48);
+    points.setY(i, (elevation + (erosion + ledge) * foothill) * exit - 1.8 * (1 - exit));
   }
 
   geometry.computeVertexNormals();
   const normals = geometry.attributes.normal;
   const colors = new Float32Array(points.count * 4);
-  const shale = new T.Color(distant ? 0x37605f : 0x23353d);
-  const exposed = new T.Color(distant ? 0x5d7a7c : 0x597577);
+  const shale = new T.Color(distant ? 0x3a5c67 : 0x22333f);
+  const exposed = new T.Color(distant ? 0x657f87 : 0x637e7f);
   const lichen = new T.Color(distant ? 0x45665d : 0x506656);
   const shade = new T.Color();
   for (let i = 0; i < points.count; i++) {
@@ -105,7 +111,7 @@ function rangeGeometry(range: Range, compact: boolean) {
     const slope = 1 - normals.getY(i);
     const mineral = noise(x * .48 + y * .56, z * .44 - y * .2, seed + 21);
     const ledges = (.5 + .5 * Math.sin(y * 2.4 + x * .53 + z * .26 + mineral * 2.5)) ** 3;
-    const relief = .11 + .26 * mineral + .23 * ledges + .18 * slope;
+    const relief = .09 + .21 * mineral + .31 * ledges + .16 * slope;
     const moss = T.MathUtils.smoothstep(normals.getY(i), .48, .96) *
       T.MathUtils.smoothstep(mineral, .47, .89) * (1 - T.MathUtils.smoothstep(y, 9, 15));
     shade.copy(shale).lerp(exposed, relief).lerp(lichen, moss * .62);
@@ -148,7 +154,7 @@ function stoneMaterial(compact: boolean) {
       float grains = stoneNoise(stoneFace * 5.0 + flecks * .3);
       float beds = sin(dot(vMountainStone, vec3(-.8, 12.9, 1.1)) + grains * 2.6);
       float layer = mix(.5 + .5 * beds, .5, smoothstep(.15, 1.8, fwidth(beds)));
-      diffuseColor.rgb *= .87 + .14 * grains + .09 * layer + .07 * flecks;
+      diffuseColor.rgb *= .82 + .14 * grains + .16 * layer + .07 * flecks;
     `);
   };
   return stone;

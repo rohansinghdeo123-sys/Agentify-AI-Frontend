@@ -12,6 +12,8 @@ export function taperedRock(parent: T.Object3D, rocky: T.Material, position: Poi
   const ridges = Array.from({ length: count }, () => .85 + .26 * random());
   const stone = new T.Color(mountain ? 0x3a505d : 0x859585);
   const vegetation = new T.Color(mountain ? 0x1d3f34 : 0x81965c);
+  const moss = new T.Color(0x465e34);
+  const tone = new T.Color();
   const angleOffset = random() * 5;
   const tilt = random() - .5;
   const layers = mountain
@@ -30,7 +32,12 @@ export function taperedRock(parent: T.Object3D, rocky: T.Material, position: Poi
       const bump = (random() - .5) * (edge ? .04 : .12) * (scale === 0 ? 0 : 1);
       const height = size[1] * (elevation + (edge ? .025 : .11) * scale * fracture) + bump;
       points.push(size[0] * (Math.cos(angle) * profile + elevation * tilt * .33), height, Math.sin(angle) * size[2] * profile);
-      const tone = (edge ? vegetation : stone).clone().multiplyScalar((.74 + random() * .36 + fracture * .18) * (layer < 2 && !mountain ? .51 : 1));
+      const stratum = .5 + .5 * Math.cos(elevation * 39 + angle * 3 + fracture * 2);
+      const shade = .78 + random() * .28 + fracture * .18;
+      tone.copy(edge ? vegetation : stone);
+      if (edge) tone.lerp(moss, .3 * stratum);
+      tone.multiplyScalar(shade * (mountain ? 1 : .53 + .47 * T.MathUtils.smoothstep(elevation, -1.22, -.19)) *
+        (edge || mountain ? 1 : .80 + .20 * stratum));
       colors.push(tone.r, tone.g, tone.b);
       uv.push(i / count * (size[0] * .82 + 1), elevation * Math.max(1.15, size[1] * .72));
       if (layer && i) {
@@ -49,44 +56,62 @@ export function taperedRock(parent: T.Object3D, rocky: T.Material, position: Poi
 }
 
 const WATER_VERTEX = `
+  attribute vec2 flowProfile;
   varying vec2 vUv;
+  varying vec2 vFlowProfile;
   void main() {
     vUv = uv;
+    vFlowProfile = flowProfile;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.);
   }
 `;
 
 const WATER_FRAGMENT = `
   varying vec2 vUv;
+  varying vec2 vFlowProfile;
   uniform float time;
   void main() {
-    float flow = vUv.y + time * .46;
-    float stripe = pow(.5 + .5*sin(vUv.x*103. + flow*17. + sin(flow*9.+vUv.x*23.)*2.2), 4.);
-    float currents = pow(.5 + .5*sin(vUv.x*48. + sin(flow*14.+vUv.x*8.)*1.9), 3.);
-    float foam = pow(.5 + .5*sin(vUv.x*270. + flow*29.+sin(flow*19.)*3.), 8.);
-    vec3 color = mix(vec3(.07,.33,.36), vec3(.80,.98,.96), .18+stripe*.31+currents*.29+foam*.16);
-    float outline = smoothstep(0.,.22,vUv.x)*smoothstep(0.,.22,1.-vUv.x);
-    float alpha = outline * (.33 + stripe*.30 + currents*.24 + foam*.13) * smoothstep(0.,.18,vUv.y);
+    float seed = vFlowProfile.x;
+    float surface = vFlowProfile.y;
+    float flow = vUv.y + time * (.38 + .16 * fract(seed));
+    float channel = vUv.x + .018 * sin(flow * 12. + seed);
+    float stripe = pow(.5 + .5 * sin(channel * 95. + flow * 12. + seed * 6.), 5.);
+    float currents = .5 + .5 * sin(channel * 26. + seed * 4. + sin(flow * 15.) * .86);
+    float foam = pow(.5 + .5 * sin(channel * 196. + flow * 33. + seed * 2.), 6.);
+    float spray = (1. - smoothstep(.02, .3, vUv.y)) * foam;
+    float shimmer = stripe * .28 + currents * .30 + foam * .15 + spray * .24;
+    vec3 body = mix(vec3(.09,.36,.41), vec3(.62,.84,.85), currents * .45 + surface * .36);
+    vec3 color = mix(body, vec3(.86,.99,.96), shimmer);
+    float outline = smoothstep(0., .18, vUv.x) * smoothstep(0., .18, 1. - vUv.x);
+    float alpha = outline * (.30 + stripe * .28 + currents * .20 + foam * .14) *
+      smoothstep(0., .18, vUv.y) * (1. - .43 * surface);
     gl_FragColor = sRGBTransferEOTF(vec4(color, alpha));
     #include <colorspace_fragment>
   }
 `;
 
-function falls(parent: T.Object3D, position: Point, width: number, height: number, angle: number, material: T.Material) {
+function falls(parent: T.Object3D, position: Point, width: number, height: number, angle: number, material: T.Material, seed: number) {
   const group = new T.Group();
   group.position.set(...position);
   group.rotation.y = angle;
   parent.add(group);
-  const geometry = new T.PlaneGeometry(width, height, 28, 25);
-  const positions = geometry.getAttribute("position");
-  const uv = geometry.getAttribute("uv");
-  for (let i = 0; i < positions.count; i++) {
-    const horizontal = uv.getX(i), level = uv.getY(i);
-    const crest = Math.pow(level, 12) * -.18;
-    const z = crest + Math.pow(1 - level, 3) * .63 + .075 * Math.sin(horizontal * 25 + level * 11);
-    positions.setXYZ(i, positions.getX(i) * (.89 + .22 * (1 - level)), (level - 1) * height, z);
+  for (const [ribbon, breadth, offset, bands] of [[0, 1, 0, 16], [1, .43, seed % 2 ? -.17 : .19, 7]]) {
+    const geometry = new T.PlaneGeometry(width * breadth, height, bands, 16);
+    const positions = geometry.getAttribute("position");
+    const uv = geometry.getAttribute("uv");
+    const profile: number[] = [];
+    for (let i = 0; i < positions.count; i++) {
+      const horizontal = uv.getX(i), level = uv.getY(i);
+      const crest = Math.pow(level, 12) * -.18;
+      const z = crest + Math.pow(1 - level, 3) * .63 +
+        .057 * Math.sin(horizontal * 16 + level * 11 + seed) + ribbon * .10;
+      const x = positions.getX(i) * (.88 + .23 * (1 - level)) + (offset + .072 * Math.sin(level * 4 + seed)) * width;
+      positions.setXYZ(i, x, (level - 1) * height, z);
+      profile.push(seed * .617 + ribbon * .29, ribbon);
+    }
+    geometry.setAttribute("flowProfile", new T.Float32BufferAttribute(profile, 2));
+    mesh(group, geometry, material);
   }
-  mesh(group, geometry, material);
 }
 
 type Foliage = { center: T.Vector3; scale: T.Vector3; color: T.Color; rotation: number };
@@ -94,22 +119,27 @@ type Foliage = { center: T.Vector3; scale: T.Vector3; color: T.Color; rotation: 
 function tree(parent: T.Object3D, p: Palette, foliage: Foliage[], origin: Point, size: number, seed: number, pink = false) {
   const rng = randomFor(seed);
   const root = new T.Vector3(...origin);
-  const crown = root.clone().add(new T.Vector3((rng() - .5) * size * .44, size * .82, (rng() - .5) * size * .27));
+  const tapered = !pink && seed % 4 === 0;
+  const crown = root.clone().add(new T.Vector3((rng() - .5) * size * .52, size * (tapered ? 1.22 : .82), (rng() - .5) * size * .32));
+  const tints = pink ? [0xbb799c, 0x8f5479, 0xdca2ba, 0xa87095] :
+    tapered ? [0x3c644e, 0x335949, 0x507451, 0x284d42] : [0x5d783c, 0x436843, 0x818b53, 0x304f38];
   rod(parent, p.trunk, root, crown, .076 * size, .04 * size);
   for (let i = 0; i < 5; i++) {
     const angle = i * 2.4 + rng() * .45;
-    const length = (.35 + rng() * .30) * size;
-    const branch = crown.clone().add(new T.Vector3(Math.cos(angle) * length, size * (.17 + rng() * .33), Math.sin(angle) * length));
-    rod(parent, p.trunk, crown, branch, .038 * size, .017 * size);
-    for (let j = 0; j < 8; j++) {
-      const tint = pink
-        ? [0xc18aaf, 0x8f658b, 0xd79bc0, 0xa878a0][Math.floor(rng() * 4)]
-        : [0x51763d, 0x39674f, 0x6e8652, 0x264d3b][Math.floor(rng() * 4)];
+    const level = tapered ? .34 + .11 * i : .66 + .30 * rng();
+    const length = (tapered ? .59 - .071 * i : .36 + rng() * .34) * size;
+    const shoulder = root.clone().lerp(crown, level);
+    const branch = shoulder.clone().add(new T.Vector3(Math.cos(angle) * length, size * (.15 + rng() * .23), Math.sin(angle) * length));
+    rod(parent, p.trunk, shoulder, branch, .038 * size, .017 * size);
+    for (let j = 0; j < 7; j++) {
+      const tint = tints[Math.floor(rng() * tints.length)];
+      const spread = tapered ? .63 + .25 * (1 - level) : .91 + rng() * .25;
       foliage.push({
-        center: branch.clone().add(new T.Vector3((rng() - .5) * size * .63, rng() * size * .38, (rng() - .5) * size * .60)),
-        scale: new T.Vector3((.21 + rng() * .28) * size, (.13 + rng() * .18) * size, (.21 + rng() * .27) * size),
+        center: branch.clone().add(new T.Vector3((rng() - .5) * size * .67, (rng() - .17) * size * .40, (rng() - .5) * size * .60)),
+        scale: new T.Vector3((.24 + rng() * .33) * size * spread,
+          (.12 + rng() * .19) * size, (.18 + rng() * .29) * size * spread),
         color: new T.Color(tint),
-        rotation: rng() * Math.PI,
+        rotation: angle + (rng() - .5) * 1.3,
       });
     }
   }
@@ -153,7 +183,7 @@ export function terrain(parent: T.Object3D, p: Palette, compact: boolean) {
   const water = new T.ShaderMaterial({
     vertexShader: WATER_VERTEX, fragmentShader: WATER_FRAGMENT,
     uniforms: { time: { value: 0 } },
-    side: T.DoubleSide, transparent: true, depthWrite: false,
+    side: T.DoubleSide, transparent: true, depthWrite: false, forceSinglePass: true,
   });
   const crowns: Foliage[] = [];
   const rings: [Point, Point][] = [
@@ -204,7 +234,7 @@ export function terrain(parent: T.Object3D, p: Palette, compact: boolean) {
     [[3.14, 9.28, -7.59], .46, 2.78, .02],
     [[7.58, 1.29, 7.04], .55, 2.3, .15],
   ];
-  cascades.forEach(([point, width, height, angle]) => falls(group, point, width, height, angle, water));
+  cascades.forEach(([point, width, height, angle], index) => falls(group, point, width, height, angle, water, index + 1));
   for (const [i, [x, y, z, size]] of [
     [15, 8.45, -14, 1.08], [13.8, 6., -22, .68], [-9.0, 1.45, -2.5, .71],
     [17.4, 5.4, -28, .64], [-9.8, 3.2, -12, .58],
@@ -214,8 +244,8 @@ export function terrain(parent: T.Object3D, p: Palette, compact: boolean) {
   }
   plant(group, crowns, compact);
   return { group, rock: rough, waterTime: water.uniforms.time,
-    waterfallBases: cascades.filter((_, index) => index % 2 === 0).map(([point, width, height]) => ({
-      point: [point[0], point[1] - height + .16, point[2] + .30] as Point, width,
+    waterfallBases: cascades.filter((_, index) => index % 2 === 0).map(([point, width, height, angle]) => ({
+      point: [point[0] + Math.sin(angle) * .54, point[1] - height + .16, point[2] + Math.cos(angle) * .54] as Point, width,
     })),
   };
 }

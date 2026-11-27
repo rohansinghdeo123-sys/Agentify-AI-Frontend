@@ -54,12 +54,21 @@ test("the centered 3D journey loads without flashing fallback artwork and preser
   await expect(replay).toBeVisible();
   await expect(skip).toHaveCount(0);
   await expect(page.locator("html")).not.toHaveAttribute("data-test-atlas-intro", "observed");
+  const markers = scene.getByRole("list", { name: "Explore the learning path" });
+  const studio = markers.getByRole("button", { name: "Preview Study Lab" });
+  const panel = scene.locator("#workspace-preview");
+  await replay.click();
+  await expect(skip).toBeVisible();
+  await expect(studio).toBeVisible();
+  await studio.press("Enter");
+  await expect(panel.getByRole("heading", { name: "Study Lab", exact: true })).toBeFocused();
+  await panel.getByRole("button", { name: "Back to Journey" }).click();
+  await expect(studio).toBeFocused();
   await replay.click();
   await expect(skip).toBeVisible();
   await skip.click();
   await expect(replay).toBeVisible({ timeout: 15_000 });
 
-  const markers = scene.getByRole("list", { name: "Explore the learning path" });
   const destinations = [
     ["Planning", "Open Planning", "/dashboard/planning"],
     ["Study Lab", "Open Study Lab", "/dashboard/study"],
@@ -107,7 +116,6 @@ test("the centered 3D journey loads without flashing fallback artwork and preser
 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(replay).toHaveCount(0);
-  const panel = scene.locator("#workspace-preview");
   for (const [name, action, route] of destinations) {
     const marker = markers.getByRole("button", { name: `Preview ${name}` });
     await marker.click();
@@ -125,6 +133,7 @@ test("the centered 3D journey loads without flashing fallback artwork and preser
   await expect(page).toHaveURL(/\/dashboard\/exam$/);
   await page.getByRole("link", { name: "Return to Workspace" }).click();
   await expect(scene).toHaveAttribute("data-atlas", "ready", { timeout: 45_000 });
+  await expect(markers.getByRole("button", { name: "Preview Exam" })).toBeFocused();
   await expect(skip).toHaveCount(0);
   expect(fallbackRequests).toEqual([]);
   expect(errors).toEqual([]);

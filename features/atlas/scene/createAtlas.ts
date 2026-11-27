@@ -6,7 +6,7 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { DESTINATIONS, VIEW, overviewCamera, type Destination } from "./layout";
+import { DESTINATIONS, VIEW, overviewCamera, type Destination, type Point } from "./layout";
 import { palette } from "./primitives";
 import { book } from "./book";
 import { pathway } from "./path";
@@ -14,13 +14,18 @@ import { terrain } from "./terrain";
 import { atmosphere } from "./atmosphere";
 import { buildings, compass } from "./architecture";
 import { dressAtlas } from "./materials";
-import { ATLAS_INTRO_MS, atlasPixelRatio, cinematicDelta } from "./presentation";
+import { ATLAS_FOCUS_MS, ATLAS_INTRO_MS, atlasPixelRatio, cinematicDelta } from "./presentation";
+
+export type AtlasOverview = { eye: Point; target: Point; aspect: number };
 
 export type AtlasRuntime = {
   ready: Promise<boolean>;
   reset: () => void;
   focus: (id: Destination | null) => void;
   highlight: (id: Destination | null) => void;
+  recommend: (id: Destination) => void;
+  readOverview: () => AtlasOverview;
+  restoreOverview: (view: AtlasOverview) => void;
   markMastered: (mastered: boolean) => void;
   preferences: (daylight: boolean, reducedMotion: boolean) => void;
   playIntro: () => void;
@@ -185,6 +190,7 @@ export function createAtlas(
   const road = pathway(world, p);
   road.lightRoute(1);
   const havens = buildings(world, p);
+  havens.forEach((haven, index) => lamps[index].color.setHex(haven.lightColor));
   const north = compass(world, p);
   const reward = new T.Mesh(
     new T.TorusGeometry(2.83, .031, 6, 60),
@@ -243,6 +249,9 @@ export function createAtlas(
   let focusPass: ReturnType<typeof makeFocusPass> | undefined;
   let selected = -1;
   let hovered = -1;
+  let recommended = -1;
+  let previousOverview: AtlasOverview | null = null;
+  const landmarkEnergy = new Float32Array(havens.length);
   let reduced = false;
   let paused = false;
   let ambienceUntil = 0;
@@ -280,7 +289,7 @@ export function createAtlas(
     camera.lookAt(target);
   }
 
-  function applyIntro(progress: number) {
+  function applyIntro(progress: number, moveCamera = true) {
     const open = T.MathUtils.smootherstep(progress, .02, .51);
     spine.unfold(open, T.MathUtils.smootherstep(progress, .20, .68));
     const rise = T.MathUtils.smootherstep(progress, .34, .89);
@@ -291,6 +300,7 @@ export function createAtlas(
     road.lightRoute(light);
     const wick = T.MathUtils.smootherstep(progress, .16, .37);
     gutter.intensity = 12 + wick * (11 + 20 * Math.sin(Math.PI * light));
+    if (!moveCamera) return;
     const sweep = T.MathUtils.smootherstep(progress, .12, .96);
     camera.position.lerpVectors(introEye, homeEye, sweep);
     camera.position.y += Math.sin(Math.PI * sweep) * 1.25;
@@ -315,26 +325,31 @@ export function createAtlas(
     }
     if (introElapsed !== null) {
       introVisibleTime += frameGap;
-      // Smooth short stalls, but don't keep the route hidden if software WebGL falls behind.
-      introElapsed = Math.max(introElapsed + delta, introVisibleTime - 1200);
+      // Smooth short stalls without stretching the reveal on software WebGL.
+      introElapsed = Math.max(introElapsed + delta, introVisibleTime - 700);
       if (introElapsed >= ATLAS_INTRO_MS) finishIntro();
       else applyIntro(introElapsed / ATLAS_INTRO_MS);
     }
     if (flight) {
       flight.elapsed += delta;
-      const time = T.MathUtils.smootherstep(flight.elapsed, 0, 840);
+      const time = T.MathUtils.smootherstep(flight.elapsed, 0, ATLAS_FOCUS_MS);
       camera.position.lerpVectors(flight.fromEye, flight.toEye, time);
       target.lerpVectors(flight.fromTarget, flight.toTarget, time);
       camera.lookAt(target);
       if (time === 1) {
         flight = null;
-        if (selected === -1) enterOrbit();
+        if (selected === -1) {
+          previousOverview = null;
+          enterOrbit();
+        }
       }
     }
     const atmospheric = !reduced && (moving || now < ambienceUntil);
-    if (atmospheric) atmosphereTime += Math.min(.045, (now - (lastFrame || now)) / 1000);
+    const frameSeconds = Math.min(.045, (now - (lastFrame || now)) / 1000);
+    if (atmospheric) atmosphereTime += frameSeconds;
     lastFrame = now;
     islands.waterTime.value = atmosphereTime;
+    air.moveClouds(atmosphereTime);
     north.rotation.y = compassAngle + Math.sin(atmosphereTime * .78) * .16;
     distantCompass.rotation.y = north.rotation.y;
     if (masteredAt !== null) {
@@ -342,9 +357,13 @@ export function createAtlas(
       reward.scale.setScalar(1 + .19 * Math.sin(Math.PI * pulse));
       reward.material.opacity = .65 + .35 * Math.sin(Math.PI * pulse);
     }
-    havens.forEach(({ glow }, index) => {
-      glow.value = index === selected ? .92 + .08 * Math.sin(atmosphereTime * 3) : index === hovered ? .73 : 0;
-      lamps[index].intensity = index === selected ? 31 : index === hovered ? 22 : 15;
+    const lightEase = atmospheric ? 1 - Math.exp(-22 * frameSeconds) : 1;
+    havens.forEach((haven, index) => {
+      const strength = index === selected ? 1 : index === hovered ? .7 : index === recommended ? .42 : 0;
+      const energy = T.MathUtils.lerp(landmarkEnergy[index], strength, lightEase);
+      landmarkEnergy[index] = energy;
+      haven.setLighting(energy, atmosphereTime, air.daylight.value > 0);
+      lamps[index].intensity = 12 + 16 * energy;
     });
     try {
       syncResolution(introElapsed !== null || flight !== null || orbiting);
@@ -387,7 +406,7 @@ export function createAtlas(
       projected.copy(anchors[i]).applyMatrix4(world.matrixWorld).project(camera);
       positions.push({
         index: i,
-        x: T.MathUtils.clamp((projected.x + 1) * width / 2, 43, width - 43),
+        x: T.MathUtils.clamp((projected.x + 1) * width / 2, 58, width - 58),
         y: T.MathUtils.clamp((1 - projected.y) * height / 2, minY, maxY),
       });
     }
@@ -396,7 +415,7 @@ export function createAtlas(
       for (const [i, point] of positions.entries()) {
         for (let before = 0; before < i; before++) {
           const other = positions[before];
-          if (Math.abs(other.x - point.x) < 101) point.y = Math.max(point.y, other.y + labelSpacing);
+          if (Math.abs(other.x - point.x) < 112) point.y = Math.max(point.y, other.y + labelSpacing);
         }
       }
       for (let i = positions.length - 1; i >= 0; i--) {
@@ -404,7 +423,7 @@ export function createAtlas(
         point.y = Math.min(point.y, maxY);
         for (let after = i + 1; after < positions.length; after++) {
           const other = positions[after];
-          if (Math.abs(other.x - point.x) < 101) point.y = Math.min(point.y, other.y - labelSpacing);
+          if (Math.abs(other.x - point.x) < 112) point.y = Math.min(point.y, other.y - labelSpacing);
         }
       }
     }
@@ -439,6 +458,7 @@ export function createAtlas(
     homeTarget.set(...framing.target);
     profileRise = framing.rise;
     const portrait = width / height <= .58;
+    air.setCloudPortrait(width / height < .8);
     distantCompass.visible = portrait;
     spine.group.scale.x = portrait ? 1.24 : 1;
     introEye.set(portrait ? -.5 : 1.05, portrait ? 6.2 : 7.35, portrait ? 20.6 : 24);
@@ -461,7 +481,7 @@ export function createAtlas(
       aim(homeEye, homeTarget);
       enterOrbit();
     }
-    if (selected >= 0 && aspectChanged) {
+    if (selected >= 0 && aspectChanged && !reduced) {
       const { eye, look } = focusPose(selected);
       flight = null;
       aim(eye, look);
@@ -483,6 +503,7 @@ export function createAtlas(
     }
     flight = null;
     selected = hovered = -1;
+    previousOverview = null;
     introElapsed = 0;
     introVisibleTime = 0;
     lastMotionFrame = 0;
@@ -492,15 +513,15 @@ export function createAtlas(
     journey.onIntroChange(true);
   }
 
-  function finishIntro() {
+  function finishIntro(moveCamera = true) {
     introRequested = false;
     if (introElapsed === null) return;
     introElapsed = null;
     lastMotionFrame = 0;
-    applyIntro(1);
+    applyIntro(1, moveCamera);
     updateLandmarkBounds();
     renderer.shadowMap.needsUpdate = true;
-    enterOrbit();
+    if (moveCamera) enterOrbit();
     projectLabels();
     invalidate();
     journey.onIntroChange(false);
@@ -509,6 +530,7 @@ export function createAtlas(
   function reset() {
     finishIntro();
     selected = hovered = -1;
+    previousOverview = null;
     flight = null;
     aim(homeEye, homeTarget);
     enterOrbit();
@@ -539,17 +561,42 @@ export function createAtlas(
     };
   }
 
+  function currentOverview(home = false): AtlasOverview {
+    return {
+      eye: (home ? homeEye : camera.position).toArray(),
+      target: (home ? homeTarget : target).toArray(),
+      aspect: camera.aspect,
+    };
+  }
+
+  function overviewPose(view: AtlasOverview | null) {
+    const valid = view && Math.abs(view.aspect - camera.aspect) < .12;
+    return {
+      eye: valid ? new T.Vector3(...view.eye) : homeEye.clone(),
+      look: valid ? new T.Vector3(...view.target) : homeTarget.clone(),
+    };
+  }
+
+  function readOverview() {
+    return previousOverview ?? currentOverview(introElapsed !== null);
+  }
+
+  function restoreOverview(view: AtlasOverview) {
+    const pose = overviewPose(view);
+    aim(pose.eye, pose.look);
+    enterOrbit();
+    projectLabels();
+    invalidate();
+  }
+
   function focus(id: Destination | null) {
-    finishIntro();
     const next = id === null ? -1 : DESTINATIONS.findIndex((destination) => destination.id === id);
-    if (selected === next && id !== null) return;
+    if (selected === next) return;
+    if (id && selected < 0) previousOverview ??= currentOverview(introElapsed !== null);
+    finishIntro(false);
     selected = next;
     hovered = -1;
-    if (!id && reduced) {
-      reset();
-      return;
-    }
-    const { eye: toEye, look: toTarget } = focusPose(next);
+    const { eye: toEye, look: toTarget } = !id || reduced ? overviewPose(previousOverview) : focusPose(next);
     const wide = camera.aspect >= 1.12;
     if (id && wide && !coarse && !software && !reduced && !focusPass && renderer.extensions.has("EXT_color_buffer_float")) {
       focusPass = makeFocusPass(renderer, scene, camera);
@@ -559,7 +606,10 @@ export function createAtlas(
     if (reduced) {
       aim(toEye, toTarget);
       flight = null;
-      if (!id) enterOrbit();
+      if (!id) {
+        previousOverview = null;
+        enterOrbit();
+      }
     } else {
       lastMotionFrame = 0;
       flight = { elapsed: 0, fromEye: camera.position.clone(), fromTarget: target.clone(), toEye, toTarget };
@@ -573,6 +623,11 @@ export function createAtlas(
     if (next === hovered) return;
     hovered = next;
     ambienceUntil = performance.now() + 850;
+    invalidate();
+  }
+
+  function recommend(id: Destination) {
+    recommended = DESTINATIONS.findIndex((destination) => destination.id === id);
     invalidate();
   }
 
@@ -598,9 +653,13 @@ export function createAtlas(
     if (reduced) {
       finishIntro();
       if (flight) {
-        aim(flight.toEye, flight.toTarget);
+        const pose = overviewPose(previousOverview);
+        aim(pose.eye, pose.look);
         flight = null;
-        if (selected === -1) enterOrbit();
+        if (selected === -1) {
+          previousOverview = null;
+          enterOrbit();
+        }
       }
     }
     invalidate();
@@ -631,7 +690,7 @@ export function createAtlas(
     if (press?.id !== event.pointerId) return;
     const start = press;
     press = null;
-    if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 8 || introElapsed !== null || flight) return;
+    if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 8 || introElapsed !== null) return;
     const hit = hitTest(event);
     if (hit) journey.onSelect(hit);
   }
@@ -720,6 +779,9 @@ export function createAtlas(
     reset,
     focus,
     highlight,
+    recommend,
+    readOverview,
+    restoreOverview,
     markMastered,
     preferences,
     playIntro,

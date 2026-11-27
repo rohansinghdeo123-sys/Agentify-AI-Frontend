@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { AppIcon } from "@/components/ui/Polished";
-import type { AtlasRuntime } from "@/features/atlas/scene/createAtlas";
+import type { AtlasOverview, AtlasRuntime } from "@/features/atlas/scene/createAtlas";
 import type { PlanningPortfolioProgress } from "@/features/planning/contracts";
 import Link from "next/link";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
@@ -17,6 +17,23 @@ const WAYPOINTS = {
   revision: { x: 73.0, y: 44.5, action: "Start a review" },
   exam: { x: 64.8, y: 34.6, action: "Open Exam" },
 } as const;
+
+type JourneyReturn = { mode: LearningModeId; view?: AtlasOverview };
+
+function readJourneyReturn(key: string): JourneyReturn | null {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(key) ?? "null") as JourneyReturn | null;
+    if (!saved || !LEARNING_WORKSPACE_STEPS.some(({ id }) => id === saved.mode)) return null;
+    const view = saved.view;
+    const point = (value?: number[]) => Array.isArray(value) && value.length === 3 && value.every(Number.isFinite);
+    return {
+      mode: saved.mode,
+      view: view && Number.isFinite(view.aspect) && point(view.eye) && point(view.target) ? view : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
 
 export default function LearningJourney({
   recommendation = recommendLearningWorkspace(null),
@@ -42,20 +59,40 @@ export default function LearningJourney({
   const recommended = active?.id === recommendation.mode;
   const mastered = !!progress?.total_units && progress.mastered_units === progress.total_units;
   const atlasReady = atlasPhase === "ready";
+  const returnKey = `agentify-atlas-return:${userId ?? "learner"}`;
 
   useEffect(() => {
     if (choice) previewHeading.current?.focus({ preventScroll: true });
   }, [choice]);
 
   useEffect(() => {
-    if (atlasReady) atlas.current?.markMastered(mastered);
-  }, [atlasReady, mastered]);
+    if (atlasReady) {
+      atlas.current?.markMastered(mastered);
+      atlas.current?.recommend(recommendation.mode);
+    }
+  }, [atlasReady, mastered, recommendation.mode]);
 
   useEffect(() => {
     let cancelled = false;
+    let focusFrame = 0;
     const root = document.documentElement;
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const key = `agentify-atlas-intro:${userId ?? "learner"}`;
+    let returning = readJourneyReturn(returnKey);
+    function restoreFocus() {
+      const saved = returning;
+      if (!saved) return;
+      cancelAnimationFrame(focusFrame);
+      // Wait for the route's own focus handling and the visible marker layout.
+      focusFrame = requestAnimationFrame(() => {
+        focusFrame = requestAnimationFrame(() => {
+          const index = LEARNING_WORKSPACE_STEPS.findIndex(({ id }) => id === saved.mode);
+          buttons.current[index]?.focus({ preventScroll: true });
+          returning = null;
+          try { sessionStorage.removeItem(returnKey); } catch { /* Storage is optional. */ }
+        });
+      });
+    }
     function syncPreferences() {
       const reduce = motion.matches || root.dataset.motion === "reduced";
       setReduced(reduce);
@@ -71,6 +108,7 @@ export default function LearningJourney({
         if (cancelled) return;
         setAtlasPhase(available ? "ready" : "fallback");
         if (!available) setPlaying(false);
+        restoreFocus();
       }, {
         onIntroChange: setPlaying,
         onSelect(id) {
@@ -85,6 +123,8 @@ export default function LearningJourney({
       const reduce = syncPreferences();
       if (selected.current) {
         runtime.focus(selected.current);
+      } else if (returning?.view) {
+        runtime.restoreOverview(returning.view);
       } else if (!reduce) {
         let played = false;
         try {
@@ -96,20 +136,25 @@ export default function LearningJourney({
         if (!played) runtime.playIntro();
       }
       const available = await runtime.ready;
-      if (!cancelled) setAtlasPhase(available ? "ready" : "fallback");
+      if (!cancelled) {
+        setAtlasPhase(available ? "ready" : "fallback");
+        restoreFocus();
+      }
     }).catch(() => {
       if (cancelled) return;
       setPlaying(false);
       setAtlasPhase("fallback");
+      restoreFocus();
     });
     return () => {
       cancelled = true;
+      cancelAnimationFrame(focusFrame);
       preferences.disconnect();
       motion.removeEventListener("change", syncPreferences);
       atlas.current?.dispose();
       atlas.current = null;
     };
-  }, [userId]);
+  }, [returnKey, userId]);
 
   const closePreview = () => {
     selected.current = null;
@@ -153,6 +198,8 @@ export default function LearningJourney({
                   aria-describedby={suggested ? "journey-recommendation" : undefined}
                   onPointerEnter={() => atlas.current?.highlight(step.id)}
                   onPointerLeave={() => atlas.current?.highlight(null)}
+                  onFocus={() => atlas.current?.highlight(step.id)}
+                  onBlur={() => atlas.current?.highlight(null)}
                   onClick={(event) => {
                     if (expanded) {
                       closePreview();
@@ -163,7 +210,10 @@ export default function LearningJourney({
                       atlas.current?.focus(step.id);
                     }
                   }}>
-                  <span className={styles.pinLabel} aria-hidden="true">{step.title}</span>
+                  <span className={styles.pinLabel} aria-hidden="true">
+                    {suggested && <span className={styles.nextCue}>{recommendation.basis === "setup" ? "Start" : "Next"}</span>}
+                    {step.title}
+                  </span>
                 </button>
               </li>
             );
@@ -173,13 +223,11 @@ export default function LearningJourney({
 
       {atlasReady && !active && (
         <div className={styles.controls} aria-label="Journey controls">
+          <button type="button" onClick={() => atlas.current?.reset()}>Reset view</button>
           {playing ? (
             <button type="button" onClick={() => atlas.current?.finishIntro()}>Skip intro</button>
           ) : (
-            <>
-              <button type="button" onClick={() => atlas.current?.reset()}>Reset view</button>
-              {!reduced && <button type="button" onClick={() => atlas.current?.playIntro()}>Replay intro</button>}
-            </>
+            !reduced && <button type="button" onClick={() => atlas.current?.playIntro()}>Replay intro</button>
           )}
         </div>
       )}
@@ -199,7 +247,12 @@ export default function LearningJourney({
             </button>
           </div>
           <p className={styles.detail}>{recommended ? recommendation.reason : active.description}</p>
-          <Link className={styles.launch} href={active.href}>
+          <Link className={styles.launch} href={active.href}
+            onNavigate={() => {
+              try {
+                sessionStorage.setItem(returnKey, JSON.stringify({ mode: active.id, view: atlas.current?.readOverview() }));
+              } catch { /* Storage is optional. */ }
+            }}>
             {recommended && recommendation.basis === "setup" ? "Create a plan" : WAYPOINTS[active.id].action}
             <AppIcon name="arrowRight" />
           </Link>

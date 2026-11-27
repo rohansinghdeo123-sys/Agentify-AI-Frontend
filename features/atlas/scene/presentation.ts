@@ -1,4 +1,5 @@
-export const ATLAS_INTRO_MS = 3850;
+export const ATLAS_INTRO_MS = 2240;
+export const ATLAS_FOCUS_MS = 540;
 
 export function cinematicDelta(previous: number, now: number, software = false) {
   return previous ? Math.max(0, Math.min(now - previous, software ? 160 : 64)) : 0;
