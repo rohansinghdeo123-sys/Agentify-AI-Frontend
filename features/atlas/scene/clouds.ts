@@ -4,6 +4,13 @@ import type { Point } from "./layout";
 type CloudShape = "ridge" | "crown" | "veil";
 type CloudBank = [shape: CloudShape, position: Point, width: number, height: number, opacity: number];
 
+const SUNLIT_CLOUD = 0xfff8eb;
+const MOONLIT_CLOUD = 0xe5f0ff;
+
+function cloudOpacity(opacity: number, daylight: boolean) {
+  return daylight ? opacity : opacity + .44 * opacity * (1 - opacity);
+}
+
 // Loose banks bridge the distant ridges and the floating shelves. Their
 // irregular heights and intervening gaps keep the waterfalls and gates legible.
 const VALLEY_BANKS: CloudBank[] = [
@@ -90,12 +97,12 @@ function cloudDeck(parent: T.Object3D) {
         vec2 p = field * vec2(.12, .155) + vec2(time * .025, -time * .011);
         float broad = noise(p);
         float curls = noise(p * 2.18 + broad * .85) * .27 + noise(p * 4.5 - .4) * .09;
-        float density = smoothstep(.21, .86, broad * .67 + curls);
+        float density = smoothstep(mix(.16, .21, daylight), mix(.79, .86, daylight), broad * .67 + curls);
         float shade = clamp(.18 + density * .76 + (broad - noise(p + vec2(.27, -.21))) * .63, 0., 1.);
-        vec3 night = mix(vec3(.048, .17, .182), vec3(.36, .55, .52), shade);
+        vec3 night = mix(vec3(.095, .22, .255), vec3(.60, .73, .79), shade);
         vec3 day = mix(vec3(.44, .64, .66), vec3(.93, .95, .91), shade);
         float fade = 1. - smoothstep(51., 73., length(field * vec2(.91, 1.)));
-        float coverage = (.21 + density * .48) * fade;
+        float coverage = mix(.245 + density * .53, .21 + density * .48, daylight) * fade;
         gl_FragColor = sRGBTransferEOTF(vec4(mix(night, day, daylight), coverage));
         #include <colorspace_fragment>
       }
@@ -124,25 +131,25 @@ export function clouds(group: T.Object3D, compact: boolean, redraw: () => void) 
   // turbulent 3D density field. Spatially separated cards preserve parallax
   // without ray marching full-screen pixels on low-power devices.
   function cloudMap(shape: CloudShape) {
-    const materials: T.SpriteMaterial[] = [];
+    const sprites: { material: T.SpriteMaterial; opacity: number }[] = [];
     let loaded = false;
     let settle!: () => void;
     textures.push(new Promise<void>((resolve) => { settle = resolve; }));
     const map = loader.load(`/atlas/cloud-${shape}.webp`, () => {
       loaded = true;
-      materials.forEach((material) => { material.visible = true; });
+      sprites.forEach(({ material }) => { material.visible = true; });
       settle();
       redraw();
     }, undefined, settle);
     map.colorSpace = T.SRGBColorSpace;
     return {
-      materials,
+      sprites,
       sprite(opacity: number) {
         const material = new T.SpriteMaterial({
           map, transparent: true, depthWrite: false, alphaTest: .008,
-          visible: loaded, opacity, color: daylight ? 0xfff8eb : 0xbddeea,
+          visible: loaded, opacity: cloudOpacity(opacity, daylight), color: daylight ? SUNLIT_CLOUD : MOONLIT_CLOUD,
         });
-        materials.push(material);
+        sprites.push({ material, opacity });
         return new T.Sprite(material);
       },
     };
@@ -174,8 +181,11 @@ export function clouds(group: T.Object3D, compact: boolean, redraw: () => void) 
     setCloudDaylight(light: boolean) {
       daylight = light;
       lowClouds.daylight.value = Number(light);
-      for (const { materials } of Object.values(maps)) {
-        for (const material of materials) material.color.setHex(light ? 0xfff8eb : 0xbddeea);
+      for (const { sprites } of Object.values(maps)) {
+        for (const { material, opacity } of sprites) {
+          material.color.setHex(light ? SUNLIT_CLOUD : MOONLIT_CLOUD);
+          material.opacity = cloudOpacity(opacity, light);
+        }
       }
     },
     setCloudPortrait(narrow: boolean) {

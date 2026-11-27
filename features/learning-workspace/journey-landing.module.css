@@ -107,7 +107,7 @@
   border-radius: .42rem;
   background: #092724;
   color: #fff1d4;
-  box-shadow: 0 2px 7px #0214139a;
+  box-shadow: 0 2px 7px #0214139a, 0 0 .62rem color-mix(in srgb, var(--landmark-light) 38%, transparent);
   font-size: clamp(.79rem, 1.05vw, .96rem);
   font-weight: 730;
   white-space: nowrap;
@@ -117,7 +117,7 @@
 .waypoint[data-active] .pinLabel {
   background: #153e35;
   color: #ffedbb;
-  box-shadow: 0 0 .7rem color-mix(in srgb, var(--landmark-light) 60%, transparent);
+  box-shadow: 0 2px 7px #0214139a, 0 0 .88rem color-mix(in srgb, var(--landmark-light) 70%, transparent);
 }
 .waypoint[data-recommended] .pinLabel {
   border-color: #edc586;

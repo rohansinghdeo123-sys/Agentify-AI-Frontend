@@ -14,7 +14,7 @@ import { terrain } from "./terrain";
 import { atmosphere } from "./atmosphere";
 import { buildings, compass } from "./architecture";
 import { dressAtlas } from "./materials";
-import { ATLAS_FOCUS_MS, ATLAS_INTRO_MS, atlasPixelRatio, cinematicDelta } from "./presentation";
+import { ATLAS_FOCUS_MS, ATLAS_INTRO_MS, ATLAS_REVEAL_MS, atlasIntroDolly, atlasPixelRatio, cinematicDelta } from "./presentation";
 
 export type AtlasOverview = { eye: Point; target: Point; aspect: number };
 
@@ -184,7 +184,7 @@ export function createAtlas(
   const world = new T.Group();
   scene.add(world);
   world.add(entranceLights);
-  const islands = terrain(world, p, compact);
+  const islands = terrain(world, p, compact, air.daylight);
   for (const { point, width } of islands.waterfallBases) air.mist(world, point, width);
   const spine = book(scene, p, !software);
   const road = pathway(world, p);
@@ -259,7 +259,6 @@ export function createAtlas(
   let atmosphereTime = 0;
   let masteredAt: number | null = null;
   let introElapsed: number | null = null;
-  let introVisibleTime = 0;
   let lastMotionFrame = 0;
   let slowMotionFrames = 0;
   let motionScale = 1;
@@ -289,7 +288,8 @@ export function createAtlas(
     camera.lookAt(target);
   }
 
-  function applyIntro(progress: number, moveCamera = true) {
+  function applyIntro(elapsed: number, moveCamera = true) {
+    const progress = Math.min(1, elapsed / ATLAS_REVEAL_MS);
     const open = T.MathUtils.smootherstep(progress, .02, .51);
     spine.unfold(open, T.MathUtils.smootherstep(progress, .20, .68));
     const rise = T.MathUtils.smootherstep(progress, .34, .89);
@@ -305,6 +305,7 @@ export function createAtlas(
     camera.position.lerpVectors(introEye, homeEye, sweep);
     camera.position.y += Math.sin(Math.PI * sweep) * 1.25;
     target.lerpVectors(introTarget, homeTarget, sweep);
+    camera.position.sub(target).multiplyScalar(atlasIntroDolly(elapsed, sweep)).add(target);
     camera.lookAt(target);
   }
 
@@ -324,11 +325,10 @@ export function createAtlas(
       }
     }
     if (introElapsed !== null) {
-      introVisibleTime += frameGap;
-      // Smooth short stalls without stretching the reveal on software WebGL.
-      introElapsed = Math.max(introElapsed + delta, introVisibleTime - 700);
+      // Catch up on slow frames without skipping the arrival after a GPU stall.
+      introElapsed += Math.min(frameGap, 160);
       if (introElapsed >= ATLAS_INTRO_MS) finishIntro();
-      else applyIntro(introElapsed / ATLAS_INTRO_MS);
+      else applyIntro(introElapsed);
     }
     if (flight) {
       flight.elapsed += delta;
@@ -358,18 +358,22 @@ export function createAtlas(
       reward.material.opacity = .65 + .35 * Math.sin(Math.PI * pulse);
     }
     const lightEase = atmospheric ? 1 - Math.exp(-22 * frameSeconds) : 1;
+    const arrivalLight = introElapsed === null ? 0 : .18 * Math.sin(Math.PI *
+      T.MathUtils.smoothstep(introElapsed, ATLAS_REVEAL_MS, ATLAS_INTRO_MS));
     havens.forEach((haven, index) => {
-      const strength = index === selected ? 1 : index === hovered ? .7 : index === recommended ? .42 : 0;
-      const energy = T.MathUtils.lerp(landmarkEnergy[index], strength, lightEase);
+      const strength = index === selected ? 1 : index === hovered ? .82 : index === recommended ? .60 : .16;
+      const energy = T.MathUtils.lerp(landmarkEnergy[index], Math.min(1, strength + arrivalLight), lightEase);
       landmarkEnergy[index] = energy;
       haven.setLighting(energy, atmosphereTime, air.daylight.value > 0);
-      lamps[index].intensity = 12 + 16 * energy;
+      lamps[index].intensity = 13 + 19 * energy;
     });
     try {
       syncResolution(introElapsed !== null || flight !== null || orbiting);
       renderScene();
       if (!presented) {
         presented = true;
+        // The first render may compile shaders while the canvas is still hidden.
+        lastMotionFrame = 0;
         resolveReady(true);
       }
     } catch {
@@ -505,7 +509,6 @@ export function createAtlas(
     selected = hovered = -1;
     previousOverview = null;
     introElapsed = 0;
-    introVisibleTime = 0;
     lastMotionFrame = 0;
     controls.enabled = false;
     applyIntro(0);
@@ -518,7 +521,7 @@ export function createAtlas(
     if (introElapsed === null) return;
     introElapsed = null;
     lastMotionFrame = 0;
-    applyIntro(1, moveCamera);
+    applyIntro(ATLAS_INTRO_MS, moveCamera);
     updateLandmarkBounds();
     renderer.shadowMap.needsUpdate = true;
     if (moveCamera) enterOrbit();

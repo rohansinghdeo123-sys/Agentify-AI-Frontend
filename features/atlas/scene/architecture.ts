@@ -71,8 +71,11 @@ const portalFragment = `
     float glow=pow(clamp(radius,0.,1.), 5.);
     float ribbon=pow(.5+.5*sin(5.*a+9.*radius-phase), 4.);
     float rim=smoothstep(.57, .99, radius);
+    float litEdge=exp(-pow((radius-.87)*19., 2.));
     vec3 center=mix(vec3(.013,.064,.069),accent*.143,.44);
-    vec3 color=mix(center,accent,rim*(.56+.21*energy)+glow*.16*ribbon);
+    vec3 color=mix(center,accent,rim*(.61+.22*energy)+glow*.16*ribbon);
+    vec3 edgeColor=mix(accent, vec3(1., .96, .88), .32);
+    color=mix(color,edgeColor,litEdge*(.43+.29*energy));
     gl_FragColor=sRGBTransferEOTF(vec4(color,1.));
     #include <colorspace_fragment>
   }
@@ -85,8 +88,8 @@ const haloFragment = `
   uniform float daylight;
   void main() {
     float radius = length(vUv - .5) * 2.;
-    float spill = exp(-pow((radius - .64) * 8.5, 2.)) * (1. - smoothstep(.75, 1., radius));
-    gl_FragColor = sRGBTransferEOTF(vec4(accent,spill * (.15 + energy * .24 - daylight * .043)));
+    float spill = exp(-pow((radius - .64) * 7., 2.)) * (1. - smoothstep(.77, 1., radius));
+    gl_FragColor = sRGBTransferEOTF(vec4(accent,spill * (.24 + energy * .26 - daylight * .045)));
     #include <colorspace_fragment>
   }
 `;
@@ -104,9 +107,9 @@ function entranceLighting(id: Destination, lightColor: number) {
     pools.push({ material, night, day, response });
     return material;
   }
-  const inlay = lightSurface(emissive(0xb59a75, lightColor, .29), .39, .22, .85);
+  const inlay = lightSurface(emissive(0xb59a75, lightColor, .29), .49, .31, .85);
   inlay.color.lerp(color, .4);
-  const emblem = lightSurface(emissive(lightColor, lightColor, .83), .83, .60, .60);
+  const emblem = lightSurface(emissive(lightColor, lightColor, .83), .94, .73, .60);
   emblem.color.lerp(new T.Color(0xfff6e3), .39);
   return {
     lightColor,
