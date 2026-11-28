@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ATLAS_INTRO_MS, ATLAS_REVEAL_MS, atlasIntroFraming, atlasPixelRatio, cinematicDelta } from "@/features/atlas/scene/presentation";
+import { ATLAS_INTRO_MS, ATLAS_REVEAL_MS, atlasIntroFraming, atlasIntroMarker, atlasPixelRatio, cinematicDelta } from "@/features/atlas/scene/presentation";
 
 describe("Atlas presentation", () => {
   it("pushes in after the book opens, holds on the destinations, then settles at the overview", () => {
@@ -10,6 +10,18 @@ describe("Atlas presentation", () => {
     expect(atlasIntroFraming(ATLAS_REVEAL_MS + 960, 1)).toEqual({ distance: .78, focus: 1 });
     expect(atlasIntroFraming(ATLAS_INTRO_MS - 340, 1).distance).toBeCloseTo(.89);
     expect(atlasIntroFraming(ATLAS_INTRO_MS, 1)).toEqual({ distance: 1, focus: 0 });
+  });
+
+  it("sends each marker toward its own entrance and lights it before the next departure", () => {
+    const firstDeparture = ATLAS_REVEAL_MS + 180;
+    for (let index = 0; index < 4; index++) {
+      const departure = firstDeparture + index * 880;
+      expect(atlasIntroMarker(departure - 1, index)).toEqual({ stage: "waiting", travel: 0, glow: 0 });
+      expect(atlasIntroMarker(departure + 310, index)).toEqual({ stage: "traveling", travel: .5, glow: 0 });
+      expect(atlasIntroMarker(departure + 740, index)).toEqual({ stage: "landed", travel: 1, glow: 1 });
+      if (index < 3) expect(atlasIntroMarker(departure + 740, index + 1).stage).toBe("waiting");
+    }
+    expect(atlasIntroMarker(ATLAS_INTRO_MS, 3)).toEqual({ stage: "landed", travel: 1, glow: 0 });
   });
 
   it("keeps native resolution for 4K and high-density portrait views at rest", () => {

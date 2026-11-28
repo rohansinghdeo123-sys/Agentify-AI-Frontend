@@ -1,6 +1,11 @@
+import { DESTINATIONS } from "./layout";
+
 export const ATLAS_REVEAL_MS = 2240;
 const ATLAS_ARRIVAL_MS = ATLAS_REVEAL_MS + 720;
-const ATLAS_SETTLE_MS = ATLAS_ARRIVAL_MS + 320;
+const ATLAS_MARKERS_MS = ATLAS_REVEAL_MS + 180;
+const MARKER_TRAVEL_MS = 620;
+const MARKER_INTERVAL_MS = 880;
+const ATLAS_SETTLE_MS = ATLAS_MARKERS_MS + DESTINATIONS.length * MARKER_INTERVAL_MS;
 export const ATLAS_INTRO_MS = ATLAS_SETTLE_MS + 680;
 export const ATLAS_FOCUS_MS = 540;
 
@@ -13,6 +18,16 @@ export function atlasIntroFraming(elapsed: number, overviewBlend: number) {
   const approach = easeBetween(elapsed, ATLAS_REVEAL_MS, ATLAS_ARRIVAL_MS);
   const focus = approach * (1 - easeBetween(elapsed, ATLAS_SETTLE_MS, ATLAS_INTRO_MS));
   return { focus, distance: 1 + .07 * overviewBlend * (1 - approach) - .22 * focus };
+}
+
+export function atlasIntroMarker(elapsed: number, index: number) {
+  const departure = ATLAS_MARKERS_MS + index * MARKER_INTERVAL_MS;
+  const arrival = departure + MARKER_TRAVEL_MS;
+  return {
+    stage: elapsed < departure ? "waiting" : elapsed < arrival ? "traveling" : "landed",
+    travel: easeBetween(elapsed, departure, arrival),
+    glow: easeBetween(elapsed, arrival, arrival + 120) * (1 - easeBetween(elapsed, arrival + 135, arrival + 430)),
+  } as const;
 }
 
 export function cinematicDelta(previous: number, now: number, software = false) {

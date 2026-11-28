@@ -28,15 +28,22 @@ test("the 3D journey plays after sign-in and preserves navigation", async ({ pag
   }, WORKSPACE_TEST_USER_ID);
   await page.addInitScript(() => {
     const phases = new Set<string>();
-    const witness = new MutationObserver(() => {
+    const stops = new Set<string>();
+    const witness = new MutationObserver((changes) => {
       if (document.querySelector('[data-intro="true"]')) document.documentElement.dataset.testAtlasIntro = "observed";
       const phase = document.querySelector('[aria-labelledby="learning-journey-title"]')?.getAttribute("data-atlas");
       if (phase && !phases.has(phase)) {
         phases.add(phase);
         document.documentElement.dataset.testAtlasPhases = [...phases].join(",");
       }
+      for (const change of changes) {
+        if (change.attributeName !== "data-intro-stage" || !(change.target instanceof HTMLElement)) continue;
+        const { mode, introStage } = change.target.dataset;
+        if (mode && introStage && introStage !== "waiting") stops.add(`${mode}:${introStage}`);
+      }
+      if (stops.size) document.documentElement.dataset.testAtlasStops = [...stops].join(",");
     });
-    witness.observe(document, { attributes: true, attributeFilter: ["data-atlas", "data-intro"], childList: true, subtree: true });
+    witness.observe(document, { attributes: true, attributeFilter: ["data-atlas", "data-intro", "data-intro-stage"], childList: true, subtree: true });
   });
   await page.goto("/login", { waitUntil: "domcontentloaded" });
   await expect(page).toHaveURL(/\/dashboard$/);
@@ -58,7 +65,9 @@ test("the 3D journey plays after sign-in and preserves navigation", async ({ pag
   await expect(canvas).toBeVisible();
   const replay = scene.getByRole("button", { name: "Replay intro" });
   // This suite uses a CPU renderer. Real hardware timing is independent of its frame rate.
-  await expect(replay).toBeVisible({ timeout: 40_000 });
+  await expect(replay).toBeVisible({ timeout: 55_000 });
+  await expect(page.locator("html")).toHaveAttribute("data-test-atlas-stops",
+    "planning:traveling,planning:landed,study:traveling,study:landed,revision:traveling,revision:landed,exam:traveling,exam:landed");
   await page.reload();
   await expect(replay).toBeVisible({ timeout: 45_000 });
   await expect(skip).toHaveCount(0);
@@ -68,7 +77,7 @@ test("the 3D journey plays after sign-in and preserves navigation", async ({ pag
   const panel = scene.locator("#workspace-preview");
   await replay.click();
   await expect(skip).toBeVisible();
-  await expect(studio).toBeVisible();
+  await expect(studio.locator("..")).toHaveCSS("opacity", "0");
   await studio.press("Enter");
   await expect(panel.getByRole("heading", { name: "Study Lab", exact: true })).toBeFocused();
   await panel.getByRole("button", { name: "Back to Journey" }).click();

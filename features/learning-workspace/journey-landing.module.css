@@ -90,8 +90,22 @@
   gap: .25rem .45rem;
 }
 .page[data-atlas="ready"][data-intro] .waypoint {
-  position: static;
-  translate: none;
+  position: relative;
+  inset: auto;
+  translate: var(--intro-x, 0px) var(--intro-y, 0px);
+  opacity: var(--intro-reveal, 0);
+}
+.page[data-atlas="ready"][data-intro] .waypoint:is([data-intro-stage="landed"], :focus-within) { opacity: 1; }
+.page[data-atlas="ready"][data-intro] .waypoint:not([data-intro-stage="traveling"], [data-intro-stage="landed"], :focus-within) .pin {
+  pointer-events: none;
+}
+.page[data-atlas="ready"][data-intro] .waypoint[data-intro-stage="traveling"] {
+  z-index: 1;
+  will-change: translate, opacity;
+}
+.page[data-atlas="ready"][data-intro] .waypoint[data-intro-stage="landed"] .pin {
+  --pin-glow: calc(var(--pin-idle-glow, 48%) + var(--intro-glow, 0%));
+  transition: none;
 }
 .waypoint[data-mode="planning"] { --landmark-light: #70ecd0; --landmark-ink: #176052; }
 .waypoint[data-mode="study"] { --landmark-light: #83ddff; --landmark-ink: #195774; }

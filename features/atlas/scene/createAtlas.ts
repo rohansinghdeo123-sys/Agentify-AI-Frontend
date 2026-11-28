@@ -14,7 +14,7 @@ import { terrain } from "./terrain";
 import { atmosphere } from "./atmosphere";
 import { buildings, compass } from "./architecture";
 import { dressAtlas } from "./materials";
-import { ATLAS_FOCUS_MS, ATLAS_INTRO_MS, ATLAS_REVEAL_MS, atlasIntroFraming, atlasPixelRatio, cinematicDelta } from "./presentation";
+import { ATLAS_FOCUS_MS, ATLAS_INTRO_MS, ATLAS_REVEAL_MS, atlasIntroFraming, atlasIntroMarker, atlasPixelRatio, cinematicDelta } from "./presentation";
 
 export type AtlasOverview = { eye: Point; target: Point; aspect: number };
 
@@ -259,7 +259,7 @@ export function createAtlas(
   let atmosphereTime = 0;
   let masteredAt: number | null = null;
   let introElapsed: number | null = null;
-  let introFocus = 0;
+  let introStarts: { x: number; y: number }[] | null = null;
   let lastMotionFrame = 0;
   let slowMotionFrames = 0;
   let motionScale = 1;
@@ -306,13 +306,12 @@ export function createAtlas(
     if (!moveCamera) return;
     const sweep = T.MathUtils.smootherstep(progress, .12, .96);
     const framing = atlasIntroFraming(elapsed, sweep);
-    introFocus = framing.focus;
     camera.position.lerpVectors(introEye, homeEye, sweep);
     camera.position.y += Math.sin(Math.PI * sweep) * 1.25;
     target.lerpVectors(introTarget, homeTarget, sweep);
     // Move the focus off the book and toward the center of all four entrances.
-    target.x += introFocus * (camera.aspect <= .58 ? 2.0 : 1.55);
-    target.y += introFocus * (camera.aspect <= .58 ? .85 : 1.05);
+    target.x += framing.focus * (camera.aspect <= .58 ? 2.0 : 1.55);
+    target.y += framing.focus * (camera.aspect <= .58 ? .85 : 1.05);
     camera.position.sub(target).multiplyScalar(framing.distance).add(target);
     camera.lookAt(target);
   }
@@ -366,10 +365,16 @@ export function createAtlas(
       reward.material.opacity = .65 + .35 * Math.sin(Math.PI * pulse);
     }
     const lightEase = atmospheric ? 1 - Math.exp(-22 * frameSeconds) : 1;
-    const arrivalLight = .32 * introFocus;
+    const elapsed = introElapsed;
+    const markerFrames = elapsed !== null && elapsed >= ATLAS_REVEAL_MS
+      ? havens.map((_, index) => atlasIntroMarker(elapsed, index))
+      : null;
     havens.forEach((haven, index) => {
       const strength = index === selected ? 1 : index === hovered ? .9 : index === recommended ? .66 : .34;
-      const energy = T.MathUtils.lerp(landmarkEnergy[index], Math.min(1, strength + arrivalLight), lightEase);
+      const marker = markerFrames?.[index];
+      const arrival = elapsed === null ? strength
+        : marker?.stage === "landed" ? Math.max(strength, marker.glow) : .12;
+      const energy = T.MathUtils.lerp(landmarkEnergy[index], arrival, lightEase);
       landmarkEnergy[index] = energy;
       haven.setLighting(energy, atmosphereTime, air.daylight.value > 0);
       lamps[index].intensity = 15 + 21 * energy;
@@ -387,7 +392,7 @@ export function createAtlas(
       renderFailed();
       return;
     }
-    if (introElapsed === null) projectLabels();
+    if (introElapsed === null || markerFrames) projectLabels(markerFrames);
     if (introElapsed !== null || flight || atmospheric) invalidate();
   }
 
@@ -406,7 +411,16 @@ export function createAtlas(
     onAvailabilityChange(false);
   }
 
-  function projectLabels() {
+  function projectLabels(intro: ReturnType<typeof atlasIntroMarker>[] | null = null) {
+    if (intro && !introStarts) {
+      const tray = labels[0]?.parentElement;
+      if (!tray || surface.parentElement?.dataset.atlas !== "ready" || !surface.parentElement.dataset.intro) return;
+      // Layout offsets ignore the animated translation applied to each marker.
+      introStarts = labels.map((label) => ({
+        x: tray.offsetLeft + (label ? label.offsetLeft + label.offsetWidth / 2 : 0),
+        y: tray.offsetTop + (label ? label.offsetTop + label.offsetHeight / 2 : 0),
+      }));
+    }
     camera.updateMatrixWorld();
     world.updateWorldMatrix(true, false);
     const positions: { index: number; x: number; y: number }[] = [];
@@ -444,8 +458,22 @@ export function createAtlas(
       }
     }
     for (const { index, x, y } of positions) {
-      labels[index]?.style.setProperty("--atlas-x", x + "px");
-      labels[index]?.style.setProperty("--atlas-y", y + "px");
+      const label = labels[index];
+      if (!label) continue;
+      const frame = intro?.[index];
+      const start = introStarts?.[index];
+      if (frame && start) {
+        if (label.dataset.introStage !== frame.stage) label.dataset.introStage = frame.stage;
+        if (frame.stage === "waiting") continue;
+        const lift = Math.sin(Math.PI * frame.travel) * Math.min(42, Math.abs(y - start.y) * .16 + 8);
+        label.style.setProperty("--intro-x", (x - start.x) * frame.travel + "px");
+        label.style.setProperty("--intro-y", (y - start.y) * frame.travel - lift + "px");
+        label.style.setProperty("--intro-reveal", String(Math.min(1, frame.travel * 12)));
+        label.style.setProperty("--intro-glow", Math.round(frame.glow * 32) + "%");
+      } else {
+        label.style.setProperty("--atlas-x", x + "px");
+        label.style.setProperty("--atlas-y", y + "px");
+      }
     }
   }
 
@@ -467,6 +495,7 @@ export function createAtlas(
     width = surface.clientWidth;
     height = surface.clientHeight;
     if (!width || !height) return;
+    introStarts = null;
     pinWidth = labels[0]?.offsetWidth || 120;
     pinHeight = labels[0]?.offsetHeight || 48;
     const framing = overviewCamera(width, height);
@@ -523,6 +552,15 @@ export function createAtlas(
     selected = hovered = -1;
     previousOverview = null;
     introElapsed = 0;
+    introStarts = null;
+    for (const label of labels) {
+      if (!label) continue;
+      delete label.dataset.introStage;
+      label.style.removeProperty("--intro-x");
+      label.style.removeProperty("--intro-y");
+      label.style.removeProperty("--intro-reveal");
+      label.style.removeProperty("--intro-glow");
+    }
     lastMotionFrame = 0;
     controls.enabled = false;
     applyIntro(0);
@@ -534,7 +572,7 @@ export function createAtlas(
     introRequested = false;
     if (introElapsed === null) return;
     introElapsed = null;
-    introFocus = 0;
+    introStarts = null;
     lastMotionFrame = 0;
     applyIntro(ATLAS_INTRO_MS, moveCamera);
     updateLandmarkBounds();
