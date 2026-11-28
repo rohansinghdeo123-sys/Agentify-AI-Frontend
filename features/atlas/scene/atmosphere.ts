@@ -31,8 +31,8 @@ const skyFragment = `
     float aurora=exp(-abs(direction.y+.10-direction.x*.37)*5.);
     float veil=smoothstep(.76,1.25,haze)*(.21+aurora*.47);
     color=mix(color,vec3(.066,.37,.32),veil);
-    vec3 day=mix(vec3(.63,.79,.81),vec3(.94,.94,.86),horizon*.88);
-    day=mix(day,vec3(.54,.73,.75),veil*.65);
+    vec3 day=mix(vec3(.49,.70,.76),vec3(.94,.94,.86),horizon*.82);
+    day=mix(day,vec3(.50,.71,.75),veil*.58);
     gl_FragColor=sRGBTransferEOTF(vec4(mix(color,day,daylight),1.));
     #include <colorspace_fragment>
   }
@@ -87,6 +87,7 @@ export function atmosphere(parent: T.Scene, compact: boolean, redraw: () => void
   const starField = new T.Points(skyPoints, new T.PointsMaterial({
     size: .069, transparent: true, vertexColors: true, opacity: .72, depthWrite: false, fog: false,
   }));
+  starField.renderOrder = -3;
   group.add(starField);
   return {
     daylight,

@@ -4,12 +4,39 @@ import type { Point } from "./layout";
 type CloudShape = "ridge" | "crown" | "veil";
 type CloudBank = [shape: CloudShape, position: Point, width: number, height: number, opacity: number];
 
-const SUNLIT_CLOUD = 0xfff8eb;
-const MOONLIT_CLOUD = 0xe5f0ff;
+const CLOUD_LIGHT = {
+  day: { valley: 0xfff8eb, upper: 0xfffaf1, density: 1.50 },
+  night: { valley: 0xe5f0ff, upper: 0x91b2c2, density: 1.55 },
+};
 
-function cloudOpacity(opacity: number, daylight: boolean) {
-  return 1 - Math.pow(1 - opacity, daylight ? 1.22 : 1.55);
+function lightCloud(material: T.SpriteMaterial, opacity: number, upper: boolean, daylight: boolean) {
+  const light = daylight ? CLOUD_LIGHT.day : CLOUD_LIGHT.night;
+  material.color.setHex(upper ? light.upper : light.valley);
+  material.opacity = 1 - Math.pow(1 - opacity, light.density);
 }
+
+// The upper banks have their own distant lighting. Applying the valley fog
+// again at these depths flattens the sunlit caps into the surrounding sky.
+const WIDE_UPPER_BANKS: CloudBank[] = [
+  ["crown", [-45, 17.4, -57], 40, 14, .78],
+  ["ridge", [-28, 12.2, -62], 35, 11.2, .57],
+  ["veil", [-15, 21.2, -68], 34, 7.8, .48],
+  ["ridge", [9, 14.1, -66], 31, 7.9, .46],
+  ["crown", [30, 18.2, -64], 38, 13.5, .77],
+  ["ridge", [48, 13.9, -57], 37, 11.8, .71],
+  ["crown", [58, 20.6, -63], 34, 13, .64],
+  ["veil", [-58, 12, -51], 31, 6.8, .51],
+];
+
+const PORTRAIT_UPPER_BANKS: CloudBank[] = [
+  ["crown", [-25, 35, -40], 33, 13.3, .75],
+  ["ridge", [28, 36.5, -49], 36, 11.5, .72],
+  ["veil", [-7, 42, -51], 29, 8.2, .48],
+  ["crown", [-17, 20, -37], 23, 9.6, .64],
+  ["ridge", [19, 24, -42], 26, 9.8, .59],
+  ["veil", [-2, 24.5, -52], 24, 6.9, .46],
+  ["crown", [-28, 22.6, -33], 26, 10.5, .62],
+];
 
 // Loose banks bridge the distant ridges and the floating shelves. Their
 // irregular heights and intervening gaps keep the waterfalls and gates legible.
@@ -36,13 +63,6 @@ const VALLEY_BANKS: CloudBank[] = [
 ];
 
 const WIDE_BANKS: CloudBank[] = [
-  ["crown", [-39, 17.8, -55], 34, 11, .37],
-  ["veil", [-15, 21.5, -63], 32, 6.8, .34],
-  ["ridge", [17, 18.1, -62], 28, 7.8, .33],
-  ["crown", [43, 19.2, -57], 33, 10, .39],
-  ["veil", [-55, 13.7, -53], 28, 4.9, .3],
-  ["ridge", [55, 12.4, -53], 24, 7.2, .28],
-  ["veil", [39, 7.4, -40], 27, 4.6, .3],
   ["crown", [-40, -1.9, -13], 25, 8.2, .61],
   ["ridge", [-19, -4.8, 4.2], 24, 9.7, .83],
   ["crown", [-9.8, -5.8, 3.1], 16, 7.2, .62],
@@ -63,13 +83,6 @@ const OUTER_BANKS: CloudBank[] = [
 ];
 
 const PORTRAIT_BANKS: CloudBank[] = [
-  ["crown", [-27, 36, -45], 29, 9.2, .49],
-  ["ridge", [30, 37, -52], 34, 7.8, .45],
-  ["crown", [-17, 18.2, -37], 19, 8.1, .41],
-  ["ridge", [14, 22.1, -42], 22, 6.9, .38],
-  ["veil", [-2, 25.6, -49], 23, 6.2, .31],
-  ["veil", [-25, 28.5, -27], 16, 4.3, .34],
-  ["veil", [25, 23.5, -26], 17, 4.6, .40],
   ["crown", [-13.6, -.4, -8.6], 12.4, 6.2, .49],
   ["ridge", [13.4, .6, -9], 12.8, 5.6, .48],
   ["ridge", [-11, -5.1, 5.8], 13.1, 5.5, .75],
@@ -125,7 +138,7 @@ function cloudDeck(parent: T.Object3D) {
         vec3 night = mix(vec3(.095, .22, .255), vec3(.60, .73, .79), shade);
         vec3 day = mix(vec3(.44, .64, .66), vec3(.93, .95, .91), shade);
         float fade = 1. - smoothstep(51., 73., length(field * vec2(.91, 1.)));
-        float coverage = mix(.27 + density * .55, .235 + density * .52, daylight) * fade;
+        float coverage = mix(.27 + density * .55, .25 + density * .54, daylight) * fade;
         gl_FragColor = sRGBTransferEOTF(vec4(mix(night, day, daylight), coverage));
         #include <colorspace_fragment>
       }
@@ -154,7 +167,7 @@ export function clouds(group: T.Object3D, compact: boolean, redraw: () => void) 
   // turbulent 3D density field. Spatially separated cards preserve parallax
   // without ray marching full-screen pixels on low-power devices.
   function cloudMap(shape: CloudShape) {
-    const sprites: { material: T.SpriteMaterial; opacity: number }[] = [];
+    const sprites: { material: T.SpriteMaterial; opacity: number; upper: boolean }[] = [];
     let loaded = false;
     let settle!: () => void;
     textures.push(new Promise<void>((resolve) => { settle = resolve; }));
@@ -167,12 +180,13 @@ export function clouds(group: T.Object3D, compact: boolean, redraw: () => void) 
     map.colorSpace = T.SRGBColorSpace;
     return {
       sprites,
-      sprite(opacity: number) {
+      sprite(opacity: number, upper: boolean) {
         const material = new T.SpriteMaterial({
           map, transparent: true, depthWrite: false, alphaTest: .008,
-          visible: loaded, opacity: cloudOpacity(opacity, daylight), color: daylight ? SUNLIT_CLOUD : MOONLIT_CLOUD,
+          visible: loaded, fog: !upper, toneMapped: !upper,
         });
-        sprites.push({ material, opacity });
+        lightCloud(material, opacity, upper, daylight);
+        sprites.push({ material, opacity, upper });
         return new T.Sprite(material);
       },
     };
@@ -180,8 +194,8 @@ export function clouds(group: T.Object3D, compact: boolean, redraw: () => void) 
 
   const maps = { ridge: cloudMap("ridge"), crown: cloudMap("crown"), veil: cloudMap("veil") };
 
-  function place([shape, position, width, height, opacity]: CloudBank, parent = group) {
-    const sprite = maps[shape].sprite(opacity);
+  function place([shape, position, width, height, opacity]: CloudBank, parent = group, upper = false) {
+    const sprite = maps[shape].sprite(opacity, upper);
     sprite.position.set(...position);
     sprite.scale.set(width, height, 1);
     parent.add(sprite);
@@ -191,8 +205,10 @@ export function clouds(group: T.Object3D, compact: boolean, redraw: () => void) 
   const drifting = [
     ...VALLEY_BANKS.map((bank) => place(bank)),
     ...WIDE_BANKS.map((bank) => place(bank, wide)),
+    ...WIDE_UPPER_BANKS.map((bank) => place(bank, wide, true)),
     ...(compact ? [] : OUTER_BANKS.map((bank) => place(bank, wide))),
     ...PORTRAIT_BANKS.map((bank) => place(bank, portrait)),
+    ...PORTRAIT_UPPER_BANKS.map((bank) => place(bank, portrait, true)),
   ].map((sprite, index) => {
     const phase = index * 1.83;
     const amplitude = .17 + (index % 4) * .095;
@@ -205,9 +221,8 @@ export function clouds(group: T.Object3D, compact: boolean, redraw: () => void) 
       daylight = light;
       lowClouds.daylight.value = Number(light);
       for (const { sprites } of Object.values(maps)) {
-        for (const { material, opacity } of sprites) {
-          material.color.setHex(light ? SUNLIT_CLOUD : MOONLIT_CLOUD);
-          material.opacity = cloudOpacity(opacity, light);
+        for (const { material, opacity, upper } of sprites) {
+          lightCloud(material, opacity, upper, light);
         }
       }
     },
