@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { expectDistinctJourneyMarkers } from "./helpers/journeyMarkers";
 import { installWorkspaceMocks } from "./helpers/mockWorkspace";
 
 test.use({
@@ -75,16 +76,18 @@ test("the centered 3D journey loads without flashing fallback artwork and preser
     ["Revision", "Start a review", "/dashboard/revision"],
     ["Exam", "Open Exam", "/dashboard/exam"],
   ] as const;
-  await expect(markers.getByRole("button")).toHaveCount(4);
+  await expectDistinctJourneyMarkers(markers);
   const planning = markers.getByRole("button", { name: "Preview Planning" });
   await expect(planning.locator("..")).toHaveAttribute("style", /--atlas-x: /);
   if (!isMobile) {
     const start = await planning.boundingBox();
     const view = await canvas.boundingBox();
     if (!start || !view) throw new Error("Missing 3D overview bounds");
-    await page.mouse.move(view.x + view.width * .50, view.y + view.height * .58);
+    const dragOrigin = { x: view.x + view.width * .31, y: view.y + view.height * .58 };
+    expect(await canvas.evaluate((element, { x, y }) => document.elementFromPoint(x, y) === element, dragOrigin)).toBe(true);
+    await page.mouse.move(dragOrigin.x, dragOrigin.y);
     await page.mouse.down();
-    await page.mouse.move(view.x + view.width * .57, view.y + view.height * .56, { steps: 5 });
+    await page.mouse.move(dragOrigin.x + view.width * .07, dragOrigin.y - view.height * .02, { steps: 5 });
     await page.mouse.up();
     await expect.poll(async () => (await planning.boundingBox())?.x).not.toBe(start.x);
     await scene.getByRole("button", { name: "Reset view" }).click();
@@ -116,6 +119,12 @@ test("the centered 3D journey loads without flashing fallback artwork and preser
 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(replay).toHaveCount(0);
+  if (isMobile) {
+    const viewport = page.viewportSize()!;
+    await page.setViewportSize({ width: 320, height: 620 });
+    await expectDistinctJourneyMarkers(markers);
+    await page.setViewportSize(viewport);
+  }
   for (const [name, action, route] of destinations) {
     const marker = markers.getByRole("button", { name: `Preview ${name}` });
     await marker.click();

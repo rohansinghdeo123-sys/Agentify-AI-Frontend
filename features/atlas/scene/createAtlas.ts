@@ -168,9 +168,9 @@ export function createAtlas(
   bookRim.position.set(-10, 3, 4);
   scene.add(bookRim);
   const entranceLights = new T.Group();
-  const lamps = DESTINATIONS.map(({ site: [x, y, z] }) => {
+  const lamps = DESTINATIONS.map(({ site: [x, y, z] }, index) => {
     const entrance = new T.PointLight(0xffbe79, 15, 4.1, 2);
-    entrance.position.set(x, y + 1.15, z + 1.91);
+    entrance.position.set(x + plaqueOffsets[index].x, y + 1.44, z + 1.91);
     entranceLights.add(entrance);
     return entrance;
   });
@@ -270,6 +270,8 @@ export function createAtlas(
   let presented = false;
   let width = 0;
   let height = 0;
+  let pinWidth = 0;
+  let pinHeight = 0;
   let profileRise = 1;
   let resolution = 0;
   let orbiting = false;
@@ -361,11 +363,11 @@ export function createAtlas(
     const arrivalLight = introElapsed === null ? 0 : .18 * Math.sin(Math.PI *
       T.MathUtils.smoothstep(introElapsed, ATLAS_REVEAL_MS, ATLAS_INTRO_MS));
     havens.forEach((haven, index) => {
-      const strength = index === selected ? 1 : index === hovered ? .82 : index === recommended ? .60 : .16;
+      const strength = index === selected ? 1 : index === hovered ? .9 : index === recommended ? .66 : .34;
       const energy = T.MathUtils.lerp(landmarkEnergy[index], Math.min(1, strength + arrivalLight), lightEase);
       landmarkEnergy[index] = energy;
       haven.setLighting(energy, atmosphereTime, air.daylight.value > 0);
-      lamps[index].intensity = 13 + 19 * energy;
+      lamps[index].intensity = 15 + 21 * energy;
     });
     try {
       syncResolution(introElapsed !== null || flight !== null || orbiting);
@@ -403,15 +405,20 @@ export function createAtlas(
     camera.updateMatrixWorld();
     world.updateWorldMatrix(true, false);
     const positions: { index: number; x: number; y: number }[] = [];
-    const minY = 82;
+    const edgeX = pinWidth / 2 + 10;
+    const minY = Math.min(130, height * .31) + pinHeight / 2;
     const maxY = height - 44;
-    const labelSpacing = 48;
+    const labelSpacing = pinHeight + 6;
+    const narrowOverview = width / height <= .58 && selected < 0;
     for (let i = 0; i < anchors.length; i++) {
       projected.copy(anchors[i]).applyMatrix4(world.matrixWorld).project(camera);
+      const examBesidePortal = narrowOverview && DESTINATIONS[i].id === "exam";
+      const shiftX = examBesidePortal ? pinWidth / 2 + 25 : 0;
+      const shiftY = examBesidePortal ? -17 : narrowOverview && DESTINATIONS[i].id === "revision" ? 22 : 8;
       positions.push({
         index: i,
-        x: T.MathUtils.clamp((projected.x + 1) * width / 2, 58, width - 58),
-        y: T.MathUtils.clamp((1 - projected.y) * height / 2, minY, maxY),
+        x: T.MathUtils.clamp((projected.x + 1) * width / 2 - shiftX, edgeX, width - edgeX),
+        y: T.MathUtils.clamp((1 - projected.y) * height / 2 + shiftY, minY, maxY),
       });
     }
     if (selected < 0) {
@@ -419,7 +426,7 @@ export function createAtlas(
       for (const [i, point] of positions.entries()) {
         for (let before = 0; before < i; before++) {
           const other = positions[before];
-          if (Math.abs(other.x - point.x) < 112) point.y = Math.max(point.y, other.y + labelSpacing);
+          if (Math.abs(other.x - point.x) < pinWidth + 6) point.y = Math.max(point.y, other.y + labelSpacing);
         }
       }
       for (let i = positions.length - 1; i >= 0; i--) {
@@ -427,7 +434,7 @@ export function createAtlas(
         point.y = Math.min(point.y, maxY);
         for (let after = i + 1; after < positions.length; after++) {
           const other = positions[after];
-          if (Math.abs(other.x - point.x) < 112) point.y = Math.min(point.y, other.y - labelSpacing);
+          if (Math.abs(other.x - point.x) < pinWidth + 6) point.y = Math.min(point.y, other.y - labelSpacing);
         }
       }
     }
@@ -455,6 +462,8 @@ export function createAtlas(
     width = surface.clientWidth;
     height = surface.clientHeight;
     if (!width || !height) return;
+    pinWidth = labels[0]?.offsetWidth || 120;
+    pinHeight = labels[0]?.offsetHeight || 48;
     const framing = overviewCamera(width, height);
     const newPose = !homeEye.equals(projected.set(...framing.eye)) || profileRise !== framing.rise;
     const aspectChanged = Math.abs(camera.aspect - width / height) > .02;

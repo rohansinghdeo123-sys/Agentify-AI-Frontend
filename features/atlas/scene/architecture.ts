@@ -70,12 +70,12 @@ const portalFragment = `
     float a=atan(d.y, d.x);
     float glow=pow(clamp(radius,0.,1.), 5.);
     float ribbon=pow(.5+.5*sin(5.*a+9.*radius-phase), 4.);
-    float rim=smoothstep(.57, .99, radius);
+    float rim=smoothstep(.60, .97, radius);
     float litEdge=exp(-pow((radius-.87)*19., 2.));
-    vec3 center=mix(vec3(.013,.064,.069),accent*.143,.44);
-    vec3 color=mix(center,accent,rim*(.61+.22*energy)+glow*.16*ribbon);
-    vec3 edgeColor=mix(accent, vec3(1., .96, .88), .32);
-    color=mix(color,edgeColor,litEdge*(.43+.29*energy));
+    vec3 center=mix(vec3(.013,.052,.058),accent*.12,.40);
+    vec3 color=mix(center,accent,rim*(.70+.22*energy)+glow*.13*ribbon);
+    vec3 edgeColor=mix(accent, vec3(1., .96, .88), .38);
+    color=mix(color,edgeColor,litEdge*(.58+.24*energy));
     gl_FragColor=sRGBTransferEOTF(vec4(color,1.));
     #include <colorspace_fragment>
   }
@@ -88,8 +88,8 @@ const haloFragment = `
   uniform float daylight;
   void main() {
     float radius = length(vUv - .5) * 2.;
-    float spill = exp(-pow((radius - .64) * 7., 2.)) * (1. - smoothstep(.77, 1., radius));
-    gl_FragColor = sRGBTransferEOTF(vec4(accent,spill * (.24 + energy * .26 - daylight * .045)));
+    float spill = exp(-pow((radius - .58) * 6., 2.)) * (1. - smoothstep(.72, 1., radius));
+    gl_FragColor = sRGBTransferEOTF(vec4(accent,spill * (.30 + energy * .30 - daylight * .06)));
     #include <colorspace_fragment>
   }
 `;
@@ -107,9 +107,9 @@ function entranceLighting(id: Destination, lightColor: number) {
     pools.push({ material, night, day, response });
     return material;
   }
-  const inlay = lightSurface(emissive(0xb59a75, lightColor, .29), .49, .31, .85);
+  const inlay = lightSurface(emissive(0xb59a75, lightColor, .29), .57, .40, .85);
   inlay.color.lerp(color, .4);
-  const emblem = lightSurface(emissive(lightColor, lightColor, .83), .94, .73, .60);
+  const emblem = lightSurface(emissive(lightColor, lightColor, .83), 1.08, .9, .64);
   emblem.color.lerp(new T.Color(0xfff6e3), .39);
   return {
     lightColor,
@@ -180,7 +180,7 @@ function portal(group: T.Object3D, p: Palette, id: Destination, point: Point, li
   frame.name = id + " portal";
   group.add(frame);
   const { uniforms, inlay, emblem } = lighting;
-  mesh(frame, new T.PlaneGeometry(2.60, 2.60), new T.ShaderMaterial({
+  mesh(frame, new T.PlaneGeometry(2.80, 2.80), new T.ShaderMaterial({
     vertexShader: portalVertex, fragmentShader: haloFragment, uniforms,
     transparent: true, depthWrite: false, blending: T.AdditiveBlending,
   }), [0,0,.047]);
@@ -191,13 +191,14 @@ function portal(group: T.Object3D, p: Palette, id: Destination, point: Point, li
   }));
   ring(frame, p.bronze, .84, .091, [0, 0, .017]);
   ring(frame, p.gold, .825, .047, [0, 0, .073]);
-  ring(frame, emblem, .784, .023, [0, 0, .05]);
+  ring(frame, emblem, .784, .029, [0, 0, .05]);
   for (let i = 0; i < 16; i++) {
     const angle = i * Math.PI * 2 / 16;
     mesh(frame, new T.OctahedronGeometry(.032), inlay, [Math.cos(angle) * .875, Math.sin(angle) * .875, .062]);
   }
   const icon = new T.Group();
-  icon.position.z = .089;
+  icon.position.z = .101;
+  icon.scale.setScalar(id === "exam" ? 1.48 : 1.34);
   frame.add(icon);
   glyph(icon, emblem, id);
 }

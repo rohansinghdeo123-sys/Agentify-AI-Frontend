@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { expectDistinctJourneyMarkers } from "./helpers/journeyMarkers";
 import { installWorkspaceMocks } from "./helpers/mockWorkspace";
 
 test.use({ launchOptions: { args: ["--disable-webgl"] } });
@@ -40,7 +41,7 @@ for (const theme of ["light", "dark"] as const) {
     expect([...new Set(artworkLoads)]).toEqual([initialArtwork]);
     const panel = page.locator("#workspace-preview");
     const path = page.getByRole("list", { name: "Explore the learning path" });
-    await expect(path.getByRole("button")).toHaveCount(4);
+    await expectDistinctJourneyMarkers(path);
     await expect(path.getByRole("button", { name: "Preview Revision" })).toHaveAccessibleDescription("Suggested next step");
     await expect(panel).toHaveCount(0);
     await expect(scene.getByRole("heading")).toHaveCount(1);
@@ -106,13 +107,14 @@ for (const theme of ["light", "dark"] as const) {
     await page.screenshot({ path: testInfo.outputPath(`journey-${theme}.png`) });
     if (isMobile) {
       await page.setViewportSize({ width: 320, height: 620 });
-      for (const target of [...await utilities.getByRole("link").all(), ...await path.getByRole("button").all()]) {
+      await expectDistinctJourneyMarkers(path);
+      for (const target of await utilities.getByRole("link").all()) {
         const box = await target.boundingBox();
         expect(box && box.x >= 0 && box.x + box.width <= 320 && box.y >= 0 && box.y + box.height <= 620).toBe(true);
       }
     } else {
       await page.setViewportSize({ width: 900, height: 370 });
-      await expect(path.getByRole("button", { name: "Preview Exam" })).toBeInViewport({ ratio: 1 });
+      await expectDistinctJourneyMarkers(path);
     }
     expect(errors).toEqual([]);
 

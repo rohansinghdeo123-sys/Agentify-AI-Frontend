@@ -12,10 +12,10 @@ import styles from "./journey-landing.module.css";
 
 // Label anchors in the 1000 by 880 Atlas overview, used without WebGL.
 const WAYPOINTS = {
-  planning: { x: 68.3, y: 68.7, action: "Open Planning" },
-  study: { x: 49.9, y: 53.8, action: "Open Study Lab" },
-  revision: { x: 73.0, y: 44.5, action: "Start a review" },
-  exam: { x: 64.8, y: 34.6, action: "Open Exam" },
+  planning: { x: 68.3, y: 68.7, icon: "mission", action: "Open Planning" },
+  study: { x: 49.9, y: 53.8, icon: "book", action: "Open Study Lab" },
+  revision: { x: 73.0, y: 44.5, icon: "history", action: "Start a review" },
+  exam: { x: 64.8, y: 34.6, icon: "trophy", action: "Open Exam" },
 } as const;
 
 type JourneyReturn = { mode: LearningModeId; view?: AtlasOverview };
@@ -210,7 +210,8 @@ export default function LearningJourney({
                       atlas.current?.focus(step.id);
                     }
                   }}>
-                  <span className={styles.pinLabel} aria-hidden="true">
+                  <span className={styles.pinIcon} aria-hidden="true"><AppIcon name={point.icon} /></span>
+                  <span className={styles.pinCopy} aria-hidden="true">
                     {suggested && <span className={styles.nextCue}>{recommendation.basis === "setup" ? "Start" : "Next"}</span>}
                     {step.title}
                   </span>
