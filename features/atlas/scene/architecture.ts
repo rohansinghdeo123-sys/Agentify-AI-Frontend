@@ -131,12 +131,14 @@ function entranceLighting(id: Destination, lightColor: number) {
 type EntranceLighting = ReturnType<typeof entranceLighting>;
 
 function glyph(group: T.Object3D, line: T.MeshStandardMaterial, id: Destination) {
-  const trace = (points: Point[], radius = .021) => {
+  const trace = (points: Point[], radius = .027) => {
     const vectors = points.map((point) => new T.Vector3(...point));
     for (let i = 1; i < vectors.length; i++) rod(group, line, vectors[i - 1], vectors[i], radius);
+    const joints = new T.SphereGeometry(radius, 8, 6);
+    for (const point of points) mesh(group, joints, line, point);
   };
   if (id === "planning") {
-    trace([[-.23,.28,0],[-.31,.28,0],[-.31,-.32,0],[.30,-.32,0],[.30,.28,0],[.20,.28,0]], .027);
+    trace([[-.23,.28,0],[-.31,.28,0],[-.31,-.32,0],[.30,-.32,0],[.30,.28,0],[.20,.28,0]], .034);
     trace([[-.14,.30,0],[-.14,.40,0],[.14,.40,0],[.14,.25,0],[-.14,.25,0],[-.14,.30,0]]);
     for (const y of [.06,-.09,-.22]) {
       trace([[-.20,y,0],[-.15,y-.041,0],[-.105,y+.03,0]]);
@@ -144,7 +146,7 @@ function glyph(group: T.Object3D, line: T.MeshStandardMaterial, id: Destination)
     }
   } else if (id === "study") {
     for (const side of [-1, 1]) {
-      trace([[0,-.28,0],[side*.16,-.16,0],[side*.39,-.18,0],[side*.39,.24,0],[side*.18,.26,0],[0,.16,0],[0,-.28,0]], .027);
+      trace([[0,-.28,0],[side*.16,-.16,0],[side*.39,-.18,0],[side*.39,.24,0],[side*.18,.26,0],[0,.16,0],[0,-.28,0]], .034);
       for (const y of [.12,.019,-.082]) trace([[side*.08,y,0],[side*.20,y+.042,0],[side*.31,y+.03,0]]);
     }
   } else if (id === "revision") {
@@ -159,14 +161,14 @@ function glyph(group: T.Object3D, line: T.MeshStandardMaterial, id: Destination)
     ];
     for (const fold of folds) {
       const shape = new T.CatmullRomCurve3(fold.map((point) => new T.Vector3(...point)));
-      mesh(group, new T.TubeGeometry(shape, fold.length * 3, .018, 5, false), line);
+      mesh(group, new T.TubeGeometry(shape, fold.length * 4, .023, 8, false), line);
     }
   } else {
     const cup = new T.LatheGeometry([
       new T.Vector2(.18,-.3), new T.Vector2(.18,-.245), new T.Vector2(.065,-.225),
       new T.Vector2(.065,-.07), new T.Vector2(.12,-.035), new T.Vector2(.21,.09),
       new T.Vector2(.253,.24), new T.Vector2(.218,.24), new T.Vector2(.165,.095), new T.Vector2(0,-.076),
-    ], 24);
+    ], 40);
     mesh(group, cup, line, [0, 0, -.014]);
     ring(group, line, .14, .021, [-.245, .095, -.025]);
     ring(group, line, .14, .021, [.245, .095, -.025]);
@@ -184,7 +186,7 @@ function portal(group: T.Object3D, p: Palette, id: Destination, point: Point, li
     vertexShader: portalVertex, fragmentShader: haloFragment, uniforms,
     transparent: true, depthWrite: false, blending: T.AdditiveBlending,
   }), [0,0,.047]);
-  mesh(frame, new T.CircleGeometry(.79, 64), new T.ShaderMaterial({
+  mesh(frame, new T.CircleGeometry(.79, 80), new T.ShaderMaterial({
     vertexShader: portalVertex, fragmentShader: portalFragment,
     uniforms,
     side: T.DoubleSide,

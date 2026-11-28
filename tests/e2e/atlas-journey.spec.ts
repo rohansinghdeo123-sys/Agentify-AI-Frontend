@@ -1,14 +1,14 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { expectDistinctJourneyMarkers } from "./helpers/journeyMarkers";
-import { installWorkspaceMocks } from "./helpers/mockWorkspace";
+import { installWorkspaceMocks, WORKSPACE_TEST_USER_ID } from "./helpers/mockWorkspace";
 
 test.use({
   launchOptions: { args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] },
   trace: { mode: "retain-on-failure", screenshots: false, snapshots: true },
 });
 
-test("the centered 3D journey loads without flashing fallback artwork and preserves navigation", async ({ page, isMobile }, testInfo) => {
+test("the 3D journey plays after sign-in and preserves navigation", async ({ page, isMobile }, testInfo) => {
   test.setTimeout(150_000);
   const errors: string[] = [];
   const fallbackRequests: string[] = [];
@@ -21,6 +21,11 @@ test("the centered 3D journey loads without flashing fallback artwork and preser
     if (message.type() === "error" && /THREE\.|WebGL/.test(message.text())) errors.push(message.text());
   });
   await installWorkspaceMocks(page, "dark", { state: "ready" });
+  // Simulate signing in again in a tab that has seen the intro and saved a workspace return.
+  await page.evaluate((userId) => {
+    sessionStorage.setItem(`agentify-atlas-intro:${userId}`, "1");
+    sessionStorage.setItem(`agentify-atlas-return:${userId}`, JSON.stringify({ mode: "exam" }));
+  }, WORKSPACE_TEST_USER_ID);
   await page.addInitScript(() => {
     const phases = new Set<string>();
     const witness = new MutationObserver(() => {
@@ -33,13 +38,15 @@ test("the centered 3D journey loads without flashing fallback artwork and preser
     });
     witness.observe(document, { attributes: true, attributeFilter: ["data-atlas", "data-intro"], childList: true, subtree: true });
   });
-  await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
+  await page.goto("/login", { waitUntil: "domcontentloaded" });
+  await expect(page).toHaveURL(/\/dashboard$/);
   const scene = page.locator('section[aria-labelledby="learning-journey-title"]');
   const canvas = scene.locator("canvas");
   await expect(scene).toHaveAttribute("data-atlas", "ready", { timeout: 45_000 });
   const skip = scene.getByRole("button", { name: "Skip intro" });
   await expect(page.locator("html")).toHaveAttribute("data-test-atlas-phases", "loading,ready");
   await expect(page.locator("html")).toHaveAttribute("data-test-atlas-intro", "observed");
+  expect(await page.evaluate((userId) => sessionStorage.getItem(`agentify-atlas-return:${userId}`), WORKSPACE_TEST_USER_ID)).toBeNull();
   const heading = scene.getByRole("heading", { name: "Your Learning Journey" });
   await expect(heading).toHaveCSS("text-align", "center");
   const insights = page.getByRole("navigation", { name: "Learning insights" });
@@ -50,9 +57,10 @@ test("the centered 3D journey loads without flashing fallback artwork and preser
   expect(headingBox.y).toBeLessThan(125);
   await expect(canvas).toBeVisible();
   const replay = scene.getByRole("button", { name: "Replay intro" });
-  await expect(replay).toBeVisible();
+  // This suite uses a CPU renderer. Real hardware timing is independent of its frame rate.
+  await expect(replay).toBeVisible({ timeout: 40_000 });
   await page.reload();
-  await expect(replay).toBeVisible();
+  await expect(replay).toBeVisible({ timeout: 45_000 });
   await expect(skip).toHaveCount(0);
   await expect(page.locator("html")).not.toHaveAttribute("data-test-atlas-intro", "observed");
   const markers = scene.getByRole("list", { name: "Explore the learning path" });

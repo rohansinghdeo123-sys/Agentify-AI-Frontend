@@ -8,7 +8,7 @@ const SUNLIT_CLOUD = 0xfff8eb;
 const MOONLIT_CLOUD = 0xe5f0ff;
 
 function cloudOpacity(opacity: number, daylight: boolean) {
-  return daylight ? opacity : opacity + .44 * opacity * (1 - opacity);
+  return 1 - Math.pow(1 - opacity, daylight ? 1.22 : 1.55);
 }
 
 // Loose banks bridge the distant ridges and the floating shelves. Their
@@ -19,6 +19,8 @@ const VALLEY_BANKS: CloudBank[] = [
   ["veil", [-7, 1.2, -35], 19, 4.0, .34],
   ["ridge", [14, 1.1, -38], 25, 6.2, .53],
   ["crown", [37, 3.2, -47], 26, 10.5, .59],
+  ["crown", [-24, 6.4, -43], 24, 9.6, .43],
+  ["ridge", [25, 6.8, -45], 23, 7.2, .46],
   ["crown", [-30, .85, -24], 21, 10.2, .63],
   ["ridge", [-20, -1.4, -17], 19, 7.3, .72],
   ["veil", [-11, -.65, -18.4], 17, 4.3, .61],
@@ -29,9 +31,15 @@ const VALLEY_BANKS: CloudBank[] = [
   ["veil", [-8.3, -2.7, -3.6], 11.7, 3.4, .48],
   ["veil", [12, -2.7, -4.1], 13.1, 4.2, .56],
   ["crown", [24, -3.05, -3.1], 23, 8.7, .75],
+  ["ridge", [-20, -3.8, .4], 19, 6.1, .54],
+  ["crown", [18.6, -4.1, 1.6], 16, 6.8, .53],
 ];
 
 const WIDE_BANKS: CloudBank[] = [
+  ["crown", [-39, 17.8, -55], 34, 11, .37],
+  ["veil", [-15, 21.5, -63], 32, 6.8, .34],
+  ["ridge", [17, 18.1, -62], 28, 7.8, .33],
+  ["crown", [43, 19.2, -57], 33, 10, .39],
   ["veil", [-55, 13.7, -53], 28, 4.9, .3],
   ["ridge", [55, 12.4, -53], 24, 7.2, .28],
   ["veil", [39, 7.4, -40], 27, 4.6, .3],
@@ -41,22 +49,37 @@ const WIDE_BANKS: CloudBank[] = [
   ["veil", [-.6, -5.6, 1.8], 26, 5.6, .48],
   ["ridge", [13.2, -5.55, 5], 21, 7.5, .77],
   ["crown", [27.5, -5, 7], 22, 8.7, .68],
+  ["crown", [-26, -6.5, 12], 21, 7.6, .68],
+  ["ridge", [-8.8, -8.6, 13.1], 18, 7.8, .52],
+  ["crown", [9.2, -8.8, 13.4], 18, 7.6, .59],
+  ["ridge", [26, -6.9, 13.3], 20, 8.6, .66],
 ];
 
 const OUTER_BANKS: CloudBank[] = [
   ["veil", [-36, 8.4, -36], 21, 4.1, .27],
   ["ridge", [41, -2.6, -9], 25, 7.3, .58],
+  ["crown", [-45, -1.8, -6], 26, 11, .57],
+  ["veil", [48, 3.1, -20], 29, 6.2, .44],
 ];
 
 const PORTRAIT_BANKS: CloudBank[] = [
+  ["crown", [-27, 36, -45], 29, 9.2, .49],
+  ["ridge", [30, 37, -52], 34, 7.8, .45],
+  ["crown", [-17, 18.2, -37], 19, 8.1, .41],
+  ["ridge", [14, 22.1, -42], 22, 6.9, .38],
+  ["veil", [-2, 25.6, -49], 23, 6.2, .31],
   ["veil", [-25, 28.5, -27], 16, 4.3, .34],
   ["veil", [25, 23.5, -26], 17, 4.6, .40],
+  ["crown", [-13.6, -.4, -8.6], 12.4, 6.2, .49],
+  ["ridge", [13.4, .6, -9], 12.8, 5.6, .48],
   ["ridge", [-11, -5.1, 5.8], 13.1, 5.5, .75],
   ["crown", [11, -5.1, 5.4], 14.5, 6.6, .68],
   ["veil", [-3, -7.3, 8.5], 21, 6.4, .56],
   ["crown", [-8, -8.5, 11.2], 14, 6.8, .64],
   ["ridge", [8, -8.2, 13.8], 15.7, 7.8, .65],
   ["veil", [1.8, -10, 13.3], 19.8, 5.2, .50],
+  ["crown", [-5.7, -7, 13.9], 14, 6.8, .61],
+  ["ridge", [6.8, -7.5, 14.5], 14.8, 7.4, .62],
 ];
 
 function cloudDeck(parent: T.Object3D) {
@@ -97,12 +120,12 @@ function cloudDeck(parent: T.Object3D) {
         vec2 p = field * vec2(.12, .155) + vec2(time * .025, -time * .011);
         float broad = noise(p);
         float curls = noise(p * 2.18 + broad * .85) * .27 + noise(p * 4.5 - .4) * .09;
-        float density = smoothstep(mix(.16, .21, daylight), mix(.79, .86, daylight), broad * .67 + curls);
+        float density = smoothstep(mix(.135, .175, daylight), mix(.78, .83, daylight), broad * .67 + curls);
         float shade = clamp(.18 + density * .76 + (broad - noise(p + vec2(.27, -.21))) * .63, 0., 1.);
         vec3 night = mix(vec3(.095, .22, .255), vec3(.60, .73, .79), shade);
         vec3 day = mix(vec3(.44, .64, .66), vec3(.93, .95, .91), shade);
         float fade = 1. - smoothstep(51., 73., length(field * vec2(.91, 1.)));
-        float coverage = mix(.245 + density * .53, .21 + density * .48, daylight) * fade;
+        float coverage = mix(.27 + density * .55, .235 + density * .52, daylight) * fade;
         gl_FragColor = sRGBTransferEOTF(vec4(mix(night, day, daylight), coverage));
         #include <colorspace_fragment>
       }

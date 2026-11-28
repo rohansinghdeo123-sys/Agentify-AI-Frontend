@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { ATLAS_INTRO_MS, ATLAS_REVEAL_MS, atlasIntroDolly, atlasPixelRatio, cinematicDelta } from "@/features/atlas/scene/presentation";
+import { ATLAS_INTRO_MS, ATLAS_REVEAL_MS, atlasIntroFraming, atlasPixelRatio, cinematicDelta } from "@/features/atlas/scene/presentation";
 
 describe("Atlas presentation", () => {
-  it("gently closes in on the overview after the book and landmarks are revealed", () => {
-    expect(atlasIntroDolly(0, 0)).toBe(1);
-    expect(atlasIntroDolly(ATLAS_REVEAL_MS, 1)).toBeCloseTo(1.068);
-    expect(atlasIntroDolly((ATLAS_INTRO_MS + ATLAS_REVEAL_MS) / 2, 1)).toBeCloseTo(1.034);
-    expect(atlasIntroDolly(ATLAS_INTRO_MS, 1)).toBe(1);
+  it("pushes in after the book opens, holds on the destinations, then settles at the overview", () => {
+    expect(atlasIntroFraming(0, 0)).toEqual({ distance: 1, focus: 0 });
+    expect(atlasIntroFraming(ATLAS_REVEAL_MS, 1)).toEqual({ distance: 1.07, focus: 0 });
+    expect(atlasIntroFraming(ATLAS_REVEAL_MS + 360, 1).distance).toBeCloseTo(.925);
+    expect(atlasIntroFraming(ATLAS_REVEAL_MS + 720, 1)).toEqual({ distance: .78, focus: 1 });
+    expect(atlasIntroFraming(ATLAS_REVEAL_MS + 960, 1)).toEqual({ distance: .78, focus: 1 });
+    expect(atlasIntroFraming(ATLAS_INTRO_MS - 340, 1).distance).toBeCloseTo(.89);
+    expect(atlasIntroFraming(ATLAS_INTRO_MS, 1)).toEqual({ distance: 1, focus: 0 });
   });
 
   it("keeps native resolution for 4K and high-density portrait views at rest", () => {

@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
 import ChatThinkingLogo from "@/components/brand/ChatThinkingLogo";
 import { AlertState, AppIcon } from "@/components/ui/Polished";
+import { prepareJourneyAfterSignIn } from "@/features/learning-workspace/journeySession";
 import { primeBackend } from "@/lib/apiClient";
 import { readOtpInputDigits } from "@/lib/otpInput";
 
@@ -218,6 +219,7 @@ export default function LoginPage() {
   const formattedPhone = useMemo(() => normalizePhoneNumber(phoneNumber), [phoneNumber]);
   const signInBlocked = Boolean(authSetupError);
   const granted = Boolean(user && !signInBlocked && !sessionExpired);
+  const signedInUserId = granted ? user?.uid : undefined;
   const visibleAuthError =
     authSetupError ||
     authStartupMessage ||
@@ -229,8 +231,10 @@ export default function LoginPage() {
   }, [backendURL]);
 
   useEffect(() => {
-    if (granted) router.replace("/dashboard");
-  }, [granted, router]);
+    if (!signedInUserId) return;
+    prepareJourneyAfterSignIn(signedInUserId);
+    router.replace("/dashboard");
+  }, [signedInUserId, router]);
 
   useEffect(() => {
     if (authError) {

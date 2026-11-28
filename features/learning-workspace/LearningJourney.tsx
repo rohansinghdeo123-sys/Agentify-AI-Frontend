@@ -6,17 +6,25 @@ import type { PlanningPortfolioProgress } from "@/features/planning/contracts";
 import Link from "next/link";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { LEARNING_WORKSPACE_STEPS } from "./config";
+import { journeySessionKeys } from "./journeySession";
 import { recommendLearningWorkspace, type LearningRecommendation } from "./recommendation";
 import type { LearningModeId } from "./types";
 import styles from "./journey-landing.module.css";
 
 // Label anchors in the 1000 by 880 Atlas overview, used without WebGL.
 const WAYPOINTS = {
-  planning: { x: 68.3, y: 68.7, icon: "mission", action: "Open Planning" },
-  study: { x: 49.9, y: 53.8, icon: "book", action: "Open Study Lab" },
-  revision: { x: 73.0, y: 44.5, icon: "history", action: "Start a review" },
-  exam: { x: 64.8, y: 34.6, icon: "trophy", action: "Open Exam" },
+  planning: { x: 68.3, y: 68.7, action: "Open Planning" },
+  study: { x: 49.9, y: 53.8, action: "Open Study Lab" },
+  revision: { x: 73.0, y: 44.5, action: "Start a review" },
+  exam: { x: 64.8, y: 34.6, action: "Open Exam" },
 } as const;
+
+const WAYPOINT_GLYPHS: Record<LearningModeId, string> = {
+  planning: "M9 4H6a1.5 1.5 0 0 0-1.5 1.5v14A1.5 1.5 0 0 0 6 21h12a1.5 1.5 0 0 0 1.5-1.5v-14A1.5 1.5 0 0 0 18 4h-3 M9 3h6v3H9z M7.5 10l1 1 1.5-1.6m-2.5 5.5 1 1 1.5-1.6M13 10.5h3.5M13 15.5h3.5",
+  study: "M12 5.8C9.9 4.1 6.8 3.7 3 4.5v14c3.8-.8 6.9-.4 9 1.2 2.1-1.6 5.2-2 9-1.2v-14c-3.8-.8-6.9-.4-9 1.3v13.9 M6 9.1c1.2 0 2.3.2 3.2.6M6 13.1c1.2 0 2.3.2 3.2.6m5.6-4c1-.4 2-.6 3.2-.6m-3.2 4.6c1-.4 2-.6 3.2-.6",
+  revision: "M12 5.4a3.1 3.1 0 0 0-5.7-1.7 3.4 3.4 0 0 0-2.5 5.2 3.5 3.5 0 0 0 0 5.8 3.4 3.4 0 0 0 2.5 5.2 3.1 3.1 0 0 0 5.7-1.7V5.4Zm0 0a3.1 3.1 0 0 1 5.7-1.7 3.4 3.4 0 0 1 2.5 5.2 3.5 3.5 0 0 1 0 5.8 3.4 3.4 0 0 1-2.5 5.2 3.1 3.1 0 0 1-5.7-1.7M8.5 7.5c0 1.2-.8 2.2-2.1 2.5m2.1 6.5c0-1.2-.8-2.2-2.1-2.5m9.1-6.5c0 1.2.8 2.2 2.1 2.5m-2.1 6.5c0-1.2.8-2.2 2.1-2.5",
+  exam: "M7 3.5h10v5a5 5 0 0 1-10 0v-5ZM7 6H3v1.5a4 4 0 0 0 4 4m10-5.5h4v1.5a4 4 0 0 1-4 4M12 14v5m-4.5 1.5h9",
+};
 
 type JourneyReturn = { mode: LearningModeId; view?: AtlasOverview };
 
@@ -59,7 +67,7 @@ export default function LearningJourney({
   const recommended = active?.id === recommendation.mode;
   const mastered = !!progress?.total_units && progress.mastered_units === progress.total_units;
   const atlasReady = atlasPhase === "ready";
-  const returnKey = `agentify-atlas-return:${userId ?? "learner"}`;
+  const { intro: introKey, return: returnKey } = journeySessionKeys(userId);
 
   useEffect(() => {
     if (choice) previewHeading.current?.focus({ preventScroll: true });
@@ -77,8 +85,12 @@ export default function LearningJourney({
     let focusFrame = 0;
     const root = document.documentElement;
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const key = `agentify-atlas-intro:${userId ?? "learner"}`;
     let returning = readJourneyReturn(returnKey);
+    let introStarted = false;
+    let presented = false;
+    function rememberIntro() {
+      try { sessionStorage.setItem(introKey, "1"); } catch { /* Storage is optional. */ }
+    }
     function restoreFocus() {
       const saved = returning;
       if (!saved) return;
@@ -110,7 +122,14 @@ export default function LearningJourney({
         if (!available) setPlaying(false);
         restoreFocus();
       }, {
-        onIntroChange: setPlaying,
+        onIntroChange(playing) {
+          if (cancelled) return;
+          if (playing) {
+            introStarted = true;
+            if (presented) rememberIntro();
+          }
+          setPlaying(playing);
+        },
         onSelect(id) {
           const index = LEARNING_WORKSPACE_STEPS.findIndex((step) => step.id === id);
           opener.current = buttons.current[index];
@@ -123,13 +142,12 @@ export default function LearningJourney({
       const reduce = syncPreferences();
       if (selected.current) {
         runtime.focus(selected.current);
-      } else if (returning?.view) {
-        runtime.restoreOverview(returning.view);
+      } else if (returning) {
+        if (returning.view) runtime.restoreOverview(returning.view);
       } else if (!reduce) {
         let played = false;
         try {
-          played = !!sessionStorage.getItem(key);
-          if (!played) sessionStorage.setItem(key, "1");
+          played = !!sessionStorage.getItem(introKey);
         } catch {
           // Replay stays available when a browser blocks session storage.
         }
@@ -137,6 +155,8 @@ export default function LearningJourney({
       }
       const available = await runtime.ready;
       if (!cancelled) {
+        presented = available;
+        if (presented && introStarted) rememberIntro();
         setAtlasPhase(available ? "ready" : "fallback");
         restoreFocus();
       }
@@ -154,7 +174,7 @@ export default function LearningJourney({
       atlas.current?.dispose();
       atlas.current = null;
     };
-  }, [returnKey, userId]);
+  }, [introKey, returnKey]);
 
   const closePreview = () => {
     selected.current = null;
@@ -210,7 +230,9 @@ export default function LearningJourney({
                       atlas.current?.focus(step.id);
                     }
                   }}>
-                  <span className={styles.pinIcon} aria-hidden="true"><AppIcon name={point.icon} /></span>
+                  <span className={styles.pinIcon} aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d={WAYPOINT_GLYPHS[step.id]} /></svg>
+                  </span>
                   <span className={styles.pinCopy} aria-hidden="true">
                     {suggested && <span className={styles.nextCue}>{recommendation.basis === "setup" ? "Start" : "Next"}</span>}
                     {step.title}

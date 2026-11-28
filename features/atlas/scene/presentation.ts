@@ -1,11 +1,18 @@
 export const ATLAS_REVEAL_MS = 2240;
-export const ATLAS_INTRO_MS = ATLAS_REVEAL_MS + 560;
+const ATLAS_ARRIVAL_MS = ATLAS_REVEAL_MS + 720;
+const ATLAS_SETTLE_MS = ATLAS_ARRIVAL_MS + 320;
+export const ATLAS_INTRO_MS = ATLAS_SETTLE_MS + 680;
 export const ATLAS_FOCUS_MS = 540;
 
-export function atlasIntroDolly(elapsed: number, overviewBlend: number) {
-  const time = Math.min(1, Math.max(0, (elapsed - ATLAS_REVEAL_MS) / (ATLAS_INTRO_MS - ATLAS_REVEAL_MS)));
-  const eased = time * time * (3 - 2 * time);
-  return 1 + .068 * overviewBlend * (1 - eased);
+function easeBetween(elapsed: number, start: number, end: number) {
+  const time = Math.min(1, Math.max(0, (elapsed - start) / (end - start)));
+  return time * time * time * (time * (time * 6 - 15) + 10);
+}
+
+export function atlasIntroFraming(elapsed: number, overviewBlend: number) {
+  const approach = easeBetween(elapsed, ATLAS_REVEAL_MS, ATLAS_ARRIVAL_MS);
+  const focus = approach * (1 - easeBetween(elapsed, ATLAS_SETTLE_MS, ATLAS_INTRO_MS));
+  return { focus, distance: 1 + .07 * overviewBlend * (1 - approach) - .22 * focus };
 }
 
 export function cinematicDelta(previous: number, now: number, software = false) {

@@ -14,7 +14,7 @@ import { terrain } from "./terrain";
 import { atmosphere } from "./atmosphere";
 import { buildings, compass } from "./architecture";
 import { dressAtlas } from "./materials";
-import { ATLAS_FOCUS_MS, ATLAS_INTRO_MS, ATLAS_REVEAL_MS, atlasIntroDolly, atlasPixelRatio, cinematicDelta } from "./presentation";
+import { ATLAS_FOCUS_MS, ATLAS_INTRO_MS, ATLAS_REVEAL_MS, atlasIntroFraming, atlasPixelRatio, cinematicDelta } from "./presentation";
 
 export type AtlasOverview = { eye: Point; target: Point; aspect: number };
 
@@ -259,6 +259,7 @@ export function createAtlas(
   let atmosphereTime = 0;
   let masteredAt: number | null = null;
   let introElapsed: number | null = null;
+  let introFocus = 0;
   let lastMotionFrame = 0;
   let slowMotionFrames = 0;
   let motionScale = 1;
@@ -304,10 +305,15 @@ export function createAtlas(
     gutter.intensity = 12 + wick * (11 + 20 * Math.sin(Math.PI * light));
     if (!moveCamera) return;
     const sweep = T.MathUtils.smootherstep(progress, .12, .96);
+    const framing = atlasIntroFraming(elapsed, sweep);
+    introFocus = framing.focus;
     camera.position.lerpVectors(introEye, homeEye, sweep);
     camera.position.y += Math.sin(Math.PI * sweep) * 1.25;
     target.lerpVectors(introTarget, homeTarget, sweep);
-    camera.position.sub(target).multiplyScalar(atlasIntroDolly(elapsed, sweep)).add(target);
+    // Move the focus off the book and toward the center of all four entrances.
+    target.x += introFocus * (camera.aspect <= .58 ? 2.0 : 1.55);
+    target.y += introFocus * (camera.aspect <= .58 ? .85 : 1.05);
+    camera.position.sub(target).multiplyScalar(framing.distance).add(target);
     camera.lookAt(target);
   }
 
@@ -328,7 +334,7 @@ export function createAtlas(
     }
     if (introElapsed !== null) {
       // Catch up on slow frames without skipping the arrival after a GPU stall.
-      introElapsed += Math.min(frameGap, 160);
+      introElapsed += Math.min(frameGap, software ? 240 : 160);
       if (introElapsed >= ATLAS_INTRO_MS) finishIntro();
       else applyIntro(introElapsed);
     }
@@ -360,8 +366,7 @@ export function createAtlas(
       reward.material.opacity = .65 + .35 * Math.sin(Math.PI * pulse);
     }
     const lightEase = atmospheric ? 1 - Math.exp(-22 * frameSeconds) : 1;
-    const arrivalLight = introElapsed === null ? 0 : .18 * Math.sin(Math.PI *
-      T.MathUtils.smoothstep(introElapsed, ATLAS_REVEAL_MS, ATLAS_INTRO_MS));
+    const arrivalLight = .32 * introFocus;
     havens.forEach((haven, index) => {
       const strength = index === selected ? 1 : index === hovered ? .9 : index === recommended ? .66 : .34;
       const energy = T.MathUtils.lerp(landmarkEnergy[index], Math.min(1, strength + arrivalLight), lightEase);
@@ -529,6 +534,7 @@ export function createAtlas(
     introRequested = false;
     if (introElapsed === null) return;
     introElapsed = null;
+    introFocus = 0;
     lastMotionFrame = 0;
     applyIntro(ATLAS_INTRO_MS, moveCamera);
     updateLandmarkBounds();
